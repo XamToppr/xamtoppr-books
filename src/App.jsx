@@ -573,21 +573,15 @@ export default function App() {
             <a href="tel:+917717707121" className="flex items-center gap-1.5 hover:text-white transition">
               <Phone className="w-3.5 h-3.5 text-slate-400" /> Student Helpline: +91 77177 07121
             </a>
-            <a href="mailto:support@xamtoppr.com" className="hidden lg:flex items-center gap-1.5 hover:text-white transition">
-              <Mail className="w-3.5 h-3.5 text-slate-400" /> support@xamtoppr.com
+            <a href="mailto:xamtoppt@gmail.com" className="hidden lg:flex items-center gap-1.5 hover:text-white transition">
+              <Mail className="w-3.5 h-3.5 text-slate-400" /> xamtoppr@gmail.com
             </a>
           </div>
           <div className="flex items-center gap-4">
             <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded text-[11px] font-semibold">
               2026 Updated Syllabus
             </span>
-            <button
-              onClick={() => showToast('Opening XamToppr Android App on Google Play Store')}
-              className="text-slate-300 hover:text-white flex items-center gap-1 font-medium transition"
-            >
-              Get Android App <ExternalLink className="w-3 h-3" />
-            </button>
-          </div>
+                      </div>
         </div>
       </div>
 
@@ -614,69 +608,51 @@ export default function App() {
               </div>
             </div>
 
+            {/* Desktop Navigation Links */}
             <nav className="hidden lg:flex items-center gap-1 xl:gap-2 text-sm font-medium">
-              <button
-                onClick={() => { setActiveTab('home'); showToast('Navigated to XamToppr Home'); }}
-                className={`px-3.5 py-2 rounded-lg transition ${
-                  activeTab === 'home'
-                    ? 'text-amber-400 font-semibold bg-white/10'
-                    : 'text-slate-200 hover:text-white hover:bg-white/5'
-                }`}
+              <a
+                href="https://www.xamtoppr.com/"
+                className="px-3.5 py-2 rounded-lg text-slate-200 hover:text-white hover:bg-white/5 transition"
               >
                 Home
-              </button>
-              <button
-                onClick={() => { setActiveTab('courses'); showToast('Navigated to Video Courses'); }}
-                className={`px-3.5 py-2 rounded-lg transition ${
-                  activeTab === 'courses'
-                    ? 'text-amber-400 font-semibold bg-white/10'
-                    : 'text-slate-200 hover:text-white hover:bg-white/5'
-                }`}
+              </a>
+              <a
+                href="https://xamtoppr.com/video"
+                className="px-3.5 py-2 rounded-lg text-slate-200 hover:text-white hover:bg-white/5 transition"
               >
                 Courses
-              </button>
-              <button
-                onClick={() => { setActiveTab('test-series'); showToast('Navigated to Online Mock Tests'); }}
-                className={`px-3.5 py-2 rounded-lg transition ${
-                  activeTab === 'test-series'
-                    ? 'text-amber-400 font-semibold bg-white/10'
-                    : 'text-slate-200 hover:text-white hover:bg-white/5'
-                }`}
+              </a>
+              <a
+                href="https://xamtoppr.com/package/combo"
+                className="px-3.5 py-2 rounded-lg text-slate-200 hover:text-white hover:bg-white/5 transition"
               >
                 Test Series
-              </button>
-              <button
-                onClick={() => setActiveTab('books')}
-                className={`px-3.5 py-2 rounded-lg relative flex items-center gap-1.5 transition ${
-                  activeTab === 'books'
-                    ? 'text-amber-400 font-bold bg-white/15 shadow-inner'
-                    : 'text-slate-200 hover:text-white hover:bg-white/5'
-                }`}
+              </a>
+              <a
+                href="/"
+                className="px-3.5 py-2 rounded-lg relative flex items-center gap-1.5 text-amber-400 font-bold bg-white/15 shadow-inner"
               >
                 <BookOpen className="w-4 h-4 text-amber-400" />
                 <span>Books & Notes</span>
                 <span className="bg-amber-500 text-slate-950 font-extrabold text-[10px] px-1.5 py-0.2 rounded-full uppercase">
                   Free
                 </span>
-              </button>
-              <button
-                onClick={() => { setActiveTab('current-affairs'); showToast('Navigated to Daily Current Affairs'); }}
-                className={`px-3.5 py-2 rounded-lg transition ${
-                  activeTab === 'current-affairs'
-                    ? 'text-amber-400 font-semibold bg-white/10'
-                    : 'text-slate-200 hover:text-white hover:bg-white/5'
-                }`}
+              </a>
+              <a
+                href="https://xamtoppr.com/weekly-quiz"
+                className="px-3.5 py-2 rounded-lg text-slate-200 hover:text-white hover:bg-white/5 transition"
               >
                 Current Affairs
-              </button>
-              <button
-                onClick={() => { setActiveTab('pyq'); showToast('Navigated to Previous Year Papers'); }}
+              </a>
+              <a
+                href="https://xamtoppr.com/blog"
                 className="px-3.5 py-2 rounded-lg text-slate-200 hover:text-white hover:bg-white/5 transition"
               >
                 PYQ Papers
-              </button>
+              </a>
             </nav>
 
+            {/* Auth CTAs */}
             <div className="hidden sm:flex items-center gap-3">
               <button
                 onClick={() => setShowRequestBookModal(true)}
@@ -684,18 +660,18 @@ export default function App() {
               >
                 <FileText className="w-3.5 h-3.5 text-amber-400" /> Request Book
               </button>
-              <button
-                onClick={() => showToast('Opening Login Modal')}
+              <a
+                href="https://xamtoppr.com/signin"
                 className="text-sm font-medium text-white hover:text-amber-400 px-3 py-2 transition"
               >
                 Log In
-              </button>
-              <button
-                onClick={() => showToast('Opening Registration Form')}
+              </a>
+              <a
+                href="https://xamtoppr.com/signup"
                 className="text-sm font-semibold bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 px-4 py-2 rounded-lg shadow-md transition transform active:scale-95"
               >
                 Sign Up Free
-              </button>
+              </a>
             </div>
 
             <div className="lg:hidden flex items-center gap-2">
