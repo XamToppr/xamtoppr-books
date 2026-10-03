@@ -1524,11 +1524,11 @@ export default function App() {
                 </div>
                 <div className="flex items-center gap-2.5">
                   <Phone className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>Toll-Free Helpline: +91 8800 123 456 / +91 11-4567-8900</span>
+                  <span>Toll-Free Helpline: +91 7717707121</span>
                 </div>
                 <div className="flex items-center gap-2.5">
                   <Mail className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>Official Support: support@xamtoppr.com | helpdesk@xamtoppr.com</span>
+                  <span>Official Support: xamtoppr@gmail.com </span>
                 </div>
               </div>
             </div>
