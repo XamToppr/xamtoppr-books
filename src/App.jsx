@@ -1579,12 +1579,39 @@ export default function App() {
           <div className="mt-12 pt-6 border-t border-blue-950/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
             <div className="flex items-center gap-4">
               <span className="text-slate-400 font-semibold">Connect with us:</span>
-              <button onClick={() => showToast('Opening XamToppr YouTube')} className="text-slate-400 hover:text-white transition font-medium">YouTube</button>
-              <button onClick={() => showToast('Opening XamToppr Telegram')} className="text-slate-400 hover:text-white transition font-medium">Telegram</button>
-              <button onClick={() => showToast('Opening XamToppr Facebook')} className="text-slate-400 hover:text-white transition font-medium">Facebook</button>
-              <button onClick={() => showToast('Opening XamToppr Instagram')} className="text-slate-400 hover:text-white transition font-medium">Instagram</button>
-              <button onClick={() => showToast('Opening XamToppr X (Twitter)')} className="text-slate-400 hover:text-white transition font-medium">X (Twitter)</button>
-            </div>
+              <a 
+                href="https://www.youtube.com/@xamtopprofficial" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-slate-400 hover:text-white transition font-medium"
+              >
+                YouTube
+              </a>
+              <a 
+                href="https://t.me/xamtopprnew" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-slate-400 hover:text-white transition font-medium"
+              >
+                Telegram
+              </a>
+              <a 
+                href="https://www.facebook.com/profile.php?id=100086508596485" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-slate-400 hover:text-white transition font-medium"
+              >
+                Facebook
+              </a>
+              <a 
+                href="https://www.instagram.com/xamtoppr" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-slate-400 hover:text-white transition font-medium"
+              >
+                Instagram
+              </a>
+                          </div>
             <div>
               <p>© 2026 XamToppr Edutech Private Limited. All Rights Reserved.</p>
             </div>
