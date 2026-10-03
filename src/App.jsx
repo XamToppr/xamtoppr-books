@@ -570,8 +570,8 @@ export default function App() {
               <Sparkles className="w-3.5 h-3.5" /> India's #1 Free Exam Prep Library
             </span>
             <span className="hidden md:inline-block text-slate-400">|</span>
-            <a href="tel:+918800123456" className="flex items-center gap-1.5 hover:text-white transition">
-              <Phone className="w-3.5 h-3.5 text-slate-400" /> Student Helpline: +91 77177 077177
+            <a href="tel:+917717707121" className="flex items-center gap-1.5 hover:text-white transition">
+              <Phone className="w-3.5 h-3.5 text-slate-400" /> Student Helpline: +91 77177 07121
             </a>
             <a href="mailto:support@xamtoppr.com" className="hidden lg:flex items-center gap-1.5 hover:text-white transition">
               <Mail className="w-3.5 h-3.5 text-slate-400" /> support@xamtoppr.com
