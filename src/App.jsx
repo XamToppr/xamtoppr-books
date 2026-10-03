@@ -571,7 +571,7 @@ export default function App() {
             </span>
             <span className="hidden md:inline-block text-slate-400">|</span>
             <a href="tel:+918800123456" className="flex items-center gap-1.5 hover:text-white transition">
-              <Phone className="w-3.5 h-3.5 text-slate-400" /> Student Helpline: +91 8800 123 456
+              <Phone className="w-3.5 h-3.5 text-slate-400" /> Student Helpline: +91 77177 077177
             </a>
             <a href="mailto:support@xamtoppr.com" className="hidden lg:flex items-center gap-1.5 hover:text-white transition">
               <Mail className="w-3.5 h-3.5 text-slate-400" /> support@xamtoppr.com
