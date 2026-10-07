@@ -13,7 +13,8 @@
     "lucide-react": "^1.45.0",
     "papaparse": "^5.7.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "react-pageflip": "^2.0.3"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
