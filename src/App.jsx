@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import Papa from 'papaparse';
 import {
   Search,
   BookOpen,
@@ -28,6 +29,12 @@ import {
   ExternalLink
 } from 'lucide-react';
 
+// ==========================================
+// 1. APNA GOOGLE SHEET CSV LINK YAHAN DALEIN
+// ==========================================
+const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTWDpgH3DG7CxaaXFi1qado9DzZ_dykCwxZeaZ58_ddMo6RmtMOsfZfmm0FRPpsYMntSv5h9DgZ7Pq2/pub?output=csv";
+
+// Fallback Books (Agar internet slow ho ya sheet load na ho)
 const INITIAL_BOOKS = [
   {
     id: 'xt-bk-001',
@@ -48,396 +55,12 @@ const INITIAL_BOOKS = [
     badgeColor: 'bg-amber-500',
     coverGradient: 'from-blue-900 via-indigo-950 to-slate-900',
     coverAccent: 'text-amber-400',
-    coverImage: '', // 👈 Yahan book cover image ka URL daalein
-    pdfUrl: '',     // 👈 Yahan actual PDF ka link daalein
+    coverImage: '',
+    pdfUrl: '',
     isFree: true,
     publishedYear: '2026',
-    description:
-      'Complete chapter-wise theoretical concepts, shortcut tricks, formula sheets, and 4500+ TCS previous year solved questions categorized from basic to advance tier-2 level.',
-    tableOfContents: [
-      'Number System & Divisibility Rules',
-      'Algebra & Polynomial Identities',
-      'Trigonometry & Heights & Distances',
-      'Geometry (Triangles, Circles, Quadrilaterals)',
-      'Mensuration 2D & 3D Solids',
-      'Percentage, Profit, Loss & Discount',
-      'Time, Speed, Distance & Trains',
-      'Data Interpretation (DI) Master Sets'
-    ]
-  },
-  {
-    id: 'xt-bk-002',
-    slug: 'general-studies-tcs-mcq-bank',
-    title: 'General Studies 7500+ TCS Pattern MCQs with In-Depth Explanations',
-    author: 'Dr. Anand Verma & XamToppr GS Wing',
-    publisher: 'XamToppr Publications',
-    exam: 'SSC',
-    examCategory: 'SSC & Railway Exams',
-    subject: 'General Studies',
-    language: 'English Medium',
-    pages: 620,
-    fileSize: '24.2 MB',
-    rating: 4.8,
-    reviewsCount: 2180,
-    downloadsCount: '62.1K',
-    badge: 'BESTSELLER',
-    badgeColor: 'bg-rose-500',
-    coverGradient: 'from-emerald-900 via-teal-950 to-slate-900',
-    coverAccent: 'text-emerald-300',
-    coverImage: '', // 👈 Yahan book cover image ka URL daalein
-    pdfUrl: '',     // 👈 Yahan actual PDF ka link daalein
-    isFree: true,
-    publishedYear: '2026',
-    description:
-      'Strictly curated on latest exam trends. Includes Ancient, Medieval, Modern History, Indian Polity & Constitution, Geography, Economy, and General Science with pictorial memory maps.',
-    tableOfContents: [
-      'Ancient & Medieval History Chronicle',
-      'Modern Freedom Struggle (1857-1947)',
-      'Indian Constitution & Fundamental Rights',
-      'Physical & Human Geography of India',
-      'Indian Economy & Budget Fundamentals',
-      'Physics, Chemistry, Biology Essentials'
-    ]
-  },
-  {
-    id: 'xt-bk-003',
-    slug: 'banking-reasoning-puzzles-master',
-    title: 'Banking Reasoning Master: High-Level Puzzles & Seating Arrangements',
-    author: 'Er. Rakesh Ranjan',
-    publisher: 'XamToppr Banking Academy',
-    exam: 'Banking',
-    examCategory: 'SBI PO / IBPS PO / RRB Scale-I',
-    subject: 'Reasoning Ability',
-    language: 'English Medium',
-    pages: 390,
-    fileSize: '14.6 MB',
-    rating: 4.9,
-    reviewsCount: 980,
-    downloadsCount: '34.2K',
-    badge: 'NEW 2026',
-    badgeColor: 'bg-indigo-600',
-    coverGradient: 'from-violet-900 via-purple-950 to-slate-900',
-    coverAccent: 'text-violet-300',
-    coverImage: '', // 👈 Yahan book cover image ka URL daalein
-    pdfUrl: '',     // 👈 Yahan actual PDF ka link daalein
-    isFree: true,
-    publishedYear: '2026',
-    description:
-      'Master Mains-level circular, linear, matrix, floor-flat, blood-relation merged, and parallel row seating puzzles with step-by-step decoding strategies and time-saving eliminating techniques.',
-    tableOfContents: [
-      'Circular & Rectangular Seating',
-      'Floor & Flat Based Complex Puzzles',
-      'Box & Stack Placement with Variables',
-      'Blood Relations & Direction Sense Merged',
-      'Machine Input-Output Step Logic',
-      'Critical & Analytical Reasoning'
-    ]
-  },
-  {
-    id: 'xt-bk-004',
-    slug: 'samanya-gyan-one-liner-capsule-hindi',
-    title: 'सामान्य ज्ञान (GK/GS) ब्रह्मास्त्र वन-लाइनर कैप्सूल 2026',
-    author: 'XamToppr Editorial Board (Hindi Wing)',
-    publisher: 'XamToppr Publications',
-    exam: 'State Exams',
-    examCategory: 'UPSSSC / BSSC / MPPSC / Police',
-    subject: 'General Awareness',
-    language: 'Hindi Medium',
-    pages: 310,
-    fileSize: '12.1 MB',
-    rating: 4.7,
-    reviewsCount: 3120,
-    downloadsCount: '89.4K',
-    badge: 'FREE PDF',
-    badgeColor: 'bg-emerald-600',
-    coverGradient: 'from-amber-900 via-orange-950 to-slate-900',
-    coverAccent: 'text-amber-300',
-    coverImage: '', // 👈 Yahan book cover image ka URL daalein
-    pdfUrl: '',     // 👈 Yahan actual PDF ka link daalein
-    isFree: true,
-    publishedYear: '2026',
-    description:
-      'सभी राज्य स्तरीय परीक्षाओं, पुलिस कांस्टेबल/SI, रेलवे एवं SSC के लिए 10,000+ अति-महत्वपूर्ण तथ्यों का सारगर्भित संकलन। त्वरित रिवीजन के लिए सर्वश्रेष्ठ पुस्तक।',
-    tableOfContents: [
-      'भारतीय इतिहास एवं प्रमुख युद्ध',
-      'भारत एवं विश्व का भूगोल',
-      'भारतीय संविधान एवं अनुच्छेद',
-      'सामान्य विज्ञान (भौतिक, रसायन, जीव)',
-      'पर्यावरण एवं पारिस्थितिकी',
-      'महत्वपूर्ण दिवस, पुरस्कार एवं खेल'
-    ]
-  },
-  {
-    id: 'xt-bk-005',
-    slug: 'english-grammar-root-words-vocab-booster',
-    title: 'English Grammar Rules & 3500+ Root Words Vocab Booster',
-    author: 'Prof. Neha Sengupta',
-    publisher: 'XamToppr Academic Press',
-    exam: 'SSC',
-    examCategory: 'SSC CGL / Bank PO / CDS / NDA',
-    subject: 'English Language',
-    language: 'Bilingual (Hindi + English)',
-    pages: 420,
-    fileSize: '16.5 MB',
-    rating: 4.8,
-    reviewsCount: 1650,
-    downloadsCount: '52.0K',
-    badge: 'POPULAR',
-    badgeColor: 'bg-amber-500',
-    coverGradient: 'from-cyan-900 via-blue-950 to-slate-900',
-    coverAccent: 'text-cyan-300',
-    coverImage: '', // 👈 Yahan book cover image ka URL daalein
-    pdfUrl: '',     // 👈 Yahan actual PDF ka link daalein
-    isFree: true,
-    publishedYear: '2026',
-    description:
-      '100 Golden Grammar Rules with 1000+ error spotting exercises, Mnemonics and Root-word method for 3500+ Synonyms, Antonyms, One-Word Substitutions, and Idioms & Phrases.',
-    tableOfContents: [
-      '100 Golden Rules of English Grammar',
-      'Etymology & Root Word Methodologies',
-      'Frequently Repeated One-Word Substitutions',
-      'Idioms & Phrases with Contextual Usages',
-      'Cloze Test & Sentence Improvement Tricks',
-      'Reading Comprehension Speed Techniques'
-    ]
-  },
-  {
-    id: 'xt-bk-006',
-    slug: 'modern-history-upsc-topper-notes',
-    title: 'Modern Indian History & Freedom Struggle: Toppers Handwritten Notes',
-    author: 'AIR-18 (UPSC CSE) & XamToppr Mentors',
-    publisher: 'XamToppr Civil Services Cell',
-    exam: 'UPSC',
-    examCategory: 'UPSC CSE / State PSC Prelims & Mains',
-    subject: 'History',
-    language: 'English Medium',
-    pages: 285,
-    fileSize: '29.8 MB',
-    rating: 4.9,
-    reviewsCount: 840,
-    downloadsCount: '41.3K',
-    badge: 'TOPPER NOTES',
-    badgeColor: 'bg-purple-600',
-    coverGradient: 'from-stone-900 via-zinc-950 to-slate-900',
-    coverAccent: 'text-amber-400',
-    coverImage: '', // 👈 Yahan book cover image ka URL daalein
-    pdfUrl: '',     // 👈 Yahan actual PDF ka link daalein
-    isFree: true,
-    publishedYear: '2026',
-    description:
-      'High-yield synthesis of Spectrum, Bipin Chandra, and NCERTs with timeline flowcharts, thematic mind-maps, governor-general policies, tribal & peasant uprisings, and Mains model answers.',
-    tableOfContents: [
-      'Advent of Europeans & British Expansion',
-      'Socio-Religious Reform Movements',
-      '1857 Revolt & Early Nationalist Era',
-      'Gandhian Era (1915-1947) Chronology',
-      'Constitutional Developments under British Rule',
-      'Prominent Personalities & Literature'
-    ]
-  },
-  {
-    id: 'xt-bk-007',
-    slug: 'rrb-ntpc-group-d-general-science-5000',
-    title: 'Railway RRB NTPC & Group D: General Science 5000+ PYQ Compendium',
-    author: 'Science Research Group, XamToppr',
-    publisher: 'XamToppr Publications',
-    exam: 'Railway',
-    examCategory: 'RRB NTPC / Group D / ALP & Tech',
-    subject: 'General Science',
-    language: 'Bilingual (Hindi + English)',
-    pages: 440,
-    fileSize: '19.0 MB',
-    rating: 4.7,
-    reviewsCount: 1890,
-    downloadsCount: '71.2K',
-    badge: 'FREE PDF',
-    badgeColor: 'bg-emerald-600',
-    coverGradient: 'from-blue-950 via-slate-900 to-indigo-950',
-    coverAccent: 'text-sky-400',
-    coverImage: '', // 👈 Yahan book cover image ka URL daalein
-    pdfUrl: '',     // 👈 Yahan actual PDF ka link daalein
-    isFree: true,
-    publishedYear: '2026',
-    description:
-      'Targeted for upcoming Railway recruitment. Physics numerical formulas, Chemistry periodic table & equations, Biology human anatomy & botany with 100% verified bilingual explanations.',
-    tableOfContents: [
-      'Physics: Units, Motion, Work, Energy & Optics',
-      'Physics: Electricity, Magnetism & Sound',
-      'Chemistry: Metals, Non-metals, Acids & Bases',
-      'Chemistry: Chemical Reactions & Periodic Table',
-      'Biology: Cell Biology, Human Body Systems',
-      'Biology: Plant Physiology & Ecology'
-    ]
-  },
-  {
-    id: 'xt-bk-008',
-    slug: 'banking-financial-awareness-annual-digest',
-    title: 'Banking & Financial Awareness Annual Master Digest 2026',
-    author: 'Ex-RBI Officer Panel & XamToppr Finance Team',
-    publisher: 'XamToppr Banking Academy',
-    exam: 'Banking',
-    examCategory: 'RBI Grade B / IBPS / SBI PO & Clerk',
-    subject: 'Banking Awareness',
-    language: 'English Medium',
-    pages: 260,
-    fileSize: '11.4 MB',
-    rating: 4.9,
-    reviewsCount: 760,
-    downloadsCount: '29.7K',
-    badge: 'NEW 2026',
-    badgeColor: 'bg-indigo-600',
-    coverGradient: 'from-teal-900 via-slate-950 to-cyan-950',
-    coverAccent: 'text-teal-300',
-    coverImage: '', // 👈 Yahan book cover image ka URL daalein
-    pdfUrl: '',     // 👈 Yahan actual PDF ka link daalein
-    isFree: true,
-    publishedYear: '2026',
-    description:
-      'Complete guide covering RBI Monetary Policy, Basel III norms, Priority Sector Lending (PSL), Union Budget highlights, economic terms, digital banking innovations, and NPCI payment gateways.',
-    tableOfContents: [
-      'Structure of Indian Banking System',
-      'RBI Functions & Monetary Policy Tools',
-      'NPA Management, IBC & SARFAESI Act',
-      'Digital Banking, UPI, CBDC & Fintech',
-      'Government Schemes (PMJDY, PMSBY, PMJJBY)',
-      'Union Budget & Economic Survey Gist'
-    ]
-  },
-  {
-    id: 'xt-bk-009',
-    slug: 'quant-formula-sheet-vedic-maths-shortcuts',
-    title: 'Quantitative Aptitude Formula Sheet & Vedic Maths Speed Tricks',
-    author: 'XamToppr Math Labs',
-    publisher: 'XamToppr Academic Press',
-    exam: 'All Exams',
-    examCategory: 'All Competitive Exams',
-    subject: 'Quantitative Aptitude',
-    language: 'Bilingual (Hindi + English)',
-    pages: 140,
-    fileSize: '6.2 MB',
-    rating: 5.0,
-    reviewsCount: 4200,
-    downloadsCount: '115K',
-    badge: 'MOST DOWNLOADED',
-    badgeColor: 'bg-amber-600',
-    coverGradient: 'from-amber-950 via-yellow-950 to-slate-900',
-    coverAccent: 'text-amber-400',
-    coverImage: '', // 👈 Yahan book cover image ka URL daalein
-    pdfUrl: '',     // 👈 Yahan actual PDF ka link daalein
-    isFree: true,
-    publishedYear: '2026',
-    description:
-      'Pocket formula handbook containing 500+ formulas, tables up to 30, square/cube shortcuts, percentage-to-fraction charts, and 5-second Vedic maths multiplication tricks.',
-    tableOfContents: [
-      'Square, Cube & Calculation Boosters',
-      'Percentage-Fraction Quick Convertor',
-      'Arithmetic Core Formula Handbook',
-      'Geometry & Mensuration 2D/3D Cheat-Sheet',
-      'Trigonometry Angles & Height Matrix',
-      'Coordinate Geometry & Algebra Identities'
-    ]
-  },
-  {
-    id: 'xt-bk-010',
-    slug: 'ctet-child-development-pedagogy-master-hindi',
-    title: 'CTET बाल विकास एवं शिक्षण शास्त्र (CDP) सम्पूर्ण हस्तलिखित नोट्स',
-    author: 'डॉ. मीनाक्षी शर्मा (CTET Topper)',
-    publisher: 'XamToppr Teaching Academy',
-    exam: 'Teaching',
-    examCategory: 'CTET Paper 1 & 2 / State TET',
-    subject: 'Child Development & Pedagogy',
-    language: 'Hindi Medium',
-    pages: 245,
-    fileSize: '15.2 MB',
-    rating: 4.8,
-    reviewsCount: 1120,
-    downloadsCount: '38.4K',
-    badge: 'FREE PDF',
-    badgeColor: 'bg-emerald-600',
-    coverGradient: 'from-rose-950 via-pink-950 to-slate-900',
-    coverAccent: 'text-rose-300',
-    coverImage: '', // 👈 Yahan book cover image ka URL daalein
-    pdfUrl: '',     // 👈 Yahan actual PDF ka link daalein
-    isFree: true,
-    publishedYear: '2026',
-    description:
-      'जीन पियाजे, कोहलबर्ग, वाइगोत्स्की, स्किनर एवं थार्नडाइक के सिद्धांतों की सरल सचित्र व्याख्या, NEP 2020 एवं NCF 2005 के महत्वपूर्ण बिंदु तथा पिछले 10 वर्षों के प्रश्न।',
-    tableOfContents: [
-      'विकास की अवधारणा एवं अधिगम से संबंध',
-      'पियाजे, कोहलबर्ग और वाइगोत्स्की के सिद्धांत',
-      'समावेशी शिक्षा एवं विशेष आवश्यकता वाले बालक',
-      'अधिगम एवं शिक्षण की बुनियादी प्रक्रियाएं',
-      'राष्ट्रीय शिक्षा नीति (NEP 2020) के प्रमुख बिंदु',
-      'NCF 2005 एवं RTE Act 2009'
-    ]
-  },
-  {
-    id: 'xt-bk-011',
-    slug: 'defence-pathfinder-nda-cds-mathematics',
-    title: 'Defence Pathfinder: NDA & CDS Mathematics with 10 Mock Tests',
-    author: 'Col. (Retd.) S. K. Roy & Maths Faculty',
-    publisher: 'XamToppr Defence Cell',
-    exam: 'Defence',
-    examCategory: 'NDA / NA / CDS / AFCAT',
-    subject: 'Mathematics',
-    language: 'English Medium',
-    pages: 510,
-    fileSize: '22.7 MB',
-    rating: 4.8,
-    reviewsCount: 650,
-    downloadsCount: '23.1K',
-    badge: 'NEW 2026',
-    badgeColor: 'bg-indigo-600',
-    coverGradient: 'from-slate-900 via-neutral-950 to-emerald-950',
-    coverAccent: 'text-emerald-400',
-    coverImage: '', // 👈 Yahan book cover image ka URL daalein
-    pdfUrl: '',     // 👈 Yahan actual PDF ka link daalein
-    isFree: true,
-    publishedYear: '2026',
-    description:
-      'Complete UPSC standard coverage of 10+2 NDA mathematics syllabus: Matrices, Determinants, Vector Algebra, Probability, Calculus, and 10 full-length practice question papers with solutions.',
-    tableOfContents: [
-      'Sets, Relations, Functions & Complex Numbers',
-      'Matrices & Determinants Matrix Methods',
-      'Vector Algebra & 3D Geometry',
-      'Differential & Integral Calculus',
-      'Probability & Statistics for Defence',
-      '10 Full-Length UPSC Standard Mock Tests'
-    ]
-  },
-  {
-    id: 'xt-bk-012',
-    slug: 'static-gk-statewise-infographic-atlas',
-    title: 'Static GK Encyclopedia & State-Wise Infographic Atlas 2026',
-    author: 'XamToppr Research Group',
-    publisher: 'XamToppr Publications',
-    exam: 'All Exams',
-    examCategory: 'SSC / State Exams / Railways / Police',
-    subject: 'Static GK',
-    language: 'Bilingual (Hindi + English)',
-    pages: 360,
-    fileSize: '31.5 MB',
-    rating: 4.9,
-    reviewsCount: 2840,
-    downloadsCount: '81.6K',
-    badge: 'POPULAR',
-    badgeColor: 'bg-amber-500',
-    coverGradient: 'from-blue-950 via-teal-950 to-slate-900',
-    coverAccent: 'text-amber-300',
-    coverImage: '', // 👈 Yahan book cover image ka URL daalein
-    pdfUrl: '',     // 👈 Yahan actual PDF ka link daalein
-    isFree: true,
-    publishedYear: '2026',
-    description:
-      'Visual learning through full-color maps of Indian National Parks, Wildlife Sanctuaries, Classical Dances, Folk Arts, UNESCO Heritage Sites, River Tributaries, Dams, and Stadiums.',
-    tableOfContents: [
-      'National Parks, Tiger Reserves & Biospheres',
-      'Classical & Folk Dances of all Indian States',
-      'UNESCO World Heritage Sites in India',
-      'Rivers, Tributaries, Dams & Waterfalls Map',
-      'Fairs, Festivals & State Tribal Cultures',
-      'Major Ports, Airports & Thermal Power Plants'
-    ]
+    description: 'Complete chapter-wise theoretical concepts and TCS PYQ solved questions.',
+    tableOfContents: ['Number System', 'Algebra', 'Trigonometry', 'Geometry', 'Arithmetic']
   }
 ];
 
@@ -478,6 +101,7 @@ const SORT_OPTIONS = [
 ];
 
 export default function App() {
+  const [booksList, setBooksList] = useState(INITIAL_BOOKS);
   const [activeTab, setActiveTab] = useState('books');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -485,12 +109,59 @@ export default function App() {
   const [selectedMedium, setSelectedMedium] = useState('All Mediums');
   const [selectedSubject, setSelectedSubject] = useState('All Subjects');
   const [sortBy, setSortBy] = useState('popular');
-  const [savedBooks, setSavedBooks] = useState(['xt-bk-001', 'xt-bk-009']);
+  const [savedBooks, setSavedBooks] = useState(['xt-bk-001']);
   const [selectedBookForModal, setSelectedBookForModal] = useState(null);
   const [showRequestBookModal, setShowRequestBookModal] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
   const [isLoadingSkeleton, setIsLoadingSkeleton] = useState(false);
   const [quickFilterBadge, setQuickFilterBadge] = useState('ALL');
+
+  // Google Sheet Data Auto-Fetch
+  useEffect(() => {
+    if (!GOOGLE_SHEET_CSV_URL || GOOGLE_SHEET_CSV_URL.includes("YAHAN_APNA_GOOGLE_SHEET")) {
+      return;
+    }
+
+    setIsLoadingSkeleton(true);
+    Papa.parse(GOOGLE_SHEET_CSV_URL, {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        if (results.data && results.data.length > 0) {
+          const parsed = results.data.map((b, index) => ({
+            id: b.id || `xt-bk-${index + 1}`,
+            slug: b.slug || `book-${index + 1}`,
+            title: b.title || 'Untitled Book',
+            author: b.author || 'XamToppr Faculty',
+            publisher: b.publisher || 'XamToppr Publications',
+            exam: b.exam || 'All Exams',
+            examCategory: b.examCategory || 'All Competitive Exams',
+            subject: b.subject || 'General Studies',
+            language: b.language || 'Bilingual (Hindi + English)',
+            pages: Number(b.pages) || 120,
+            fileSize: b.fileSize || '10 MB',
+            rating: Number(b.rating) || 4.8,
+            reviewsCount: Number(b.reviewsCount) || 250,
+            downloadsCount: b.downloadsCount || '25K',
+            badge: b.badge || 'FREE PDF',
+            badgeColor: b.badgeColor || 'bg-amber-500',
+            coverGradient: 'from-blue-900 via-indigo-950 to-slate-900',
+            coverAccent: 'text-amber-400',
+            coverImage: b.coverImage ? b.coverImage.trim() : '',
+            pdfUrl: b.pdfUrl ? b.pdfUrl.trim() : '',
+            isFree: true,
+            publishedYear: b.publishedYear || '2026',
+            description: b.description || 'Verified exam preparation study material with solved papers.',
+            tableOfContents: b.tableOfContents ? b.tableOfContents.split(',').map(s => s.trim()) : ['Core Concepts', 'Practice MCQs']
+          }));
+          setBooksList(parsed);
+        }
+        setIsLoadingSkeleton(false);
+      },
+      error: () => setIsLoadingSkeleton(false)
+    });
+  }, []);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -528,7 +199,7 @@ export default function App() {
   };
 
   const filteredBooks = useMemo(() => {
-    return INITIAL_BOOKS.filter((book) => {
+    return booksList.filter((book) => {
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
         const matchTitle = book.title.toLowerCase().includes(query);
@@ -568,12 +239,12 @@ export default function App() {
       if (sortBy === 'title-asc') return a.title.localeCompare(b.title);
       if (sortBy === 'pages-desc') return b.pages - a.pages;
       if (sortBy === 'downloads') {
-        const parseDL = (str) => parseFloat(str.replace('K', '')) * 1000 || 0;
+        const parseDL = (str) => parseFloat(String(str).replace('K', '')) * 1000 || 0;
         return parseDL(b.downloadsCount) - parseDL(a.downloadsCount);
       }
       return 0;
     });
-  }, [searchQuery, selectedExam, selectedMedium, selectedSubject, quickFilterBadge, sortBy]);
+  }, [booksList, searchQuery, selectedExam, selectedMedium, selectedSubject, quickFilterBadge, sortBy]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-amber-500 selection:text-white">
@@ -587,7 +258,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Top Notification Bar */}
+      {/* Top Helpline Bar */}
       <div className="bg-[#0b1f44] text-slate-300 text-xs py-2 px-4 sm:px-8 border-b border-blue-950/60 hidden sm:block">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-6">
@@ -610,7 +281,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* Header */}
+      {/* Navigation Header */}
       <header className="sticky top-0 z-40 bg-[#0c2356] text-white shadow-lg border-b border-blue-900/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 sm:h-20">
@@ -675,7 +346,7 @@ export default function App() {
               </a>
             </nav>
 
-            {/* Auth CTAs */}
+            {/* Header Right Actions */}
             <div className="hidden sm:flex items-center gap-3">
               <button
                 onClick={() => setShowRequestBookModal(true)}
@@ -715,7 +386,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* Mobile Dropdown Navigation */}
+        {/* Mobile Dropdown */}
         {mobileMenuOpen && (
           <div className="lg:hidden bg-[#0a1b3d] border-b border-blue-900 px-4 pt-3 pb-5 space-y-2">
             <a
@@ -776,6 +447,7 @@ export default function App() {
       </header>
 
       <main className="flex-1 pb-16">
+        {/* Breadcrumb */}
         <div className="bg-slate-100 border-b border-slate-200 py-2.5 px-4 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto flex items-center text-xs text-slate-600 gap-1.5 flex-wrap">
             <a href="https://www.xamtoppr.com/" className="hover:text-blue-900 font-medium transition">
@@ -822,7 +494,7 @@ export default function App() {
           </div>
         </section>
 
-        {/* Filter & Search Bar */}
+        {/* Filter Controls */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 sm:-mt-8 relative z-20">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200/80 p-4 sm:p-6">
             <div className="relative">
@@ -983,7 +655,7 @@ export default function App() {
           </div>
         </section>
 
-        {/* Books List Grid */}
+        {/* Books Grid */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
             <div className="flex items-center gap-2">
@@ -1062,7 +734,7 @@ export default function App() {
                     key={book.id}
                     className="bg-white rounded-2xl border border-slate-200 hover:border-amber-400/80 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden group hover:-translate-y-1 relative"
                   >
-                    {/* BOOK COVER ART SECTION (Supports coverImage with Gradient Fallback) */}
+                    {/* BOOK COVER ART SECTION */}
                     <div
                       onClick={() => setSelectedBookForModal(book)}
                       className="h-56 bg-slate-900 relative cursor-pointer select-none overflow-hidden"
@@ -1089,10 +761,8 @@ export default function App() {
                         </div>
                       )}
 
-                      {/* Dark overlay for contrast */}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-black/40 pointer-events-none"></div>
 
-                      {/* Top Badges & Bookmark */}
                       <div className="absolute top-3 inset-x-3 flex items-start justify-between z-10">
                         <span
                           className={`${book.badgeColor} text-white font-extrabold text-[10px] uppercase px-2 py-0.5 rounded-md shadow-md tracking-wider`}
@@ -1116,7 +786,6 @@ export default function App() {
                         </button>
                       </div>
 
-                      {/* Bottom Cover Metadata */}
                       <div className="absolute bottom-2.5 inset-x-3 flex items-center justify-between z-10 text-[10px] text-slate-200 font-medium">
                         <span className="bg-black/60 px-2 py-0.5 rounded backdrop-blur-xs">
                           {book.language.includes('Hindi') && !book.language.includes('Bilingual')
@@ -1131,7 +800,7 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Book Card Body */}
+                    {/* Book Card Details */}
                     <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
                       <div>
                         <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500 mb-1.5">
@@ -1169,7 +838,7 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Card Action Buttons with Direct Download / View */}
+                      {/* Card Action Buttons */}
                       <div className="pt-2 flex items-center gap-2">
                         <button
                           onClick={() => setSelectedBookForModal(book)}
@@ -1243,7 +912,7 @@ export default function App() {
           </div>
         </section>
 
-        {/* Guide Section */}
+        {/* Prep Strategy Guide */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-14">
           <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8">
             <h3 className="text-lg sm:text-xl font-bold text-blue-950 mb-2 flex items-center gap-2">
