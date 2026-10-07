@@ -26,7 +26,8 @@ import {
   Award,
   Clock,
   HelpCircle,
-  ExternalLink
+  ExternalLink,
+  ShoppingCart
 } from 'lucide-react';
 
 // ==========================================
@@ -129,32 +130,40 @@ export default function App() {
       skipEmptyLines: true,
       complete: (results) => {
         if (results.data && results.data.length > 0) {
-          const parsed = results.data.map((b, index) => ({
-            id: b.id || `xt-bk-${index + 1}`,
-            slug: b.slug || `book-${index + 1}`,
-            title: b.title || 'Untitled Book',
-            author: b.author || 'XamToppr Faculty',
-            publisher: b.publisher || 'XamToppr Publications',
-            exam: b.exam || 'All Exams',
-            examCategory: b.examCategory || 'All Competitive Exams',
-            subject: b.subject || 'General Studies',
-            language: b.language || 'Bilingual (Hindi + English)',
-            pages: Number(b.pages) || 120,
-            fileSize: b.fileSize || '10 MB',
-            rating: Number(b.rating) || 4.8,
-            reviewsCount: Number(b.reviewsCount) || 250,
-            downloadsCount: b.downloadsCount || '25K',
-            badge: b.badge || 'FREE PDF',
-            badgeColor: b.badgeColor || 'bg-amber-500',
-            coverGradient: 'from-blue-900 via-indigo-950 to-slate-900',
-            coverAccent: 'text-amber-400',
-            coverImage: b.coverImage ? b.coverImage.trim() : '',
-            pdfUrl: b.pdfUrl ? b.pdfUrl.trim() : '',
-            isFree: true,
-            publishedYear: b.publishedYear || '2026',
-            description: b.description || 'Verified exam preparation study material with solved papers.',
-            tableOfContents: b.tableOfContents ? b.tableOfContents.split(',').map(s => s.trim()) : ['Core Concepts', 'Practice MCQs']
-          }));
+          const parsed = results.data.map((b, index) => {
+            const badgeStr = (b.badge || '').trim();
+            const isPaid = 
+              badgeStr.toUpperCase().includes('PAID') || 
+              badgeStr.toUpperCase().includes('PREMIUM') || 
+              badgeStr.includes('₹');
+
+            return {
+              id: b.id || `xt-bk-${index + 1}`,
+              slug: b.slug || `book-${index + 1}`,
+              title: b.title || 'Untitled Book',
+              author: b.author || 'XamToppr Faculty',
+              publisher: b.publisher || 'XamToppr Publications',
+              exam: b.exam || 'All Exams',
+              examCategory: b.examCategory || 'All Competitive Exams',
+              subject: b.subject || 'General Studies',
+              language: b.language || 'Bilingual (Hindi + English)',
+              pages: Number(b.pages) || 120,
+              fileSize: b.fileSize || '10 MB',
+              rating: Number(b.rating) || 4.8,
+              reviewsCount: Number(b.reviewsCount) || 250,
+              downloadsCount: b.downloadsCount || '25K',
+              badge: badgeStr || 'FREE PDF',
+              badgeColor: b.badgeColor || (isPaid ? 'bg-rose-600' : 'bg-amber-500'),
+              coverGradient: 'from-blue-900 via-indigo-950 to-slate-900',
+              coverAccent: 'text-amber-400',
+              coverImage: b.coverImage ? b.coverImage.trim() : '',
+              pdfUrl: b.pdfUrl ? b.pdfUrl.trim() : '',
+              isFree: !isPaid,
+              publishedYear: b.publishedYear || '2026',
+              description: b.description || 'Verified exam preparation study material with solved papers.',
+              tableOfContents: b.tableOfContents ? b.tableOfContents.split(',').map(s => s.trim()) : ['Core Concepts', 'Practice MCQs']
+            };
+          });
           setBooksList(parsed);
         }
         setIsLoadingSkeleton(false);
@@ -729,6 +738,8 @@ export default function App() {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {filteredBooks.map((book) => {
                 const isSaved = savedBooks.includes(book.id);
+                const isPaid = !book.isFree;
+
                 return (
                   <div
                     key={book.id}
@@ -838,7 +849,7 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Card Action Buttons */}
+                      {/* Card Action Buttons (Direct Buy/Download) */}
                       <div className="pt-2 flex items-center gap-2">
                         <button
                           onClick={() => setSelectedBookForModal(book)}
@@ -848,7 +859,24 @@ export default function App() {
                           <span>View Book</span>
                         </button>
                         
-                        {book.pdfUrl ? (
+                        {isPaid ? (
+                          <a
+                            href={book.pdfUrl || '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => {
+                              if (!book.pdfUrl) {
+                                e.preventDefault();
+                                showToast('Payment link will be updated soon!');
+                              }
+                            }}
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2.5 rounded-xl transition font-bold text-xs shadow-sm flex items-center gap-1.5"
+                            title="Buy Now"
+                          >
+                            <ShoppingCart className="w-3.5 h-3.5" />
+                            <span>Buy</span>
+                          </a>
+                        ) : book.pdfUrl ? (
                           <a
                             href={book.pdfUrl}
                             target="_blank"
@@ -959,149 +987,172 @@ export default function App() {
       </main>
 
       {/* Book Detail Modal */}
-      {selectedBookForModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-300 flex flex-col">
-            <div className="p-5 sm:p-6 bg-[#0c2356] text-white flex items-start justify-between relative">
-              <div className="pr-8">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="bg-amber-400 text-slate-950 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded">
-                    {selectedBookForModal.badge}
-                  </span>
-                  <span className="text-xs text-blue-200 font-medium">
-                    {selectedBookForModal.examCategory}
-                  </span>
-                </div>
-                <h3 className="text-lg sm:text-xl font-bold text-white leading-tight">
-                  {selectedBookForModal.title}
-                </h3>
-                <p className="text-xs text-slate-300 mt-1">
-                  By {selectedBookForModal.author} • {selectedBookForModal.publisher}
-                </p>
-              </div>
-              <button
-                onClick={() => setSelectedBookForModal(null)}
-                className="text-slate-300 hover:text-white p-1 rounded-lg bg-white/10 hover:bg-white/20 transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {selectedBookForModal && (() => {
+        const isPaidBook = 
+          selectedBookForModal.badge?.toUpperCase().includes('PAID') ||
+          selectedBookForModal.badge?.toUpperCase().includes('PREMIUM') ||
+          selectedBookForModal.badge?.includes('₹');
 
-            <div className="p-5 sm:p-6 space-y-6 text-slate-800">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-center text-xs font-medium">
-                <div>
-                  <span className="text-slate-400 block text-[10px] uppercase">Language</span>
-                  <span className="font-bold text-slate-900">{selectedBookForModal.language}</span>
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-sm animate-fadeIn">
+            <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-300 flex flex-col">
+              
+              {/* Modal Header */}
+              <div className="p-5 sm:p-6 bg-[#0c2356] text-white flex items-start justify-between relative">
+                <div className="pr-8">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className={`${selectedBookForModal.badgeColor || 'bg-amber-400'} text-white text-[10px] font-extrabold uppercase px-2 py-0.5 rounded shadow-sm`}>
+                      {selectedBookForModal.badge}
+                    </span>
+                    <span className="text-xs text-blue-200 font-medium">
+                      {selectedBookForModal.examCategory}
+                    </span>
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-bold text-white leading-tight">
+                    {selectedBookForModal.title}
+                  </h3>
+                  <p className="text-xs text-slate-300 mt-1">
+                    By {selectedBookForModal.author} • {selectedBookForModal.publisher}
+                  </p>
                 </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px] uppercase">Total Pages</span>
-                  <span className="font-bold text-slate-900">{selectedBookForModal.pages} Pages</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px] uppercase">File Size</span>
-                  <span className="font-bold text-slate-900">{selectedBookForModal.fileSize}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px] uppercase">Rating</span>
-                  <span className="font-bold text-amber-600 flex items-center justify-center gap-1">
-                    <Star className="w-3.5 h-3.5 fill-amber-500" /> {selectedBookForModal.rating} (
-                    {selectedBookForModal.reviewsCount})
-                  </span>
-                </div>
+                <button
+                  onClick={() => setSelectedBookForModal(null)}
+                  className="text-slate-300 hover:text-white p-1 rounded-lg bg-white/10 hover:bg-white/20 transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
 
-              <div>
-                <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-2">
-                  About This Study Material
-                </h4>
-                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed bg-slate-50/70 p-4 rounded-xl border border-slate-100">
-                  {selectedBookForModal.description}
-                </p>
-              </div>
+              {/* Modal Body */}
+              <div className="p-5 sm:p-6 space-y-6 text-slate-800">
+                
+                {/* Stats Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-center text-xs font-medium">
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase">Language</span>
+                    <span className="font-bold text-slate-900">{selectedBookForModal.language}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase">Total Pages</span>
+                    <span className="font-bold text-slate-900">{selectedBookForModal.pages} Pages</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase">File Size</span>
+                    <span className="font-bold text-slate-900">{selectedBookForModal.fileSize}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase">Rating</span>
+                    <span className="font-bold text-amber-600 flex items-center justify-center gap-1">
+                      <Star className="w-3.5 h-3.5 fill-amber-500" /> {selectedBookForModal.rating} ({selectedBookForModal.reviewsCount})
+                    </span>
+                  </div>
+                </div>
 
-              <div>
-                <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-2.5 flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-blue-900" />
-                  Table of Contents & Key Chapters ({selectedBookForModal.tableOfContents.length})
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                  {selectedBookForModal.tableOfContents.map((chap, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center gap-2.5 p-2.5 bg-slate-50 rounded-lg border border-slate-200/80 text-slate-700"
-                    >
-                      <span className="w-5 h-5 bg-blue-100 text-blue-950 font-bold text-[10px] rounded flex items-center justify-center shrink-0">
-                        {idx + 1}
-                      </span>
-                      <span className="font-medium line-clamp-1">{chap}</span>
+                {/* About This Study Material (whitespace-pre-line se Alt+Enter line breaks properly dikhenge) */}
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-2">
+                    About This Study Material
+                  </h4>
+                  <div className="text-xs sm:text-sm text-slate-700 leading-relaxed bg-slate-50/80 p-4 sm:p-5 rounded-2xl border border-slate-200 whitespace-pre-line font-sans">
+                    {selectedBookForModal.description}
+                  </div>
+                </div>
+
+                {/* Table of Contents */}
+                {selectedBookForModal.tableOfContents && selectedBookForModal.tableOfContents.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-2.5 flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-blue-900" />
+                      Table of Contents & Key Chapters ({selectedBookForModal.tableOfContents.length})
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      {selectedBookForModal.tableOfContents.map((chap, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center gap-2.5 p-2.5 bg-slate-50 rounded-lg border border-slate-200/80 text-slate-700"
+                        >
+                          <span className="w-5 h-5 bg-blue-100 text-blue-950 font-bold text-[10px] rounded flex items-center justify-center shrink-0">
+                            {idx + 1}
+                          </span>
+                          <span className="font-medium line-clamp-1">{chap}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
               </div>
 
-              <div className="border border-slate-200 rounded-2xl p-4 bg-slate-900 text-white flex flex-col items-center justify-center text-center space-y-2 py-8">
-                <FileText className="w-10 h-10 text-amber-400" />
-                <div className="font-bold text-sm">Interactive PDF Reader Ready</div>
-                <p className="text-xs text-slate-400 max-w-sm">
-                  Click 'Read Online' to open the PDF in your browser, or use 'Download Free PDF' to save it directly.
-                </p>
-              </div>
-            </div>
+              {/* Modal Footer Buttons */}
+              <div className="p-4 sm:p-6 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                <button
+                  onClick={() => toggleBookmark(selectedBookForModal.id, selectedBookForModal.title)}
+                  className="text-xs font-semibold text-slate-700 hover:text-slate-900 flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-300 hover:bg-slate-100"
+                >
+                  <BookMarked className="w-4 h-4 text-amber-500" />
+                  {savedBooks.includes(selectedBookForModal.id) ? 'Saved in Library' : 'Save for Later'}
+                </button>
 
-            <div className="p-4 sm:p-6 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
-              <button
-                onClick={() => toggleBookmark(selectedBookForModal.id, selectedBookForModal.title)}
-                className="text-xs font-semibold text-slate-700 hover:text-slate-900 flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-300 hover:bg-slate-100"
-              >
-                <BookMarked className="w-4 h-4 text-amber-500" />
-                {savedBooks.includes(selectedBookForModal.id) ? 'Saved in Library' : 'Save for Later'}
-              </button>
+                <div className="flex items-center gap-2.5">
+                  {/* Read Online Button */}
+                  <a
+                    href={selectedBookForModal.pdfUrl || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => {
+                      if (!selectedBookForModal.pdfUrl) {
+                        e.preventDefault();
+                        showToast('Link will be updated soon!');
+                      }
+                    }}
+                    className="bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs sm:text-sm font-bold px-4 py-2.5 rounded-xl transition inline-block"
+                  >
+                    Read Online
+                  </a>
 
-              <div className="flex items-center gap-2.5">
-                {selectedBookForModal.pdfUrl ? (
-                  <>
+                  {/* Dynamic Action Button: Buy Now vs Free Download */}
+                  {isPaidBook ? (
                     <a
-                      href={selectedBookForModal.pdfUrl}
+                      href={selectedBookForModal.pdfUrl || '#'}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs sm:text-sm font-bold px-4 py-2.5 rounded-xl transition inline-block"
+                      onClick={(e) => {
+                        if (!selectedBookForModal.pdfUrl) {
+                          e.preventDefault();
+                          showToast('Razorpay payment link update hone wala hai!');
+                        }
+                      }}
+                      className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white text-xs sm:text-sm font-extrabold px-5 py-2.5 rounded-xl shadow-md transition flex items-center gap-2 transform active:scale-95"
                     >
-                      Read Online
+                      <Sparkles className="w-4 h-4 text-amber-300" />
+                      <span>Buy Now ({selectedBookForModal.badge})</span>
                     </a>
+                  ) : (
                     <a
-                      href={selectedBookForModal.pdfUrl}
+                      href={selectedBookForModal.pdfUrl || '#'}
                       target="_blank"
                       rel="noopener noreferrer"
                       download={selectedBookForModal.title}
-                      onClick={() => setSelectedBookForModal(null)}
+                      onClick={(e) => {
+                        if (!selectedBookForModal.pdfUrl) {
+                          e.preventDefault();
+                          showToast('Free PDF link update hone wala hai!');
+                        } else {
+                          setSelectedBookForModal(null);
+                        }
+                      }}
                       className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs sm:text-sm font-extrabold px-5 py-2.5 rounded-xl shadow-md transition flex items-center gap-2"
                     >
                       <Download className="w-4 h-4 stroke-[2.5]" />
                       <span>Download Free PDF</span>
                     </a>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => showToast('PDF link will be updated soon for this book!')}
-                      className="bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs sm:text-sm font-bold px-4 py-2.5 rounded-xl transition"
-                    >
-                      Read Online
-                    </button>
-                    <button
-                      onClick={() => showToast('PDF link will be updated soon for this book!')}
-                      className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs sm:text-sm font-extrabold px-5 py-2.5 rounded-xl shadow-md transition flex items-center gap-2"
-                    >
-                      <Download className="w-4 h-4 stroke-[2.5]" />
-                      <span>Download Free PDF</span>
-                    </button>
-                  </>
-                )}
+                  )}
+                </div>
               </div>
+
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Request Modal */}
       {showRequestBookModal && (
