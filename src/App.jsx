@@ -48,6 +48,8 @@ const INITIAL_BOOKS = [
     badgeColor: 'bg-amber-500',
     coverGradient: 'from-blue-900 via-indigo-950 to-slate-900',
     coverAccent: 'text-amber-400',
+    coverImage: '', // 👈 Yahan book cover image ka URL daalein
+    pdfUrl: '',     // 👈 Yahan actual PDF ka link daalein
     isFree: true,
     publishedYear: '2026',
     description:
@@ -82,6 +84,8 @@ const INITIAL_BOOKS = [
     badgeColor: 'bg-rose-500',
     coverGradient: 'from-emerald-900 via-teal-950 to-slate-900',
     coverAccent: 'text-emerald-300',
+    coverImage: '', // 👈 Yahan book cover image ka URL daalein
+    pdfUrl: '',     // 👈 Yahan actual PDF ka link daalein
     isFree: true,
     publishedYear: '2026',
     description:
@@ -114,6 +118,8 @@ const INITIAL_BOOKS = [
     badgeColor: 'bg-indigo-600',
     coverGradient: 'from-violet-900 via-purple-950 to-slate-900',
     coverAccent: 'text-violet-300',
+    coverImage: '', // 👈 Yahan book cover image ka URL daalein
+    pdfUrl: '',     // 👈 Yahan actual PDF ka link daalein
     isFree: true,
     publishedYear: '2026',
     description:
@@ -146,6 +152,8 @@ const INITIAL_BOOKS = [
     badgeColor: 'bg-emerald-600',
     coverGradient: 'from-amber-900 via-orange-950 to-slate-900',
     coverAccent: 'text-amber-300',
+    coverImage: '', // 👈 Yahan book cover image ka URL daalein
+    pdfUrl: '',     // 👈 Yahan actual PDF ka link daalein
     isFree: true,
     publishedYear: '2026',
     description:
@@ -178,6 +186,8 @@ const INITIAL_BOOKS = [
     badgeColor: 'bg-amber-500',
     coverGradient: 'from-cyan-900 via-blue-950 to-slate-900',
     coverAccent: 'text-cyan-300',
+    coverImage: '', // 👈 Yahan book cover image ka URL daalein
+    pdfUrl: '',     // 👈 Yahan actual PDF ka link daalein
     isFree: true,
     publishedYear: '2026',
     description:
@@ -210,6 +220,8 @@ const INITIAL_BOOKS = [
     badgeColor: 'bg-purple-600',
     coverGradient: 'from-stone-900 via-zinc-950 to-slate-900',
     coverAccent: 'text-amber-400',
+    coverImage: '', // 👈 Yahan book cover image ka URL daalein
+    pdfUrl: '',     // 👈 Yahan actual PDF ka link daalein
     isFree: true,
     publishedYear: '2026',
     description:
@@ -242,6 +254,8 @@ const INITIAL_BOOKS = [
     badgeColor: 'bg-emerald-600',
     coverGradient: 'from-blue-950 via-slate-900 to-indigo-950',
     coverAccent: 'text-sky-400',
+    coverImage: '', // 👈 Yahan book cover image ka URL daalein
+    pdfUrl: '',     // 👈 Yahan actual PDF ka link daalein
     isFree: true,
     publishedYear: '2026',
     description:
@@ -274,6 +288,8 @@ const INITIAL_BOOKS = [
     badgeColor: 'bg-indigo-600',
     coverGradient: 'from-teal-900 via-slate-950 to-cyan-950',
     coverAccent: 'text-teal-300',
+    coverImage: '', // 👈 Yahan book cover image ka URL daalein
+    pdfUrl: '',     // 👈 Yahan actual PDF ka link daalein
     isFree: true,
     publishedYear: '2026',
     description:
@@ -306,6 +322,8 @@ const INITIAL_BOOKS = [
     badgeColor: 'bg-amber-600',
     coverGradient: 'from-amber-950 via-yellow-950 to-slate-900',
     coverAccent: 'text-amber-400',
+    coverImage: '', // 👈 Yahan book cover image ka URL daalein
+    pdfUrl: '',     // 👈 Yahan actual PDF ka link daalein
     isFree: true,
     publishedYear: '2026',
     description:
@@ -338,6 +356,8 @@ const INITIAL_BOOKS = [
     badgeColor: 'bg-emerald-600',
     coverGradient: 'from-rose-950 via-pink-950 to-slate-900',
     coverAccent: 'text-rose-300',
+    coverImage: '', // 👈 Yahan book cover image ka URL daalein
+    pdfUrl: '',     // 👈 Yahan actual PDF ka link daalein
     isFree: true,
     publishedYear: '2026',
     description:
@@ -370,6 +390,8 @@ const INITIAL_BOOKS = [
     badgeColor: 'bg-indigo-600',
     coverGradient: 'from-slate-900 via-neutral-950 to-emerald-950',
     coverAccent: 'text-emerald-400',
+    coverImage: '', // 👈 Yahan book cover image ka URL daalein
+    pdfUrl: '',     // 👈 Yahan actual PDF ka link daalein
     isFree: true,
     publishedYear: '2026',
     description:
@@ -402,6 +424,8 @@ const INITIAL_BOOKS = [
     badgeColor: 'bg-amber-500',
     coverGradient: 'from-blue-950 via-teal-950 to-slate-900',
     coverAccent: 'text-amber-300',
+    coverImage: '', // 👈 Yahan book cover image ka URL daalein
+    pdfUrl: '',     // 👈 Yahan actual PDF ka link daalein
     isFree: true,
     publishedYear: '2026',
     description:
@@ -563,6 +587,7 @@ export default function App() {
         </div>
       )}
 
+      {/* Top Notification Bar */}
       <div className="bg-[#0b1f44] text-slate-300 text-xs py-2 px-4 sm:px-8 border-b border-blue-950/60 hidden sm:block">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-6">
@@ -573,7 +598,7 @@ export default function App() {
             <a href="tel:+917717707121" className="flex items-center gap-1.5 hover:text-white transition">
               <Phone className="w-3.5 h-3.5 text-slate-400" /> Student Helpline: +91 77177 07121
             </a>
-            <a href="mailto:xamtoppt@gmail.com" className="hidden lg:flex items-center gap-1.5 hover:text-white transition">
+            <a href="mailto:xamtoppr@gmail.com" className="hidden lg:flex items-center gap-1.5 hover:text-white transition">
               <Mail className="w-3.5 h-3.5 text-slate-400" /> xamtoppr@gmail.com
             </a>
           </div>
@@ -581,18 +606,16 @@ export default function App() {
             <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded text-[11px] font-semibold">
               2026 Updated Syllabus
             </span>
-                      </div>
+          </div>
         </div>
       </div>
 
+      {/* Header */}
       <header className="sticky top-0 z-40 bg-[#0c2356] text-white shadow-lg border-b border-blue-900/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 sm:h-20">
             <div className="flex items-center gap-3">
-              <div
-                onClick={() => setActiveTab('books')}
-                className="cursor-pointer flex items-center gap-2.5 group"
-              >
+              <a href="https://www.xamtoppr.com/" className="cursor-pointer flex items-center gap-2.5 group">
                 <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-orange-600 flex items-center justify-center shadow-md group-hover:scale-105 transition">
                   <GraduationCap className="w-6 h-6 text-slate-950 stroke-[2.5]" />
                 </div>
@@ -605,7 +628,7 @@ export default function App() {
                     Learn • Practice • Excel
                   </span>
                 </div>
-              </div>
+              </a>
             </div>
 
             {/* Desktop Navigation Links */}
@@ -692,54 +715,61 @@ export default function App() {
           </div>
         </div>
 
+        {/* Mobile Dropdown Navigation */}
         {mobileMenuOpen && (
           <div className="lg:hidden bg-[#0a1b3d] border-b border-blue-900 px-4 pt-3 pb-5 space-y-2">
-            <button
-              onClick={() => { setActiveTab('home'); setMobileMenuOpen(false); }}
+            <a
+              href="https://www.xamtoppr.com/"
               className="block w-full text-left px-3 py-2.5 rounded-lg text-slate-200 hover:bg-blue-900/50"
             >
               Home
-            </button>
-            <button
-              onClick={() => { setActiveTab('courses'); setMobileMenuOpen(false); }}
+            </a>
+            <a
+              href="https://xamtoppr.com/video"
               className="block w-full text-left px-3 py-2.5 rounded-lg text-slate-200 hover:bg-blue-900/50"
             >
               Courses
-            </button>
-            <button
-              onClick={() => { setActiveTab('test-series'); setMobileMenuOpen(false); }}
+            </a>
+            <a
+              href="https://xamtoppr.com/package/combo"
               className="block w-full text-left px-3 py-2.5 rounded-lg text-slate-200 hover:bg-blue-900/50"
             >
               Test Series
-            </button>
-            <button
-              onClick={() => { setActiveTab('books'); setMobileMenuOpen(false); }}
+            </a>
+            <a
+              href="/"
               className="block w-full text-left px-3 py-2.5 rounded-lg text-amber-400 font-bold bg-blue-900/60 flex items-center justify-between"
             >
               <span className="flex items-center gap-2">
                 <BookOpen className="w-4 h-4" /> Free Books & PDF Library
               </span>
               <span className="bg-amber-500 text-slate-950 text-[10px] font-black px-1.5 py-0.5 rounded">FREE</span>
-            </button>
-            <button
-              onClick={() => { setActiveTab('current-affairs'); setMobileMenuOpen(false); }}
+            </a>
+            <a
+              href="https://xamtoppr.com/weekly-quiz"
               className="block w-full text-left px-3 py-2.5 rounded-lg text-slate-200 hover:bg-blue-900/50"
             >
               Current Affairs
-            </button>
+            </a>
+            <a
+              href="https://xamtoppr.com/blog"
+              className="block w-full text-left px-3 py-2.5 rounded-lg text-slate-200 hover:bg-blue-900/50"
+            >
+              PYQ Papers
+            </a>
             <div className="pt-3 border-t border-blue-900/60 flex flex-col gap-2">
-              <button
-                onClick={() => { showToast('Redirecting to Student Login'); setMobileMenuOpen(false); }}
+              <a
+                href="https://xamtoppr.com/signin"
                 className="w-full py-2.5 text-center text-sm font-semibold text-white border border-blue-700 rounded-lg hover:bg-blue-900"
               >
                 Log In
-              </button>
-              <button
-                onClick={() => { showToast('Redirecting to Student Sign Up'); setMobileMenuOpen(false); }}
+              </a>
+              <a
+                href="https://xamtoppr.com/signup"
                 className="w-full py-2.5 text-center text-sm font-bold text-slate-950 bg-amber-400 hover:bg-amber-300 rounded-lg"
               >
                 Sign Up Free
-              </button>
+              </a>
             </div>
           </div>
         )}
@@ -748,12 +778,9 @@ export default function App() {
       <main className="flex-1 pb-16">
         <div className="bg-slate-100 border-b border-slate-200 py-2.5 px-4 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto flex items-center text-xs text-slate-600 gap-1.5 flex-wrap">
-            <button
-              onClick={() => setActiveTab('home')}
-              className="hover:text-blue-900 font-medium transition"
-            >
+            <a href="https://www.xamtoppr.com/" className="hover:text-blue-900 font-medium transition">
               Home
-            </button>
+            </a>
             <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
             <span className="text-slate-500">Study Resources</span>
             <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
@@ -761,6 +788,7 @@ export default function App() {
           </div>
         </div>
 
+        {/* Hero Section */}
         <section className="bg-gradient-to-b from-[#0c2356] via-[#102d6b] to-[#153a8a] text-white py-10 sm:py-14 px-4 sm:px-6 lg:px-8 relative overflow-hidden shadow-inner">
           <div className="absolute inset-0 opacity-10 pointer-events-none bg-[radial-gradient(#f59e0b_1px,transparent_1px)] [background-size:16px_16px]"></div>
           <div className="max-w-7xl mx-auto relative z-10">
@@ -794,6 +822,7 @@ export default function App() {
           </div>
         </section>
 
+        {/* Filter & Search Bar */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 sm:-mt-8 relative z-20">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200/80 p-4 sm:p-6">
             <div className="relative">
@@ -887,81 +916,74 @@ export default function App() {
                 <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
                   Medium / Language
                 </label>
-                <div className="relative">
-                  <select
-                    value={selectedMedium}
-                    onChange={(e) => setSelectedMedium(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs sm:text-sm rounded-lg py-2 pl-3 pr-8 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 cursor-pointer"
-                  >
-                    {MEDIUM_OPTIONS.map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <select
+                  value={selectedMedium}
+                  onChange={(e) => setSelectedMedium(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs sm:text-sm rounded-lg py-2 pl-3 pr-8 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 cursor-pointer"
+                >
+                  {MEDIUM_OPTIONS.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
                   Subject / Topic
                 </label>
-                <div className="relative">
-                  <select
-                    value={selectedSubject}
-                    onChange={(e) => setSelectedSubject(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs sm:text-sm rounded-lg py-2 pl-3 pr-8 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 cursor-pointer"
-                  >
-                    {SUBJECT_OPTIONS.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <select
+                  value={selectedSubject}
+                  onChange={(e) => setSelectedSubject(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs sm:text-sm rounded-lg py-2 pl-3 pr-8 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 cursor-pointer"
+                >
+                  {SUBJECT_OPTIONS.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
                   Resource Type
                 </label>
-                <div className="relative">
-                  <select
-                    value={quickFilterBadge}
-                    onChange={(e) => setQuickFilterBadge(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs sm:text-sm rounded-lg py-2 pl-3 pr-8 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 cursor-pointer"
-                  >
-                    <option value="ALL">All Types</option>
-                    <option value="FREE">100% Free Books</option>
-                    <option value="POPULAR">Most Popular / Bestsellers</option>
-                    <option value="TOPPER">Toppers Handwritten Notes</option>
-                    <option value="NEW">New 2026 Editions</option>
-                  </select>
-                </div>
+                <select
+                  value={quickFilterBadge}
+                  onChange={(e) => setQuickFilterBadge(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs sm:text-sm rounded-lg py-2 pl-3 pr-8 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 cursor-pointer"
+                >
+                  <option value="ALL">All Types</option>
+                  <option value="FREE">100% Free Books</option>
+                  <option value="POPULAR">Most Popular / Bestsellers</option>
+                  <option value="TOPPER">Toppers Handwritten Notes</option>
+                  <option value="NEW">New 2026 Editions</option>
+                </select>
               </div>
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
                   Sort Results By
                 </label>
-                <div className="relative">
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs sm:text-sm rounded-lg py-2 pl-3 pr-8 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 cursor-pointer font-medium"
-                  >
-                    {SORT_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs sm:text-sm rounded-lg py-2 pl-3 pr-8 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 cursor-pointer font-medium"
+                >
+                  {SORT_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
         </section>
 
+        {/* Books List Grid */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
             <div className="flex items-center gap-2">
@@ -993,7 +1015,7 @@ export default function App() {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
                 <div key={n} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm animate-pulse">
-                  <div className="h-52 bg-slate-200"></div>
+                  <div className="h-56 bg-slate-200"></div>
                   <div className="p-4 space-y-3">
                     <div className="h-4 bg-slate-200 rounded w-1/3"></div>
                     <div className="h-5 bg-slate-200 rounded w-5/6"></div>
@@ -1040,14 +1062,38 @@ export default function App() {
                     key={book.id}
                     className="bg-white rounded-2xl border border-slate-200 hover:border-amber-400/80 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden group hover:-translate-y-1 relative"
                   >
+                    {/* BOOK COVER ART SECTION (Supports coverImage with Gradient Fallback) */}
                     <div
                       onClick={() => setSelectedBookForModal(book)}
-                      className={`h-52 sm:h-56 bg-gradient-to-br ${book.coverGradient} p-4 flex flex-col justify-between relative cursor-pointer select-none overflow-hidden`}
+                      className="h-56 bg-slate-900 relative cursor-pointer select-none overflow-hidden"
                     >
-                      <div className="absolute left-0 top-0 bottom-0 w-3 bg-white/10 border-r border-white/20"></div>
-                      <div className="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-32 h-32 bg-white/5 rounded-full blur-xl pointer-events-none"></div>
+                      {book.coverImage ? (
+                        <img
+                          src={book.coverImage}
+                          alt={book.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className={`w-full h-full bg-gradient-to-br ${book.coverGradient} p-4 flex flex-col justify-between`}>
+                          <div className="absolute left-0 top-0 bottom-0 w-3 bg-white/10 border-r border-white/20"></div>
+                          <div className="z-10 pl-2">
+                            <div className="text-[10px] uppercase font-bold tracking-widest text-slate-300 mb-1">
+                              {book.examCategory}
+                            </div>
+                            <h4 className="text-white font-black text-sm sm:text-base leading-tight line-clamp-3">
+                              {book.title}
+                            </h4>
+                            <div className={`mt-2 text-xs font-bold ${book.coverAccent}`}>{book.subject}</div>
+                          </div>
+                        </div>
+                      )}
 
-                      <div className="flex items-start justify-between z-10 pl-2">
+                      {/* Dark overlay for contrast */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-black/40 pointer-events-none"></div>
+
+                      {/* Top Badges & Bookmark */}
+                      <div className="absolute top-3 inset-x-3 flex items-start justify-between z-10">
                         <span
                           className={`${book.badgeColor} text-white font-extrabold text-[10px] uppercase px-2 py-0.5 rounded-md shadow-md tracking-wider`}
                         >
@@ -1062,7 +1108,7 @@ export default function App() {
                           className={`p-1.5 rounded-full backdrop-blur-md transition ${
                             isSaved
                               ? 'bg-amber-500 text-slate-950'
-                              : 'bg-black/30 text-white/80 hover:text-white hover:bg-black/50'
+                              : 'bg-black/40 text-white/90 hover:text-white hover:bg-black/60'
                           }`}
                           title={isSaved ? 'Remove Bookmark' : 'Save Book'}
                         >
@@ -1070,32 +1116,22 @@ export default function App() {
                         </button>
                       </div>
 
-                      <div className="z-10 pl-2 pr-1 my-auto">
-                        <div className="text-[10px] uppercase font-bold tracking-widest text-slate-300 mb-1">
-                          {book.examCategory}
-                        </div>
-                        <h4 className="text-white font-black text-sm sm:text-base leading-tight line-clamp-3 drop-shadow-sm">
-                          {book.title}
-                        </h4>
-                        <div className={`mt-2 text-xs font-bold ${book.coverAccent}`}>
-                          {book.subject}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between z-10 pl-2 text-[10px] text-slate-300 font-medium">
-                        <span className="bg-black/40 px-2 py-0.5 rounded">
+                      {/* Bottom Cover Metadata */}
+                      <div className="absolute bottom-2.5 inset-x-3 flex items-center justify-between z-10 text-[10px] text-slate-200 font-medium">
+                        <span className="bg-black/60 px-2 py-0.5 rounded backdrop-blur-xs">
                           {book.language.includes('Hindi') && !book.language.includes('Bilingual')
                             ? 'हिन्दी माध्यम'
                             : book.language.includes('Bilingual')
                             ? 'द्विभाषी (Bilingual)'
                             : 'English Medium'}
                         </span>
-                        <span className="flex items-center gap-1 text-amber-300 font-bold bg-black/40 px-1.5 py-0.5 rounded">
+                        <span className="flex items-center gap-1 text-amber-300 font-bold bg-black/60 px-1.5 py-0.5 rounded">
                           <Star className="w-3 h-3 fill-amber-300" /> {book.rating}
                         </span>
                       </div>
                     </div>
 
+                    {/* Book Card Body */}
                     <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
                       <div>
                         <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500 mb-1.5">
@@ -1133,23 +1169,37 @@ export default function App() {
                         </div>
                       </div>
 
+                      {/* Card Action Buttons with Direct Download / View */}
                       <div className="pt-2 flex items-center gap-2">
                         <button
                           onClick={() => setSelectedBookForModal(book)}
-                          className="flex-1 bg-blue-950 hover:bg-blue-900 text-white text-xs font-bold py-2.5 px-3 rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm"
+                          className="flex-1 bg-blue-950 hover:bg-blue-900 text-white text-xs font-bold py-2.5 px-3 rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm active:scale-98"
                         >
                           <Eye className="w-3.5 h-3.5 text-amber-400" />
                           <span>View Book</span>
                         </button>
-                        <button
-                          onClick={() => {
-                            showToast(`Starting high-speed download for ${book.title.substring(0, 20)}...`);
-                          }}
-                          className="bg-amber-500 hover:bg-amber-400 text-slate-950 p-2.5 rounded-xl transition font-bold shadow-sm"
-                          title="Instant Download PDF"
-                        >
-                          <Download className="w-4 h-4 stroke-[2.5]" />
-                        </button>
+                        
+                        {book.pdfUrl ? (
+                          <a
+                            href={book.pdfUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download={book.title}
+                            onClick={() => showToast(`Starting download: ${book.title.substring(0, 20)}...`)}
+                            className="bg-amber-500 hover:bg-amber-400 text-slate-950 p-2.5 rounded-xl transition font-bold shadow-sm flex items-center justify-center"
+                            title="Download PDF"
+                          >
+                            <Download className="w-4 h-4 stroke-[2.5]" />
+                          </a>
+                        ) : (
+                          <button
+                            onClick={() => showToast('PDF link will be updated soon for this book!')}
+                            className="bg-amber-500 hover:bg-amber-400 text-slate-950 p-2.5 rounded-xl transition font-bold shadow-sm flex items-center justify-center"
+                            title="Download PDF"
+                          >
+                            <Download className="w-4 h-4 stroke-[2.5]" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1159,6 +1209,7 @@ export default function App() {
           )}
         </section>
 
+        {/* Telegram Banner */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-14">
           <div className="bg-gradient-to-r from-blue-900 via-indigo-950 to-slate-950 rounded-3xl p-6 sm:p-10 text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 border border-blue-800/60">
             <div className="space-y-2 max-w-xl text-center md:text-left">
@@ -1173,13 +1224,15 @@ export default function App() {
               </p>
             </div>
             <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0 w-full md:w-auto">
-              <button
-                onClick={() => showToast('Redirecting to official XamToppr Telegram Channel')}
+              <a
+                href="https://t.me/xamtopprnew"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="w-full sm:w-auto bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-sm px-6 py-3.5 rounded-xl shadow-lg transition flex items-center justify-center gap-2"
               >
                 <span>Join Telegram Channel</span>
                 <ArrowRight className="w-4 h-4" />
-              </button>
+              </a>
               <button
                 onClick={() => setShowRequestBookModal(true)}
                 className="w-full sm:w-auto bg-white/10 hover:bg-white/20 text-white text-sm font-semibold px-5 py-3.5 rounded-xl border border-white/20 transition"
@@ -1190,6 +1243,7 @@ export default function App() {
           </div>
         </section>
 
+        {/* Guide Section */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-14">
           <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8">
             <h3 className="text-lg sm:text-xl font-bold text-blue-950 mb-2 flex items-center gap-2">
@@ -1235,6 +1289,7 @@ export default function App() {
         </section>
       </main>
 
+      {/* Book Detail Modal */}
       {selectedBookForModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-300 flex flex-col">
@@ -1319,7 +1374,7 @@ export default function App() {
                 <FileText className="w-10 h-10 text-amber-400" />
                 <div className="font-bold text-sm">Interactive PDF Reader Ready</div>
                 <p className="text-xs text-slate-400 max-w-sm">
-                  You can read this book online without downloading or save a copy to your local device.
+                  Click 'Read Online' to open the PDF in your browser, or use 'Download Free PDF' to save it directly.
                 </p>
               </div>
             </div>
@@ -1334,30 +1389,52 @@ export default function App() {
               </button>
 
               <div className="flex items-center gap-2.5">
-                <button
-                  onClick={() => {
-                    showToast('Opening Fullscreen Reader with Zoom & Dark Mode');
-                  }}
-                  className="bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs sm:text-sm font-bold px-4 py-2.5 rounded-xl transition"
-                >
-                  Read Online
-                </button>
-                <button
-                  onClick={() => {
-                    showToast(`Downloading "${selectedBookForModal.title}" (${selectedBookForModal.fileSize})...`);
-                    setSelectedBookForModal(null);
-                  }}
-                  className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs sm:text-sm font-extrabold px-5 py-2.5 rounded-xl shadow-md transition flex items-center gap-2"
-                >
-                  <Download className="w-4 h-4 stroke-[2.5]" />
-                  <span>Download Free PDF</span>
-                </button>
+                {selectedBookForModal.pdfUrl ? (
+                  <>
+                    <a
+                      href={selectedBookForModal.pdfUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs sm:text-sm font-bold px-4 py-2.5 rounded-xl transition inline-block"
+                    >
+                      Read Online
+                    </a>
+                    <a
+                      href={selectedBookForModal.pdfUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download={selectedBookForModal.title}
+                      onClick={() => setSelectedBookForModal(null)}
+                      className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs sm:text-sm font-extrabold px-5 py-2.5 rounded-xl shadow-md transition flex items-center gap-2"
+                    >
+                      <Download className="w-4 h-4 stroke-[2.5]" />
+                      <span>Download Free PDF</span>
+                    </a>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => showToast('PDF link will be updated soon for this book!')}
+                      className="bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs sm:text-sm font-bold px-4 py-2.5 rounded-xl transition"
+                    >
+                      Read Online
+                    </button>
+                    <button
+                      onClick={() => showToast('PDF link will be updated soon for this book!')}
+                      className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs sm:text-sm font-extrabold px-5 py-2.5 rounded-xl shadow-md transition flex items-center gap-2"
+                    >
+                      <Download className="w-4 h-4 stroke-[2.5]" />
+                      <span>Download Free PDF</span>
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>
         </div>
       )}
 
+      {/* Request Modal */}
       {showRequestBookModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4">
@@ -1445,6 +1522,7 @@ export default function App() {
         </div>
       )}
 
+      {/* Footer */}
       <footer className="bg-[#08152e] text-slate-300 border-t border-blue-950">
         <div className="border-b border-blue-950/80 py-8 px-4 sm:px-6 lg:px-8 bg-[#0a1a38]">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
@@ -1462,18 +1540,18 @@ export default function App() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => showToast('Opening Free Registration')}
-                className="bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs sm:text-sm font-bold px-5 py-2.5 rounded-xl transition"
+              <a
+                href="https://xamtoppr.com/signup"
+                className="bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs sm:text-sm font-bold px-5 py-2.5 rounded-xl transition inline-block"
               >
                 Create Free Account
-              </button>
-              <button
-                onClick={() => showToast('Connecting with Student Counselor')}
-                className="border border-slate-600 hover:border-slate-400 text-white text-xs sm:text-sm font-medium px-4 py-2.5 rounded-xl transition"
+              </a>
+              <a
+                href="tel:+917717707121"
+                className="border border-slate-600 hover:border-slate-400 text-white text-xs sm:text-sm font-medium px-4 py-2.5 rounded-xl transition inline-block"
               >
                 Contact Counselor
-              </button>
+              </a>
             </div>
           </div>
         </div>
@@ -1528,12 +1606,12 @@ export default function App() {
                 Study Resources
               </h5>
               <ul className="space-y-2 text-slate-400">
-                <li><button onClick={() => setActiveTab('books')} className="text-amber-400 font-semibold hover:underline">Free PDF Books Library</button></li>
-                <li><button onClick={() => showToast('Opening Daily Current Affairs')} className="hover:text-amber-400 transition">Daily Current Affairs Capsules</button></li>
-                <li><button onClick={() => showToast('Opening Previous Year Question Papers')} className="hover:text-amber-400 transition">Previous Year Papers (PYQ)</button></li>
-                <li><button onClick={() => showToast('Opening Subject-wise Formula Sheets')} className="hover:text-amber-400 transition">Formula Sheets & Mind-Maps</button></li>
-                <li><button onClick={() => showToast('Opening Daily Free Mini Quizzes')} className="hover:text-amber-400 transition">Daily Live Free Quizzes</button></li>
-                <li><button onClick={() => showToast('Opening Exam Syllabus & Notifications')} className="hover:text-amber-400 transition">Exam Notifications 2026</button></li>
+                <li><a href="/" className="text-amber-400 font-semibold hover:underline">Free PDF Books Library</a></li>
+                <li><a href="https://xamtoppr.com/weekly-quiz" className="hover:text-amber-400 transition">Daily Current Affairs Capsules</a></li>
+                <li><a href="https://xamtoppr.com/blog" className="hover:text-amber-400 transition">Previous Year Papers (PYQ)</a></li>
+                <li><a href="/" className="hover:text-amber-400 transition">Formula Sheets & Mind-Maps</a></li>
+                <li><a href="https://xamtoppr.com/weekly-quiz" className="hover:text-amber-400 transition">Daily Live Free Quizzes</a></li>
+                <li><a href="https://xamtoppr.com/blog" className="hover:text-amber-400 transition">Exam Notifications 2026</a></li>
               </ul>
             </div>
 
@@ -1542,12 +1620,12 @@ export default function App() {
                 Support & Legal
               </h5>
               <ul className="space-y-2 text-slate-400">
-                <li><button onClick={() => showToast('Opening About XamToppr')} className="hover:text-amber-400 transition">About XamToppr</button></li>
-                <li><button onClick={() => showToast('Opening Privacy Policy')} className="hover:text-amber-400 transition">Privacy Policy</button></li>
-                <li><button onClick={() => showToast('Opening Terms & Conditions')} className="hover:text-amber-400 transition">Terms & Conditions</button></li>
-                <li><button onClick={() => showToast('Opening Refund & Cancellation Policy')} className="hover:text-amber-400 transition">Refund & Cancellation Policy</button></li>
-                <li><button onClick={() => showToast('Opening DMCA & Copyright Policy')} className="hover:text-amber-400 transition">DMCA & Copyright Disclaimer</button></li>
-                <li><button onClick={() => showToast('Opening Helpdesk & FAQs')} className="hover:text-amber-400 transition">Student FAQs & Help Center</button></li>
+                <li><a href="https://xamtoppr.com/about-us" className="hover:text-amber-400 transition">About XamToppr</a></li>
+                <li><a href="https://xamtoppr.com/privacy-policy" className="hover:text-amber-400 transition">Privacy Policy</a></li>
+                <li><a href="https://xamtoppr.com/terms" className="hover:text-amber-400 transition">Terms & Conditions</a></li>
+                <li><a href="https://xamtoppr.com/refund-policy" className="hover:text-amber-400 transition">Refund & Cancellation Policy</a></li>
+                <li><a href="https://xamtoppr.com/disclaimer" className="hover:text-amber-400 transition">DMCA & Copyright Disclaimer</a></li>
+                <li><a href="https://xamtoppr.com/contact" className="hover:text-amber-400 transition">Student FAQs & Help Center</a></li>
               </ul>
             </div>
           </div>
@@ -1587,7 +1665,7 @@ export default function App() {
               >
                 Instagram
               </a>
-                          </div>
+            </div>
             <div>
               <p>© 2026 XamToppr Edutech Private Limited. All Rights Reserved.</p>
             </div>
