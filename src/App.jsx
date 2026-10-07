@@ -89,6 +89,7 @@ const SUBJECT_OPTIONS = [
   'General Awareness',
   'English Language',
   'General Science',
+  'Science',
   'Banking Awareness',
   'Static GK',
   'Child Development & Pedagogy',
@@ -122,74 +123,85 @@ export default function App() {
   const [flipPageNumber, setFlipPageNumber] = useState(0);
 
   const flipBookRef = useRef(null);
-  const flipAudioRef = useRef(new Audio('https://assets.mixkit.co/active_storage/sfx/2405/2405-preview.mp3'));
+  const flipAudioRef = useRef(null);
 
-  
+  // Initialize Page-turn Audio
+  useEffect(() => {
+    flipAudioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2405/2405-preview.mp3');
+  }, []);
+
+  const playPageFlipSound = () => {
+    if (flipAudioRef.current) {
+      flipAudioRef.current.currentTime = 0;
+      flipAudioRef.current.play().catch(() => {});
+    }
+  };
+
   // Google Sheet Data Auto-Fetch
-useEffect(() => {
-  if (!GOOGLE_SHEET_CSV_URL || GOOGLE_SHEET_CSV_URL.includes("YAHAN_APNA_GOOGLE_SHEET")) {
-    return;
-  }
+  useEffect(() => {
+    if (!GOOGLE_SHEET_CSV_URL || GOOGLE_SHEET_CSV_URL.includes("YAHAN_APNA_GOOGLE_SHEET")) {
+      return;
+    }
 
-  setIsLoadingSkeleton(true);
-  Papa.parse(GOOGLE_SHEET_CSV_URL, {
-    download: true,
-    header: true,
-    skipEmptyLines: true,
-    complete: (results) => {
-      if (results.data && results.data.length > 0) {
-        // STRICT FILTER: Sirf wahi rows le jisme valid ID aur TITLE dono maujood ho
-        const validRows = results.data.filter(
-          (b) => b.id && b.id.trim() !== '' && b.title && b.title.trim() !== ''
-        );
+    setIsLoadingSkeleton(true);
+    Papa.parse(GOOGLE_SHEET_CSV_URL, {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        if (results.data && results.data.length > 0) {
+          // STRICT FILTER: Sirf valid ID aur Title wali rows hi render hongi
+          const validRows = results.data.filter(
+            (b) => b.id && b.id.trim() !== '' && b.title && b.title.trim() !== ''
+          );
 
-        const parsed = validRows.map((b, index) => {
-          const badgeStr = (b.badge || '').trim();
-          const isPaid = 
-            badgeStr.toUpperCase().includes('PAID') || 
-            badgeStr.toUpperCase().includes('PREMIUM') || 
-            badgeStr.includes('₹');
+          const parsed = validRows.map((b, index) => {
+            const badgeStr = (b.badge || '').trim();
+            const isPaid = 
+              badgeStr.toUpperCase().includes('PAID') || 
+              badgeStr.toUpperCase().includes('PREMIUM') || 
+              badgeStr.includes('₹');
 
-          const samplePagesArr = b.samplePages 
-            ? b.samplePages.split(',').map(s => s.trim()).filter(Boolean)
-            : [];
+            const samplePagesArr = b.samplePages 
+              ? b.samplePages.split(',').map(s => s.trim()).filter(Boolean)
+              : [];
 
-          return {
-            id: b.id.trim(),
-            slug: b.slug ? b.slug.trim() : b.id.trim(),
-            title: b.title.trim(),
-            author: b.author || 'XamToppr Faculty',
-            publisher: b.publisher || 'XamToppr Publications',
-            exam: b.exam || 'All Exams',
-            examCategory: b.examCategory || 'All Competitive Exams',
-            subject: b.subject || 'General Studies',
-            language: b.language || 'Bilingual (Hindi + English)',
-            pages: Number(b.pages) || 0,
-            fileSize: b.fileSize || '',
-            rating: Number(b.rating) || 4.8,
-            reviewsCount: Number(b.reviewsCount) || 100,
-            downloadsCount: b.downloadsCount || '10K',
-            badge: badgeStr || 'FREE PDF',
-            badgeColor: b.badgeColor || (isPaid ? 'bg-emerald-600' : 'bg-amber-500'),
-            coverGradient: 'from-blue-900 via-indigo-950 to-slate-900',
-            coverAccent: 'text-amber-400',
-            coverImage: b.coverImage ? b.coverImage.trim() : '',
-            samplePdfUrl: b.samplePdfUrl ? b.samplePdfUrl.trim() : '',
-            pdfUrl: b.pdfUrl ? b.pdfUrl.trim() : '',
-            samplePages: samplePagesArr,
-            isFree: !isPaid,
-            publishedYear: b.publishedYear || '2026',
-            description: b.description || '',
-            tableOfContents: b.tableOfContents ? b.tableOfContents.split(',').map(s => s.trim()).filter(Boolean) : []
-          };
-        });
-        setBooksList(parsed);
-      }
-      setIsLoadingSkeleton(false);
-    },
-    error: () => setIsLoadingSkeleton(false)
-  });
-}, []);
+            return {
+              id: b.id.trim(),
+              slug: b.slug ? b.slug.trim() : b.id.trim(),
+              title: b.title.trim(),
+              author: b.author || 'XamToppr Faculty',
+              publisher: b.publisher || 'XamToppr Publications',
+              exam: b.exam || 'All Exams',
+              examCategory: b.examCategory || 'All Competitive Exams',
+              subject: b.subject || 'General Studies',
+              language: b.language || 'Bilingual (Hindi + English)',
+              pages: Number(b.pages) || 0,
+              fileSize: b.fileSize || '',
+              rating: Number(b.rating) || 4.8,
+              reviewsCount: Number(b.reviewsCount) || 100,
+              downloadsCount: b.downloadsCount || '10K',
+              badge: badgeStr || 'FREE PDF',
+              badgeColor: b.badgeColor || (isPaid ? 'bg-emerald-600' : 'bg-amber-500'),
+              coverGradient: 'from-blue-900 via-indigo-950 to-slate-900',
+              coverAccent: 'text-amber-400',
+              coverImage: b.coverImage ? b.coverImage.trim() : '',
+              samplePdfUrl: b.samplePdfUrl ? b.samplePdfUrl.trim() : '',
+              pdfUrl: b.pdfUrl ? b.pdfUrl.trim() : '',
+              samplePages: samplePagesArr,
+              isFree: !isPaid,
+              publishedYear: b.publishedYear || '2026',
+              description: b.description || '',
+              tableOfContents: b.tableOfContents ? b.tableOfContents.split(',').map(s => s.trim()).filter(Boolean) : []
+            };
+          });
+          setBooksList(parsed);
+        }
+        setIsLoadingSkeleton(false);
+      },
+      error: () => setIsLoadingSkeleton(false)
+    });
+  }, []);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -245,11 +257,12 @@ useEffect(() => {
           const isNote = 
             book.badge.toUpperCase().includes('NOTES') || 
             book.title.toUpperCase().includes('NOTES') || 
-            book.examCategory.toUpperCase().includes('NOTES');
+            book.examCategory.toUpperCase().includes('NOTES') ||
+            book.samplePages.length > 0;
           if (!isNote) return false;
         } else {
-          if (selectedExam === 'State Exams' && book.exam !== 'State Exams') return false;
-          if (selectedExam !== 'State Exams' && book.exam !== selectedExam && book.exam !== 'All Exams') return false;
+          if (selectedExam === 'State Exams' && !book.exam.includes('State Exams')) return false;
+          if (selectedExam !== 'State Exams' && !book.exam.includes(selectedExam) && book.exam !== 'All Exams') return false;
         }
       }
 
@@ -266,7 +279,7 @@ useEffect(() => {
       if (quickFilterBadge === 'FREE' && !book.isFree) return false;
       if (quickFilterBadge === 'POPULAR' && !['POPULAR', 'BESTSELLER', 'MOST DOWNLOADED'].includes(book.badge)) return false;
       if (quickFilterBadge === 'TOPPER' && !book.badge.toUpperCase().includes('TOPPER')) return false;
-      if (quickFilterBadge === 'NOTES' && !book.badge.toUpperCase().includes('NOTES')) return false;
+      if (quickFilterBadge === 'NOTES' && !(book.badge.toUpperCase().includes('NOTES') || book.samplePages.length > 0)) return false;
       if (quickFilterBadge === 'NEW' && book.badge !== 'NEW 2026') return false;
 
       return true;
@@ -456,7 +469,7 @@ useEffect(() => {
           </div>
         </section>
 
-        {/* Filter Controls (Visual Notes Button Added) */}
+        {/* Filter Controls */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 sm:-mt-8 relative z-20">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200/80 p-4 sm:p-6">
             <div className="relative">
@@ -490,7 +503,7 @@ useEffect(() => {
                 <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Popular:
               </span>
               {[
-                'Geography Visual Notes',
+                'Biology Notes',
                 'Maths Formula Sheet',
                 'General Studies 7500+',
                 'Handwritten History',
@@ -642,7 +655,7 @@ useEffect(() => {
 
           {isLoadingSkeleton ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+              {[1, 2, 3, 4].map((n) => (
                 <div key={n} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm animate-pulse">
                   <div className="h-72 bg-slate-200"></div>
                   <div className="p-4 space-y-3">
@@ -679,7 +692,13 @@ useEffect(() => {
                   >
                     {/* ENLARGED COVER CONTAINER */}
                     <div
-                      onClick={() => setSelectedBookForModal(book)}
+                      onClick={() => {
+                        if (isVisualNote) {
+                          setShowFlipbookModal(book);
+                        } else {
+                          setSelectedBookForModal(book);
+                        }
+                      }}
                       className="h-72 sm:h-80 bg-slate-950 relative cursor-pointer select-none overflow-hidden flex items-center justify-center"
                     >
                       {book.coverImage ? (
@@ -742,7 +761,13 @@ useEffect(() => {
                         </div>
 
                         <h3
-                          onClick={() => setSelectedBookForModal(book)}
+                          onClick={() => {
+                            if (isVisualNote) {
+                              setShowFlipbookModal(book);
+                            } else {
+                              setSelectedBookForModal(book);
+                            }
+                          }}
                           className="font-bold text-slate-900 text-sm leading-snug line-clamp-2 hover:text-blue-900 cursor-pointer transition"
                           title={book.title}
                         >
@@ -760,7 +785,7 @@ useEffect(() => {
                           </div>
                           <div className="border-x border-slate-200">
                             <span className="block text-slate-400 text-[9px] uppercase">Size</span>
-                            <span className="font-bold text-slate-800">{book.fileSize}</span>
+                            <span className="font-bold text-slate-800">{book.fileSize || 'N/A'}</span>
                           </div>
                           <div>
                             <span className="block text-slate-400 text-[9px] uppercase">Downloads</span>
@@ -830,7 +855,7 @@ useEffect(() => {
       </main>
 
       {/* ============================================================== */}
-      {/* 3D INTERACTIVE IN-HOUSE FLIPBOOK MODAL (100% FREE & UNLIMITED) */}
+      {/* 3D INTERACTIVE FLIPBOOK MODAL WITH REALISTIC SOUND */}
       {/* ============================================================== */}
       {showFlipbookModal && (() => {
         const book = showFlipbookModal;
@@ -850,12 +875,12 @@ useEffect(() => {
                   </div>
                   <div>
                     <h3 className="text-sm sm:text-base font-bold text-white line-clamp-1">{book.title}</h3>
-                    <p className="text-[11px] text-purple-300">3D Interactive Page-Flip Preview</p>
+                    <p className="text-[11px] text-purple-300">Interactive 3D Page-Flip Experience</p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {book.pdfUrl && (
+                  {!book.isFree && book.pdfUrl && (
                     <a
                       href={book.pdfUrl}
                       target="_blank"
@@ -864,6 +889,17 @@ useEffect(() => {
                     >
                       <ShoppingCart className="w-3.5 h-3.5" />
                       <span>Buy Full ({book.badge})</span>
+                    </a>
+                  )}
+                  {book.isFree && book.pdfUrl && (
+                    <a
+                      href={book.pdfUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-md"
+                    >
+                      <Download className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span>Download PDF</span>
                     </a>
                   )}
                   <button
@@ -892,7 +928,10 @@ useEffect(() => {
                   mobileScrollSupport={true}
                   className="shadow-2xl mx-auto rounded-lg overflow-hidden"
                   ref={flipBookRef}
-                  onFlip={(e) => setFlipPageNumber(e.data)}
+                  onFlip={(e) => {
+                    setFlipPageNumber(e.data);
+                    playPageFlipSound();
+                  }}
                 >
                   {/* Page 1: Cover */}
                   <div className="bg-slate-900 border border-slate-700 h-full flex flex-col items-center justify-center p-4 shadow-2xl relative">
@@ -908,40 +947,56 @@ useEffect(() => {
                     <div className="absolute bottom-3 text-[10px] text-slate-400 font-mono">Turn page to start reading ➔</div>
                   </div>
 
-                  {/* Sample Pages (From samplePages column in Sheet) */}
+                  {/* Sample Pages */}
                   {pagesList.map((pageImg, idx) => (
                     <div key={idx} className="bg-white text-slate-900 h-full flex flex-col items-center justify-center p-2 shadow-inner border border-slate-300">
                       <img src={pageImg} alt={`Page ${idx + 1}`} className="w-full h-full object-contain" />
-                      <div className="text-[10px] text-slate-400 mt-1">Sample Page {idx + 1}</div>
+                      <div className="text-[10px] text-slate-400 mt-1">Page {idx + 1}</div>
                     </div>
                   ))}
 
-                  {/* Final Page: Buy / Unlock Screen */}
+                  {/* Final Page */}
                   <div className="bg-gradient-to-br from-indigo-950 via-slate-900 to-purple-950 text-white h-full flex flex-col items-center justify-center p-6 text-center border border-indigo-700/50">
                     <Sparkles className="w-12 h-12 text-amber-400 mb-3 animate-pulse" />
                     <h3 className="text-lg font-black text-white">Sample Preview Ended</h3>
                     <p className="text-xs text-slate-300 mt-2 max-w-xs leading-relaxed">
-                      Unlock complete comprehensive visual notes with detailed diagrams, infographics, and mind maps.
+                      {book.isFree 
+                        ? 'Download the complete free PDF copy to keep revising offline.' 
+                        : 'Unlock complete comprehensive visual notes with full high-resolution diagrams.'}
                     </p>
                     <div className="mt-5 w-full max-w-xs">
-                      <a
-                        href={book.pdfUrl || '#'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 text-slate-950 font-black text-xs py-3 rounded-xl shadow-xl flex items-center justify-center gap-2 transition transform active:scale-95"
-                      >
-                        <ShoppingCart className="w-4 h-4" />
-                        <span>Unlock Full Notes ({book.badge})</span>
-                      </a>
+                      {book.isFree ? (
+                        <a
+                          href={book.pdfUrl || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs py-3 rounded-xl shadow-xl flex items-center justify-center gap-2 transition"
+                        >
+                          <Download className="w-4 h-4 stroke-[2.5]" />
+                          <span>Download Free PDF</span>
+                        </a>
+                      ) : (
+                        <a
+                          href={book.pdfUrl || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 text-slate-950 font-black text-xs py-3 rounded-xl shadow-xl flex items-center justify-center gap-2 transition"
+                        >
+                          <ShoppingCart className="w-4 h-4" />
+                          <span>Unlock Full Notes ({book.badge})</span>
+                        </a>
+                      )}
                     </div>
-                    <span className="text-[10px] text-slate-400 mt-3">Instant digital access after payment</span>
                   </div>
                 </HTMLFlipBook>
 
                 {/* Flip Navigation Controls */}
                 <div className="mt-4 flex items-center gap-4 bg-slate-900/80 px-4 py-2 rounded-full border border-slate-700/80 backdrop-blur-md">
                   <button
-                    onClick={() => flipBookRef.current?.pageFlip()?.flipPrev()}
+                    onClick={() => {
+                      flipBookRef.current?.pageFlip()?.flipPrev();
+                      playPageFlipSound();
+                    }}
                     className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white transition"
                     title="Previous Page"
                   >
@@ -953,7 +1008,10 @@ useEffect(() => {
                   </span>
 
                   <button
-                    onClick={() => flipBookRef.current?.pageFlip()?.flipNext()}
+                    onClick={() => {
+                      flipBookRef.current?.pageFlip()?.flipNext();
+                      playPageFlipSound();
+                    }}
                     className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white transition"
                     title="Next Page"
                   >
@@ -1016,7 +1074,7 @@ useEffect(() => {
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px] uppercase">File Size</span>
-                    <span className="font-bold text-slate-900">{selectedBookForModal.fileSize}</span>
+                    <span className="font-bold text-slate-900">{selectedBookForModal.fileSize || 'N/A'}</span>
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px] uppercase">Rating</span>
