@@ -122,8 +122,9 @@ export default function App() {
   const [flipPageNumber, setFlipPageNumber] = useState(0);
 
   const flipBookRef = useRef(null);
+  const flipAudioRef = useRef(new Audio('https://assets.mixkit.co/active_storage/sfx/2405/2405-preview.mp3'));
 
-  // Google Sheet Data Auto-Fetch
+  
   // Google Sheet Data Auto-Fetch
 useEffect(() => {
   if (!GOOGLE_SHEET_CSV_URL || GOOGLE_SHEET_CSV_URL.includes("YAHAN_APNA_GOOGLE_SHEET")) {
