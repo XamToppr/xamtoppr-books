@@ -124,65 +124,71 @@ export default function App() {
   const flipBookRef = useRef(null);
 
   // Google Sheet Data Auto-Fetch
-  useEffect(() => {
-    if (!GOOGLE_SHEET_CSV_URL || GOOGLE_SHEET_CSV_URL.includes("YAHAN_APNA_GOOGLE_SHEET")) {
-      return;
-    }
+  // Google Sheet Data Auto-Fetch
+useEffect(() => {
+  if (!GOOGLE_SHEET_CSV_URL || GOOGLE_SHEET_CSV_URL.includes("YAHAN_APNA_GOOGLE_SHEET")) {
+    return;
+  }
 
-    setIsLoadingSkeleton(true);
-    Papa.parse(GOOGLE_SHEET_CSV_URL, {
-      download: true,
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        if (results.data && results.data.length > 0) {
-          const parsed = results.data.map((b, index) => {
-            const badgeStr = (b.badge || '').trim();
-            const isPaid = 
-              badgeStr.toUpperCase().includes('PAID') || 
-              badgeStr.toUpperCase().includes('PREMIUM') || 
-              badgeStr.includes('₹');
+  setIsLoadingSkeleton(true);
+  Papa.parse(GOOGLE_SHEET_CSV_URL, {
+    download: true,
+    header: true,
+    skipEmptyLines: true,
+    complete: (results) => {
+      if (results.data && results.data.length > 0) {
+        // STRICT FILTER: Sirf wahi rows le jisme valid ID aur TITLE dono maujood ho
+        const validRows = results.data.filter(
+          (b) => b.id && b.id.trim() !== '' && b.title && b.title.trim() !== ''
+        );
 
-            const samplePagesArr = b.samplePages 
-              ? b.samplePages.split(',').map(s => s.trim()).filter(Boolean)
-              : [];
+        const parsed = validRows.map((b, index) => {
+          const badgeStr = (b.badge || '').trim();
+          const isPaid = 
+            badgeStr.toUpperCase().includes('PAID') || 
+            badgeStr.toUpperCase().includes('PREMIUM') || 
+            badgeStr.includes('₹');
 
-            return {
-              id: b.id || `xt-bk-${index + 1}`,
-              slug: b.slug || `book-${index + 1}`,
-              title: b.title || 'Untitled Book',
-              author: b.author || 'XamToppr Faculty',
-              publisher: b.publisher || 'XamToppr Publications',
-              exam: b.exam || 'All Exams',
-              examCategory: b.examCategory || 'All Competitive Exams',
-              subject: b.subject || 'General Studies',
-              language: b.language || 'Bilingual (Hindi + English)',
-              pages: Number(b.pages) || 120,
-              fileSize: b.fileSize || '10 MB',
-              rating: Number(b.rating) || 4.8,
-              reviewsCount: Number(b.reviewsCount) || 250,
-              downloadsCount: b.downloadsCount || '25K',
-              badge: badgeStr || 'FREE PDF',
-              badgeColor: b.badgeColor || (isPaid ? 'bg-emerald-600' : 'bg-amber-500'),
-              coverGradient: 'from-blue-900 via-indigo-950 to-slate-900',
-              coverAccent: 'text-amber-400',
-              coverImage: b.coverImage ? b.coverImage.trim() : '',
-              samplePdfUrl: b.samplePdfUrl ? b.samplePdfUrl.trim() : '',
-              pdfUrl: b.pdfUrl ? b.pdfUrl.trim() : '',
-              samplePages: samplePagesArr,
-              isFree: !isPaid,
-              publishedYear: b.publishedYear || '2026',
-              description: b.description || 'Verified exam preparation study material with solved papers.',
-              tableOfContents: b.tableOfContents ? b.tableOfContents.split(',').map(s => s.trim()) : ['Core Concepts', 'Practice MCQs']
-            };
-          });
-          setBooksList(parsed);
-        }
-        setIsLoadingSkeleton(false);
-      },
-      error: () => setIsLoadingSkeleton(false)
-    });
-  }, []);
+          const samplePagesArr = b.samplePages 
+            ? b.samplePages.split(',').map(s => s.trim()).filter(Boolean)
+            : [];
+
+          return {
+            id: b.id.trim(),
+            slug: b.slug ? b.slug.trim() : b.id.trim(),
+            title: b.title.trim(),
+            author: b.author || 'XamToppr Faculty',
+            publisher: b.publisher || 'XamToppr Publications',
+            exam: b.exam || 'All Exams',
+            examCategory: b.examCategory || 'All Competitive Exams',
+            subject: b.subject || 'General Studies',
+            language: b.language || 'Bilingual (Hindi + English)',
+            pages: Number(b.pages) || 0,
+            fileSize: b.fileSize || '',
+            rating: Number(b.rating) || 4.8,
+            reviewsCount: Number(b.reviewsCount) || 100,
+            downloadsCount: b.downloadsCount || '10K',
+            badge: badgeStr || 'FREE PDF',
+            badgeColor: b.badgeColor || (isPaid ? 'bg-emerald-600' : 'bg-amber-500'),
+            coverGradient: 'from-blue-900 via-indigo-950 to-slate-900',
+            coverAccent: 'text-amber-400',
+            coverImage: b.coverImage ? b.coverImage.trim() : '',
+            samplePdfUrl: b.samplePdfUrl ? b.samplePdfUrl.trim() : '',
+            pdfUrl: b.pdfUrl ? b.pdfUrl.trim() : '',
+            samplePages: samplePagesArr,
+            isFree: !isPaid,
+            publishedYear: b.publishedYear || '2026',
+            description: b.description || '',
+            tableOfContents: b.tableOfContents ? b.tableOfContents.split(',').map(s => s.trim()).filter(Boolean) : []
+          };
+        });
+        setBooksList(parsed);
+      }
+      setIsLoadingSkeleton(false);
+    },
+    error: () => setIsLoadingSkeleton(false)
+  });
+}, []);
 
   const showToast = (msg) => {
     setToastMessage(msg);
