@@ -35,7 +35,6 @@ import {
 // ==========================================
 const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTWDpgH3DG7CxaaXFi1qado9DzZ_dykCwxZeaZ58_ddMo6RmtMOsfZfmm0FRPpsYMntSv5h9DgZ7Pq2/pub?output=csv";
 
-// Fallback Books (Agar internet slow ho ya sheet load na ho)
 const INITIAL_BOOKS = [
   {
     id: 'xt-bk-001',
@@ -57,6 +56,7 @@ const INITIAL_BOOKS = [
     coverGradient: 'from-blue-900 via-indigo-950 to-slate-900',
     coverAccent: 'text-amber-400',
     coverImage: '',
+    samplePdfUrl: '',
     pdfUrl: '',
     isFree: true,
     publishedYear: '2026',
@@ -117,7 +117,6 @@ export default function App() {
   const [isLoadingSkeleton, setIsLoadingSkeleton] = useState(false);
   const [quickFilterBadge, setQuickFilterBadge] = useState('ALL');
 
-  // Google Sheet Data Auto-Fetch
   useEffect(() => {
     if (!GOOGLE_SHEET_CSV_URL || GOOGLE_SHEET_CSV_URL.includes("YAHAN_APNA_GOOGLE_SHEET")) {
       return;
@@ -153,10 +152,11 @@ export default function App() {
               reviewsCount: Number(b.reviewsCount) || 250,
               downloadsCount: b.downloadsCount || '25K',
               badge: badgeStr || 'FREE PDF',
-              badgeColor: b.badgeColor || (isPaid ? 'bg-rose-600' : 'bg-amber-500'),
+              badgeColor: b.badgeColor || (isPaid ? 'bg-emerald-600' : 'bg-amber-500'),
               coverGradient: 'from-blue-900 via-indigo-950 to-slate-900',
               coverAccent: 'text-amber-400',
               coverImage: b.coverImage ? b.coverImage.trim() : '',
+              samplePdfUrl: b.samplePdfUrl ? b.samplePdfUrl.trim() : '',
               pdfUrl: b.pdfUrl ? b.pdfUrl.trim() : '',
               isFree: !isPaid,
               publishedYear: b.publishedYear || '2026',
@@ -290,7 +290,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* Navigation Header */}
+      {/* Header */}
       <header className="sticky top-0 z-40 bg-[#0c2356] text-white shadow-lg border-b border-blue-900/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 sm:h-20">
@@ -696,7 +696,7 @@ export default function App() {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
                 <div key={n} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm animate-pulse">
-                  <div className="h-56 bg-slate-200"></div>
+                  <div className="h-72 bg-slate-200"></div>
                   <div className="p-4 space-y-3">
                     <div className="h-4 bg-slate-200 rounded w-1/3"></div>
                     <div className="h-5 bg-slate-200 rounded w-5/6"></div>
@@ -745,16 +745,16 @@ export default function App() {
                     key={book.id}
                     className="bg-white rounded-2xl border border-slate-200 hover:border-amber-400/80 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden group hover:-translate-y-1 relative"
                   >
-                    {/* BOOK COVER ART SECTION */}
+                    {/* ENLARGED BOOK COVER (Height h-72 + object-contain for full clarity) */}
                     <div
                       onClick={() => setSelectedBookForModal(book)}
-                      className="h-56 bg-slate-900 relative cursor-pointer select-none overflow-hidden"
+                      className="h-72 sm:h-80 bg-slate-950 relative cursor-pointer select-none overflow-hidden flex items-center justify-center"
                     >
                       {book.coverImage ? (
                         <img
                           src={book.coverImage}
                           alt={book.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                          className="w-full h-full object-contain p-1 group-hover:scale-105 transition duration-500"
                           loading="lazy"
                         />
                       ) : (
@@ -772,8 +772,7 @@ export default function App() {
                         </div>
                       )}
 
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-black/40 pointer-events-none"></div>
-
+                      {/* Top Badges & Bookmark */}
                       <div className="absolute top-3 inset-x-3 flex items-start justify-between z-10">
                         <span
                           className={`${book.badgeColor} text-white font-extrabold text-[10px] uppercase px-2 py-0.5 rounded-md shadow-md tracking-wider`}
@@ -797,15 +796,16 @@ export default function App() {
                         </button>
                       </div>
 
+                      {/* Bottom Cover Metadata */}
                       <div className="absolute bottom-2.5 inset-x-3 flex items-center justify-between z-10 text-[10px] text-slate-200 font-medium">
-                        <span className="bg-black/60 px-2 py-0.5 rounded backdrop-blur-xs">
+                        <span className="bg-black/70 px-2 py-0.5 rounded backdrop-blur-xs">
                           {book.language.includes('Hindi') && !book.language.includes('Bilingual')
                             ? 'हिन्दी माध्यम'
                             : book.language.includes('Bilingual')
                             ? 'द्विभाषी (Bilingual)'
                             : 'English Medium'}
                         </span>
-                        <span className="flex items-center gap-1 text-amber-300 font-bold bg-black/60 px-1.5 py-0.5 rounded">
+                        <span className="flex items-center gap-1 text-amber-300 font-bold bg-black/70 px-1.5 py-0.5 rounded">
                           <Star className="w-3 h-3 fill-amber-300" /> {book.rating}
                         </span>
                       </div>
@@ -993,6 +993,8 @@ export default function App() {
           selectedBookForModal.badge?.toUpperCase().includes('PREMIUM') ||
           selectedBookForModal.badge?.includes('₹');
 
+        const sampleUrl = selectedBookForModal.samplePdfUrl || selectedBookForModal.pdfUrl;
+
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-sm animate-fadeIn">
             <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-300 flex flex-col">
@@ -1048,7 +1050,7 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* About This Study Material (whitespace-pre-line se Alt+Enter line breaks properly dikhenge) */}
+                {/* About This Study Material */}
                 <div>
                   <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-2">
                     About This Study Material
@@ -1093,23 +1095,24 @@ export default function App() {
                 </button>
 
                 <div className="flex items-center gap-2.5">
-                  {/* Read Online Button */}
+                  {/* Read Online / Read Sample PDF Button */}
                   <a
-                    href={selectedBookForModal.pdfUrl || '#'}
+                    href={sampleUrl || '#'}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => {
-                      if (!selectedBookForModal.pdfUrl) {
+                      if (!sampleUrl) {
                         e.preventDefault();
-                        showToast('Link will be updated soon!');
+                        showToast('Sample PDF link will be uploaded soon!');
                       }
                     }}
-                    className="bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs sm:text-sm font-bold px-4 py-2.5 rounded-xl transition inline-block"
+                    className="bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs sm:text-sm font-bold px-4 py-2.5 rounded-xl transition inline-flex items-center gap-1.5"
                   >
-                    Read Online
+                    <BookOpen className="w-3.5 h-3.5 text-blue-900" />
+                    <span>{isPaidBook ? 'Read Sample PDF' : 'Read Online'}</span>
                   </a>
 
-                  {/* Dynamic Action Button: Buy Now vs Free Download */}
+                  {/* Buy Now vs Download Free PDF */}
                   {isPaidBook ? (
                     <a
                       href={selectedBookForModal.pdfUrl || '#'}
@@ -1123,7 +1126,7 @@ export default function App() {
                       }}
                       className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white text-xs sm:text-sm font-extrabold px-5 py-2.5 rounded-xl shadow-md transition flex items-center gap-2 transform active:scale-95"
                     >
-                      <Sparkles className="w-4 h-4 text-amber-300" />
+                      <ShoppingCart className="w-4 h-4 text-white" />
                       <span>Buy Now ({selectedBookForModal.badge})</span>
                     </a>
                   ) : (
