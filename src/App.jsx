@@ -136,15 +136,30 @@ export default function App() {
     }
   };
 
-  // Markdown bold (**text**) ko HTML Bold me badalne ka helper
-    // Markdown bold (**text**) ko HTML Bold me badalne ka helper
-  const renderFormattedText = (text) => {
+  // 1. PDF DETAIL MODAL KE LIYE: Light background par Sharp Black Bold Text
+  const renderPdfModalDescription = (text) => {
     if (!text) return '';
     const parts = text.split(/(\*\*.*?\*\*)/g);
     return parts.map((part, index) => {
       if (part.startsWith('**') && part.endsWith('**')) {
         return (
-          <strong key={index} className="font-black text-amber-300 drop-shadow">
+          <strong key={index} className="font-extrabold text-slate-950">
+            {part.slice(2, -2)}
+          </strong>
+        );
+      }
+      return part;
+    });
+  };
+
+  // 2. HANDWRITTEN 3D FLIPBOOK KE LIYE: Dark background par Glowing Amber-Yellow Bold Text
+  const renderFlipbookDescription = (text) => {
+    if (!text) return '';
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+    return parts.map((part, index) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return (
+          <strong key={index} className="font-black text-amber-300 drop-shadow-sm">
             {part.slice(2, -2)}
           </strong>
         );
@@ -986,8 +1001,8 @@ export default function App() {
         <span>About These Notes</span>
       </div>
       <div className="text-[11px] sm:text-xs text-slate-200 leading-relaxed font-sans whitespace-pre-line">
-        {renderFormattedText(book.description || '')}
-      </div>
+  {renderFlipbookDescription(book.description || '')}
+</div>
     </div>
 
     {/* Bottom Indicator (Fixed Height ~35px Anchored at Bottom) */}
@@ -1200,8 +1215,8 @@ export default function App() {
                     About This Study Material
                   </h4>
                   <div className="text-xs sm:text-sm text-slate-700 leading-relaxed bg-slate-50/80 p-4 sm:p-5 rounded-2xl border border-slate-200 whitespace-pre-line font-sans">
-                    {renderFormattedText(selectedBookForModal.description)}
-                  </div>
+  {renderPdfModalDescription(selectedBookForModal.description)}
+</div>
                 </div>
 
                 {selectedBookForModal.tableOfContents && selectedBookForModal.tableOfContents.length > 0 && (
