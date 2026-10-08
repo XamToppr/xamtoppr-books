@@ -137,16 +137,14 @@ export default function App() {
   };
 
   // Markdown bold (**text**) ko HTML Bold me badalne ka helper
-    const renderFormattedText = (text, isDark = false) => {
+    // Markdown bold (**text**) ko HTML Bold me badalne ka helper
+  const renderFormattedText = (text) => {
     if (!text) return '';
     const parts = text.split(/(\*\*.*?\*\*)/g);
     return parts.map((part, index) => {
       if (part.startsWith('**') && part.endsWith('**')) {
         return (
-          <strong 
-            key={index} 
-            className={`font-black ${isDark ? 'text-amber-300 drop-shadow' : 'text-slate-900'}`}
-          >
+          <strong key={index} className="font-black text-amber-300 drop-shadow">
             {part.slice(2, -2)}
           </strong>
         );
@@ -978,14 +976,14 @@ export default function App() {
       </p>
     </div>
 
-    {/* Middle Scrollable Clean Description Area (No Text Cut, Smooth Scroll) */}
-    <div className="relative z-10 my-2.5 flex-1 min-h-0 overflow-y-auto pr-1.5 text-left bg-slate-900/80 p-3 rounded-xl border border-indigo-500/30 backdrop-blur-md shadow-inner">
-      <div className="text-[10px] uppercase font-bold text-amber-400 tracking-wider mb-1.5 flex items-center gap-1.5 sticky top-0 bg-slate-900/90 py-0.5 backdrop-blur-sm z-10">
+    {/* Middle Scrollable Clean Description Area (No Text Cut) */}
+    <div className="relative z-10 my-2 flex-1 min-h-0 max-h-[230px] overflow-y-auto pr-1 text-left bg-slate-900/80 p-3 rounded-xl border border-indigo-500/30 backdrop-blur-md shadow-inner">
+      <div className="text-[10px] uppercase font-bold text-amber-400 tracking-wider mb-1.5 flex items-center gap-1.5 sticky top-0 bg-slate-900 py-0.5 z-10">
         <Sparkles className="w-3.5 h-3.5 text-amber-400" />
         <span>About These Notes</span>
       </div>
-      <div className="text-[11px] sm:text-xs text-slate-200 leading-relaxed font-sans whitespace-pre-line">
-        {renderFormattedText(book.description || 'Comprehensive handwritten & visual notes designed specifically for competitive exam revision.', true)}
+      <div className="text-[11px] sm:text-xs text-slate-100 leading-relaxed font-sans whitespace-pre-line">
+        {renderFormattedText(book.description || '')}
       </div>
     </div>
 
