@@ -136,6 +136,22 @@ export default function App() {
     }
   };
 
+  // Markdown bold (**text**) ko HTML Bold me badalne ka helper
+  const renderFormattedText = (text) => {
+    if (!text) return '';
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+    return parts.map((part, index) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return (
+          <strong key={index} className="font-extrabold text-slate-900">
+            {part.slice(2, -2)}
+          </strong>
+        );
+      }
+      return part;
+    });
+  };
+
   // Google Sheet Data Auto-Fetch
   useEffect(() => {
     if (!GOOGLE_SHEET_CSV_URL || GOOGLE_SHEET_CSV_URL.includes("YAHAN_APNA_GOOGLE_SHEET")) {
@@ -1145,7 +1161,7 @@ export default function App() {
                     About This Study Material
                   </h4>
                   <div className="text-xs sm:text-sm text-slate-700 leading-relaxed bg-slate-50/80 p-4 sm:p-5 rounded-2xl border border-slate-200 whitespace-pre-line font-sans">
-                    {selectedBookForModal.description}
+                    {renderFormattedText(selectedBookForModal.description)}
                   </div>
                 </div>
 
