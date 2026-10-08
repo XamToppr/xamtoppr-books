@@ -137,13 +137,16 @@ export default function App() {
   };
 
   // Markdown bold (**text**) ko HTML Bold me badalne ka helper
-  const renderFormattedText = (text) => {
+    const renderFormattedText = (text, isDark = false) => {
     if (!text) return '';
     const parts = text.split(/(\*\*.*?\*\*)/g);
     return parts.map((part, index) => {
       if (part.startsWith('**') && part.endsWith('**')) {
         return (
-          <strong key={index} className="font-extrabold text-slate-900">
+          <strong 
+            key={index} 
+            className={`font-black ${isDark ? 'text-amber-300 drop-shadow' : 'text-slate-900'}`}
+          >
             {part.slice(2, -2)}
           </strong>
         );
@@ -930,6 +933,7 @@ export default function App() {
               <div className="flex-1 overflow-auto p-4 flex flex-col items-center justify-center bg-radial from-slate-800 to-slate-950 relative min-h-[460px]">
                 
                 {/* HTMLFlipBook Component */}
+<{/* HTMLFlipBook Component */}
 <HTMLFlipBook
   width={340}
   height={480}
@@ -948,30 +952,16 @@ export default function App() {
     playPageFlipSound();
   }}
 >
-  {/* Page 1: Cover */}
-  <div className="bg-slate-900 border border-slate-700 h-full flex flex-col items-center justify-center p-4 shadow-2xl relative select-none">
-    {book.coverImage ? (
-      <img src={book.coverImage} alt="Cover" className="w-full h-full object-contain" />
-    ) : (
-      <div className="text-center p-6">
-        <span className="text-xs text-purple-400 font-bold uppercase tracking-wider">{book.examCategory}</span>
-        <h2 className="text-xl font-black text-white mt-2">{book.title}</h2>
-        <p className="text-xs text-slate-400 mt-2">By {book.author}</p>
-      </div>
-    )}
-    <div className="absolute bottom-3 text-[10px] text-slate-400 font-mono">Turn page to start reading ➔</div>
-  </div>
-
-  {/* Page 2: Auto Gradient Changing Background - Description & Overview */}
-  <div className="h-full flex flex-col justify-between p-5 text-white relative overflow-hidden select-none bg-gradient-to-br from-slate-950 via-indigo-950 to-purple-950 border-r border-slate-700/60 shadow-2xl">
-    {/* Subtle Animated Glow Layers for Auto Background Transition */}
+  {/* Page 1: Description & Overview (First Page) with Auto Animated Glow */}
+  <div className="h-full flex flex-col justify-between p-4 sm:p-5 text-white relative overflow-hidden select-none bg-gradient-to-br from-slate-950 via-indigo-950 to-purple-950 border-r border-slate-700/60 shadow-2xl">
+    {/* Subtle Auto Background Animated Glow */}
     <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/10 via-purple-600/15 to-teal-500/10 animate-pulse pointer-events-none"></div>
-    <div className="absolute -top-16 -right-16 w-44 h-44 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none"></div>
-    <div className="absolute -bottom-16 -left-16 w-44 h-44 bg-purple-500/20 rounded-full blur-2xl pointer-events-none"></div>
+    <div className="absolute -top-16 -right-16 w-40 h-40 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none"></div>
+    <div className="absolute -bottom-16 -left-16 w-40 h-40 bg-purple-500/20 rounded-full blur-2xl pointer-events-none"></div>
 
     {/* Top Header Badge & Title */}
-    <div className="relative z-10">
-      <div className="flex items-center justify-between mb-2">
+    <div className="relative z-10 flex-shrink-0">
+      <div className="flex items-center justify-between mb-1.5">
         <span className="text-[10px] font-extrabold tracking-widest uppercase bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full shadow">
           {book.badge || 'Study Notes'}
         </span>
@@ -980,7 +970,7 @@ export default function App() {
         </span>
       </div>
 
-      <h2 className="text-base sm:text-lg font-black text-white leading-tight line-clamp-2">
+      <h2 className="text-sm sm:text-base font-black text-white leading-snug line-clamp-2">
         {book.title}
       </h2>
       <p className="text-[11px] text-amber-300 font-semibold mt-0.5">
@@ -988,29 +978,29 @@ export default function App() {
       </p>
     </div>
 
-    {/* Middle Scrollable Clean Description Area */}
-    <div className="relative z-10 my-3 flex-1 overflow-y-auto pr-1 text-left bg-slate-950/70 p-3.5 rounded-xl border border-indigo-500/30 backdrop-blur-md shadow-inner">
-      <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1.5 flex items-center gap-1.5">
+    {/* Middle Scrollable Clean Description Area (No Text Cut, Smooth Scroll) */}
+    <div className="relative z-10 my-2.5 flex-1 min-h-0 overflow-y-auto pr-1.5 text-left bg-slate-900/80 p-3 rounded-xl border border-indigo-500/30 backdrop-blur-md shadow-inner">
+      <div className="text-[10px] uppercase font-bold text-amber-400 tracking-wider mb-1.5 flex items-center gap-1.5 sticky top-0 bg-slate-900/90 py-0.5 backdrop-blur-sm z-10">
         <Sparkles className="w-3.5 h-3.5 text-amber-400" />
         <span>About These Notes</span>
       </div>
-      <div className="text-xs text-slate-200 leading-relaxed font-sans whitespace-pre-line">
-        {renderFormattedText(book.description || 'Comprehensive handwritten & visual notes designed specifically for competitive exam revision.')}
+      <div className="text-[11px] sm:text-xs text-slate-200 leading-relaxed font-sans whitespace-pre-line">
+        {renderFormattedText(book.description || 'Comprehensive handwritten & visual notes designed specifically for competitive exam revision.', true)}
       </div>
     </div>
 
     {/* Bottom Indicator */}
-    <div className="relative z-10 pt-2 border-t border-slate-800/90 flex items-center justify-between text-[11px] text-slate-300">
+    <div className="relative z-10 pt-1.5 border-t border-slate-800/90 flex items-center justify-between text-[10px] sm:text-[11px] text-slate-400 flex-shrink-0">
       <span className="text-amber-400 font-bold flex items-center gap-1">
-        ★ {book.rating || '4.9'} Rating
+        ★ {book.rating || '4.9'}
       </span>
-      <span className="text-indigo-300 font-semibold animate-pulse flex items-center gap-1">
+      <span className="text-indigo-300 font-semibold animate-pulse">
         Turn next for handwritten samples →
       </span>
     </div>
   </div>
 
-  {/* Sample Pages */}
+  {/* Sample Pages (From Google Sheet) */}
   {pagesList.map((pageImg, idx) => (
     <div key={idx} className="bg-white text-slate-900 h-full flex flex-col items-center justify-center p-2 shadow-inner border border-slate-300">
       <img src={pageImg} alt={`Page ${idx + 1}`} className="w-full h-full object-contain" />
