@@ -930,7 +930,7 @@ export default function App() {
               <div className="flex-1 overflow-auto p-4 flex flex-col items-center justify-center bg-radial from-slate-800 to-slate-950 relative min-h-[460px]">
                 
                 {/* HTMLFlipBook Component */}
-                <HTMLFlipBook
+<HTMLFlipBook
   width={340}
   height={480}
   size="stretch"
@@ -948,108 +948,156 @@ export default function App() {
     playPageFlipSound();
   }}
 >
-                  {/* Page 1: Cover */}
-                  <div className="bg-slate-900 border border-slate-700 h-full flex flex-col items-center justify-center p-4 shadow-2xl relative">
-                    {book.coverImage ? (
-                      <img src={book.coverImage} alt="Cover" className="w-full h-full object-contain" />
-                    ) : (
-                      <div className="text-center p-6">
-                        <span className="text-xs text-purple-400 font-bold uppercase tracking-wider">{book.examCategory}</span>
-                        <h2 className="text-xl font-black text-white mt-2">{book.title}</h2>
-                        <p className="text-xs text-slate-400 mt-2">By {book.author}</p>
-                      </div>
-                    )}
-                    <div className="absolute bottom-3 text-[10px] text-slate-400 font-mono">Turn page to start reading ➔</div>
-                  </div>
+  {/* Page 1: Cover */}
+  <div className="bg-slate-900 border border-slate-700 h-full flex flex-col items-center justify-center p-4 shadow-2xl relative select-none">
+    {book.coverImage ? (
+      <img src={book.coverImage} alt="Cover" className="w-full h-full object-contain" />
+    ) : (
+      <div className="text-center p-6">
+        <span className="text-xs text-purple-400 font-bold uppercase tracking-wider">{book.examCategory}</span>
+        <h2 className="text-xl font-black text-white mt-2">{book.title}</h2>
+        <p className="text-xs text-slate-400 mt-2">By {book.author}</p>
+      </div>
+    )}
+    <div className="absolute bottom-3 text-[10px] text-slate-400 font-mono">Turn page to start reading ➔</div>
+  </div>
 
-                  {/* Sample Pages */}
-                  {pagesList.map((pageImg, idx) => (
-                    <div key={idx} className="bg-white text-slate-900 h-full flex flex-col items-center justify-center p-2 shadow-inner border border-slate-300">
-                      <img src={pageImg} alt={`Page ${idx + 1}`} className="w-full h-full object-contain" />
-                      <div className="text-[10px] text-slate-400 mt-1">Page {idx + 1}</div>
-                    </div>
-                  ))}
+  {/* Page 2: Auto Gradient Changing Background - Description & Overview */}
+  <div className="h-full flex flex-col justify-between p-5 text-white relative overflow-hidden select-none bg-gradient-to-br from-slate-950 via-indigo-950 to-purple-950 border-r border-slate-700/60 shadow-2xl">
+    {/* Subtle Animated Glow Layers for Auto Background Transition */}
+    <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/10 via-purple-600/15 to-teal-500/10 animate-pulse pointer-events-none"></div>
+    <div className="absolute -top-16 -right-16 w-44 h-44 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none"></div>
+    <div className="absolute -bottom-16 -left-16 w-44 h-44 bg-purple-500/20 rounded-full blur-2xl pointer-events-none"></div>
 
-                  {/* Final Page */}
-                  <div className="bg-gradient-to-br from-indigo-950 via-slate-900 to-purple-950 text-white h-full flex flex-col items-center justify-center p-6 text-center border border-indigo-700/50">
-                    <Sparkles className="w-10 h-10 text-amber-400 mb-2 animate-pulse" />
-                    <h3 className="text-base sm:text-lg font-black text-white">Sample Preview Ended</h3>
-                    <p className="text-xs text-slate-300 mt-1.5 max-w-xs leading-relaxed">
-                      {book.isFree 
-                        ? 'Download the complete free PDF copy to keep revising offline.' 
-                        : 'Unlock complete comprehensive visual notes with full high-resolution diagrams.'}
-                    </p>
+    {/* Top Header Badge & Title */}
+    <div className="relative z-10">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[10px] font-extrabold tracking-widest uppercase bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full shadow">
+          {book.badge || 'Study Notes'}
+        </span>
+        <span className="text-[10px] font-bold text-slate-300 bg-slate-900/80 px-2.5 py-0.5 rounded-full border border-slate-700">
+          {book.pages ? `${book.pages} Pages` : 'Exam Special'}
+        </span>
+      </div>
 
-                    <div className="mt-4 w-full max-w-xs">
-                      {book.isFree ? (
-                        <a
-                          href={book.pdfUrl || '#'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs py-2.5 rounded-xl shadow-xl flex items-center justify-center gap-2 transition"
-                        >
-                          <Download className="w-4 h-4 stroke-[2.5]" />
-                          <span>Download Free PDF</span>
-                        </a>
-                      ) : (
-                        <a
-                          href={book.pdfUrl || '#'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 text-slate-950 font-black text-xs py-2.5 rounded-xl shadow-xl flex items-center justify-center gap-2 transition"
-                        >
-                          <ShoppingCart className="w-4 h-4" />
-                          <span>Unlock Full Notes ({book.badge})</span>
-                        </a>
-                      )}
-                    </div>
+      <h2 className="text-base sm:text-lg font-black text-white leading-tight line-clamp-2">
+        {book.title}
+      </h2>
+      <p className="text-[11px] text-amber-300 font-semibold mt-0.5">
+        {book.subject || book.examCategory || 'Exam Preparation'}
+      </p>
+    </div>
 
-                    {/* Social Media Share Section */}
-                    <div className="mt-4 pt-3 border-t border-slate-700/70 w-full max-w-xs flex flex-col items-center">
-                      <span className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5 mb-2">
-                        <Share2 className="w-3.5 h-3.5 text-amber-400" /> Share with Friends
-                      </span>
+    {/* Middle Scrollable Clean Description Area */}
+    <div className="relative z-10 my-3 flex-1 overflow-y-auto pr-1 text-left bg-slate-950/70 p-3.5 rounded-xl border border-indigo-500/30 backdrop-blur-md shadow-inner">
+      <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1.5 flex items-center gap-1.5">
+        <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+        <span>About These Notes</span>
+      </div>
+      <div className="text-xs text-slate-200 leading-relaxed font-sans whitespace-pre-line">
+        {renderFormattedText(book.description || 'Comprehensive handwritten & visual notes designed specifically for competitive exam revision.')}
+      </div>
+    </div>
 
-                      <div className="flex items-center gap-2">
-                        {/* WhatsApp */}
-                        <a
-                          href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
-                            `*${book.title}*\n\nYeh handwritten study notes check karo:\n👉 https://xamtoppr-books.vercel.app`
-                          )}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow transition active:scale-95"
-                        >
-                          <span>WhatsApp</span>
-                        </a>
+    {/* Bottom Indicator */}
+    <div className="relative z-10 pt-2 border-t border-slate-800/90 flex items-center justify-between text-[11px] text-slate-300">
+      <span className="text-amber-400 font-bold flex items-center gap-1">
+        ★ {book.rating || '4.9'} Rating
+      </span>
+      <span className="text-indigo-300 font-semibold animate-pulse flex items-center gap-1">
+        Turn next for handwritten samples →
+      </span>
+    </div>
+  </div>
 
-                        {/* Telegram */}
-                        <a
-                          href={`https://t.me/share/url?url=${encodeURIComponent(
-                            'https://xamtoppr-books.vercel.app'
-                          )}&text=${encodeURIComponent(`*${book.title}* - Visual Study Notes!`)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="bg-sky-500 hover:bg-sky-400 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow transition active:scale-95"
-                        >
-                          <span>Telegram</span>
-                        </a>
+  {/* Sample Pages */}
+  {pagesList.map((pageImg, idx) => (
+    <div key={idx} className="bg-white text-slate-900 h-full flex flex-col items-center justify-center p-2 shadow-inner border border-slate-300">
+      <img src={pageImg} alt={`Page ${idx + 1}`} className="w-full h-full object-contain" />
+      <div className="text-[10px] text-slate-400 mt-1">Page {idx + 1}</div>
+    </div>
+  ))}
 
-                        {/* Copy Link */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText('https://xamtoppr-books.vercel.app');
-                            showToast('Link copied to clipboard!');
-                          }}
-                          className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-slate-600 flex items-center gap-1 transition active:scale-95"
-                        >
-                          <span>Copy</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </HTMLFlipBook>
+  {/* Final Page */}
+  <div className="bg-gradient-to-br from-indigo-950 via-slate-900 to-purple-950 text-white h-full flex flex-col items-center justify-center p-6 text-center border border-indigo-700/50">
+    <Sparkles className="w-10 h-10 text-amber-400 mb-2 animate-pulse" />
+    <h3 className="text-base sm:text-lg font-black text-white">Sample Preview Ended</h3>
+    <p className="text-xs text-slate-300 mt-1.5 max-w-xs leading-relaxed">
+      {book.isFree 
+        ? 'Download the complete free PDF copy to keep revising offline.' 
+        : 'Unlock complete comprehensive visual notes with full high-resolution diagrams.'}
+    </p>
+
+    <div className="mt-4 w-full max-w-xs">
+      {book.isFree ? (
+        <a
+          href={book.pdfUrl || '#'}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs py-2.5 rounded-xl shadow-xl flex items-center justify-center gap-2 transition"
+        >
+          <Download className="w-4 h-4 stroke-[2.5]" />
+          <span>Download Free PDF</span>
+        </a>
+      ) : (
+        <a
+          href={book.pdfUrl || '#'}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 text-slate-950 font-black text-xs py-2.5 rounded-xl shadow-xl flex items-center justify-center gap-2 transition"
+        >
+          <ShoppingCart className="w-4 h-4" />
+          <span>Unlock Full Notes ({book.badge})</span>
+        </a>
+      )}
+    </div>
+
+    {/* Social Media Share Section */}
+    <div className="mt-4 pt-3 border-t border-slate-700/70 w-full max-w-xs flex flex-col items-center">
+      <span className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5 mb-2">
+        <Share2 className="w-3.5 h-3.5 text-amber-400" /> Share with Friends
+      </span>
+
+      <div className="flex items-center gap-2">
+        {/* WhatsApp */}
+        <a
+          href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+            `*${book.title}*\n\nYeh handwritten study notes check karo:\n👉 https://xamtoppr-books.vercel.app`
+          )}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow transition active:scale-95"
+        >
+          <span>WhatsApp</span>
+        </a>
+
+        {/* Telegram */}
+        <a
+          href={`https://t.me/share/url?url=${encodeURIComponent(
+            'https://xamtoppr-books.vercel.app'
+          )}&text=${encodeURIComponent(`*${book.title}* - Visual Study Notes!`)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="bg-sky-500 hover:bg-sky-400 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow transition active:scale-95"
+        >
+          <span>Telegram</span>
+        </a>
+
+        {/* Copy Link */}
+        <button
+          type="button"
+          onClick={() => {
+            navigator.clipboard.writeText('https://xamtoppr-books.vercel.app');
+            showToast('Link copied to clipboard!');
+          }}
+          className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-slate-600 flex items-center gap-1 transition active:scale-95"
+        >
+          <span>Copy</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</HTMLFlipBook>
 
                 {/* Flip Navigation Controls */}
                 <div className="mt-4 flex items-center gap-4 bg-slate-900/80 px-4 py-2 rounded-full border border-slate-700/80 backdrop-blur-md">
