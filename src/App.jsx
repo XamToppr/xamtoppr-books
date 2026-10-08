@@ -950,8 +950,8 @@ export default function App() {
     playPageFlipSound();
   }}
 >
-  {/* Page 1: Description & Overview (First Page) with Auto Animated Glow */}
-  <div className="h-full flex flex-col justify-between p-4 sm:p-5 text-white relative overflow-hidden select-none bg-gradient-to-br from-slate-950 via-indigo-950 to-purple-950 border-r border-slate-700/60 shadow-2xl">
+  {/* Page 1: Description & Overview (Full Height Fitted) */}
+  <div className="h-full w-full flex flex-col justify-between p-4 sm:p-5 text-white relative overflow-hidden select-none bg-gradient-to-br from-slate-950 via-indigo-950 to-purple-950 border-r border-slate-700/60 shadow-2xl">
     {/* Subtle Auto Background Animated Glow */}
     <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/10 via-purple-600/15 to-teal-500/10 animate-pulse pointer-events-none"></div>
     <div className="absolute -top-16 -right-16 w-40 h-40 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none"></div>
@@ -976,19 +976,19 @@ export default function App() {
       </p>
     </div>
 
-    {/* Middle Scrollable Clean Description Area (No Text Cut) */}
-    <div className="relative z-10 my-2 flex-1 min-h-0 max-h-[230px] overflow-y-auto pr-1 text-left bg-slate-900/80 p-3 rounded-xl border border-indigo-500/30 backdrop-blur-md shadow-inner">
-      <div className="text-[10px] uppercase font-bold text-amber-400 tracking-wider mb-1.5 flex items-center gap-1.5 sticky top-0 bg-slate-900 py-0.5 z-10">
+    {/* Middle Full-Height Scrollable Description Area */}
+    <div className="relative z-10 my-3 flex-1 min-h-0 overflow-y-auto pr-1 text-left bg-slate-900/80 p-3.5 rounded-xl border border-indigo-500/30 backdrop-blur-md shadow-inner flex flex-col">
+      <div className="text-[10px] uppercase font-bold text-amber-400 tracking-wider mb-2 flex items-center gap-1.5 sticky top-0 bg-slate-900/90 py-1 backdrop-blur-sm z-10 flex-shrink-0">
         <Sparkles className="w-3.5 h-3.5 text-amber-400" />
         <span>About These Notes</span>
       </div>
-      <div className="text-[11px] sm:text-xs text-slate-100 leading-relaxed font-sans whitespace-pre-line">
+      <div className="text-[11px] sm:text-xs text-slate-200 leading-relaxed font-sans whitespace-pre-line flex-1">
         {renderFormattedText(book.description || '')}
       </div>
     </div>
 
-    {/* Bottom Indicator */}
-    <div className="relative z-10 pt-1.5 border-t border-slate-800/90 flex items-center justify-between text-[10px] sm:text-[11px] text-slate-400 flex-shrink-0">
+    {/* Bottom Indicator (Anchored at the very bottom) */}
+    <div className="relative z-10 pt-2 border-t border-slate-800/90 flex items-center justify-between text-[10px] sm:text-[11px] text-slate-400 flex-shrink-0">
       <span className="text-amber-400 font-bold flex items-center gap-1">
         ★ {book.rating || '4.9'}
       </span>
