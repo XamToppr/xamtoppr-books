@@ -125,9 +125,12 @@ export default function App() {
   const flipBookRef = useRef(null);
   const flipAudioRef = useRef(null);
 
-  // Initialize Page-turn Audio
+  // Initialize Page-turn Audio from public folder
   useEffect(() => {
-    flipAudioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2405/2405-preview.mp3');
+    const audio = new Audio('/page-flip.mp3?v=2');
+    audio.preload = 'auto';
+    audio.volume = 0.8;
+    flipAudioRef.current = audio;
   }, []);
 
   const playPageFlipSound = () => {
