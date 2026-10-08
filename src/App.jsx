@@ -950,15 +950,15 @@ export default function App() {
     playPageFlipSound();
   }}
 >
-  {/* Page 1: Description & Overview (Full Height Fitted) */}
-  <div className="h-full w-full flex flex-col justify-between p-4 sm:p-5 text-white relative overflow-hidden select-none bg-gradient-to-br from-slate-950 via-indigo-950 to-purple-950 border-r border-slate-700/60 shadow-2xl">
+  {/* Page 1: Description & Overview (Strict Box Height & Smooth Scroll) */}
+  <div className="h-full w-full p-4 sm:p-5 text-white relative select-none bg-gradient-to-br from-slate-950 via-indigo-950 to-purple-950 border-r border-slate-700/60 shadow-2xl overflow-hidden box-border">
     {/* Subtle Auto Background Animated Glow */}
     <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/10 via-purple-600/15 to-teal-500/10 animate-pulse pointer-events-none"></div>
     <div className="absolute -top-16 -right-16 w-40 h-40 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none"></div>
     <div className="absolute -bottom-16 -left-16 w-40 h-40 bg-purple-500/20 rounded-full blur-2xl pointer-events-none"></div>
 
-    {/* Top Header Badge & Title */}
-    <div className="relative z-10 flex-shrink-0">
+    {/* Top Header Badge & Title (Fixed Header ~90px) */}
+    <div className="relative z-10 h-[85px]">
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-[10px] font-extrabold tracking-widest uppercase bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full shadow">
           {book.badge || 'Study Notes'}
@@ -976,19 +976,22 @@ export default function App() {
       </p>
     </div>
 
-    {/* Middle Full-Height Scrollable Description Area */}
-    <div className="relative z-10 my-3 flex-1 min-h-0 overflow-y-auto pr-1 text-left bg-slate-900/80 p-3.5 rounded-xl border border-indigo-500/30 backdrop-blur-md shadow-inner flex flex-col">
-      <div className="text-[10px] uppercase font-bold text-amber-400 tracking-wider mb-2 flex items-center gap-1.5 sticky top-0 bg-slate-900/90 py-1 backdrop-blur-sm z-10 flex-shrink-0">
+    {/* Middle Description Area (Locked Inside Screen, Auto Scroll If Long) */}
+    <div 
+      className="relative z-10 my-2 overflow-y-auto pr-1.5 text-left bg-slate-900/80 p-3 rounded-xl border border-indigo-500/30 backdrop-blur-md shadow-inner"
+      style={{ height: 'calc(100% - 135px)' }}
+    >
+      <div className="text-[10px] uppercase font-bold text-amber-400 tracking-wider mb-2 flex items-center gap-1.5 sticky top-0 bg-slate-900/95 py-0.5 backdrop-blur-sm z-10">
         <Sparkles className="w-3.5 h-3.5 text-amber-400" />
         <span>About These Notes</span>
       </div>
-      <div className="text-[11px] sm:text-xs text-slate-200 leading-relaxed font-sans whitespace-pre-line flex-1">
+      <div className="text-[11px] sm:text-xs text-slate-200 leading-relaxed font-sans whitespace-pre-line">
         {renderFormattedText(book.description || '')}
       </div>
     </div>
 
-    {/* Bottom Indicator (Anchored at the very bottom) */}
-    <div className="relative z-10 pt-2 border-t border-slate-800/90 flex items-center justify-between text-[10px] sm:text-[11px] text-slate-400 flex-shrink-0">
+    {/* Bottom Indicator (Fixed Height ~35px Anchored at Bottom) */}
+    <div className="relative z-10 h-[35px] border-t border-slate-800/90 flex items-center justify-between text-[10px] sm:text-[11px] text-slate-400">
       <span className="text-amber-400 font-bold flex items-center gap-1">
         ★ {book.rating || '4.9'}
       </span>
