@@ -207,7 +207,7 @@ export default function App() {
               isFree: !isPaid,
               publishedYear: b.publishedYear || '2026',
               description: b.description || '',
-              tableOfContents: b.tableOfContents ? b.tableOfContents.split(',').map(s => s.trim()).filter(Boolean) : []
+              tableOfContents: b.tableOfContents ? b.tableOfContents.split(/[,|\n]/).map(s => s.trim()).filter(Boolean) : []
             };
           });
           setBooksList(parsed);
