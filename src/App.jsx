@@ -931,7 +931,7 @@ export default function App() {
               <div className="flex-1 overflow-auto p-4 flex flex-col items-center justify-center bg-radial from-slate-800 to-slate-950 relative min-h-[460px]">
                 
                 {/* HTMLFlipBook Component */}
-<{/* HTMLFlipBook Component */}
+
 <HTMLFlipBook
   width={340}
   height={480}
