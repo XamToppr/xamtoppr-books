@@ -956,20 +956,21 @@ export default function App() {
 
                   {/* Final Page */}
                   <div className="bg-gradient-to-br from-indigo-950 via-slate-900 to-purple-950 text-white h-full flex flex-col items-center justify-center p-6 text-center border border-indigo-700/50">
-                    <Sparkles className="w-12 h-12 text-amber-400 mb-3 animate-pulse" />
-                    <h3 className="text-lg font-black text-white">Sample Preview Ended</h3>
-                    <p className="text-xs text-slate-300 mt-2 max-w-xs leading-relaxed">
+                    <Sparkles className="w-10 h-10 text-amber-400 mb-2 animate-pulse" />
+                    <h3 className="text-base sm:text-lg font-black text-white">Sample Preview Ended</h3>
+                    <p className="text-xs text-slate-300 mt-1.5 max-w-xs leading-relaxed">
                       {book.isFree 
                         ? 'Download the complete free PDF copy to keep revising offline.' 
                         : 'Unlock complete comprehensive visual notes with full high-resolution diagrams.'}
                     </p>
-                    <div className="mt-5 w-full max-w-xs">
+
+                    <div className="mt-4 w-full max-w-xs">
                       {book.isFree ? (
                         <a
                           href={book.pdfUrl || '#'}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs py-3 rounded-xl shadow-xl flex items-center justify-center gap-2 transition"
+                          className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs py-2.5 rounded-xl shadow-xl flex items-center justify-center gap-2 transition"
                         >
                           <Download className="w-4 h-4 stroke-[2.5]" />
                           <span>Download Free PDF</span>
@@ -979,12 +980,57 @@ export default function App() {
                           href={book.pdfUrl || '#'}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 text-slate-950 font-black text-xs py-3 rounded-xl shadow-xl flex items-center justify-center gap-2 transition"
+                          className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 text-slate-950 font-black text-xs py-2.5 rounded-xl shadow-xl flex items-center justify-center gap-2 transition"
                         >
                           <ShoppingCart className="w-4 h-4" />
                           <span>Unlock Full Notes ({book.badge})</span>
                         </a>
                       )}
+                    </div>
+
+                    {/* Social Media Share Section */}
+                    <div className="mt-4 pt-3 border-t border-slate-700/70 w-full max-w-xs flex flex-col items-center">
+                      <span className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5 mb-2">
+                        <Share2 className="w-3.5 h-3.5 text-amber-400" /> Share with Friends
+                      </span>
+
+                      <div className="flex items-center gap-2">
+                        {/* WhatsApp */}
+                        <a
+                          href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                            `*${book.title}*\n\nYeh handwritten study notes check karo:\n👉 https://xamtoppr-books.vercel.app`
+                          )}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow transition active:scale-95"
+                        >
+                          <span>WhatsApp</span>
+                        </a>
+
+                        {/* Telegram */}
+                        <a
+                          href={`https://t.me/share/url?url=${encodeURIComponent(
+                            'https://xamtoppr-books.vercel.app'
+                          )}&text=${encodeURIComponent(`*${book.title}* - Visual Study Notes!`)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="bg-sky-500 hover:bg-sky-400 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow transition active:scale-95"
+                        >
+                          <span>Telegram</span>
+                        </a>
+
+                        {/* Copy Link */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText('https://xamtoppr-books.vercel.app');
+                            showToast('Link copied to clipboard!');
+                          }}
+                          className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-slate-600 flex items-center gap-1 transition active:scale-95"
+                        >
+                          <span>Copy</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </HTMLFlipBook>
