@@ -125,18 +125,14 @@ export default function App() {
   const flipBookRef = useRef(null);
   const flipAudioRef = useRef(null);
 
-  // Initialize Page-turn Audio from public folder
-  useEffect(() => {
-    const audio = new Audio('/page-flip.mp3?v=2');
-    audio.preload = 'auto';
-    audio.volume = 0.8;
-    flipAudioRef.current = audio;
-  }, []);
-
+  // Realistic Page Flip Sound (Direct user-interaction play)
   const playPageFlipSound = () => {
-    if (flipAudioRef.current) {
-      flipAudioRef.current.currentTime = 0;
-      flipAudioRef.current.play().catch(() => {});
+    try {
+      const audio = new Audio('/page-flip.mp3');
+      audio.volume = 1.0;
+      audio.play().catch((e) => console.log('Audio wait/block:', e));
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -919,23 +915,23 @@ export default function App() {
                 
                 {/* HTMLFlipBook Component */}
                 <HTMLFlipBook
-                  width={340}
-                  height={480}
-                  size="stretch"
-                  minWidth={280}
-                  maxWidth={480}
-                  minHeight={400}
-                  maxHeight={640}
-                  maxShadowOpacity={0.5}
-                  showCover={true}
-                  mobileScrollSupport={true}
-                  className="shadow-2xl mx-auto rounded-lg overflow-hidden"
-                  ref={flipBookRef}
-                  onFlip={(e) => {
-                    setFlipPageNumber(e.data);
-                    playPageFlipSound();
-                  }}
-                >
+  width={340}
+  height={480}
+  size="stretch"
+  minWidth={280}
+  maxWidth={480}
+  minHeight={400}
+  maxHeight={640}
+  maxShadowOpacity={0.5}
+  showCover={true}
+  mobileScrollSupport={true}
+  className="shadow-2xl mx-auto rounded-lg overflow-hidden"
+  ref={flipBookRef}
+  onFlip={(e) => {
+    setFlipPageNumber(e.data);
+    playPageFlipSound();
+  }}
+>
                   {/* Page 1: Cover */}
                   <div className="bg-slate-900 border border-slate-700 h-full flex flex-col items-center justify-center p-4 shadow-2xl relative">
                     {book.coverImage ? (
@@ -1011,15 +1007,26 @@ export default function App() {
                   </span>
 
                   <button
-                    onClick={() => {
-                      flipBookRef.current?.pageFlip()?.flipNext();
-                      playPageFlipSound();
-                    }}
-                    className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white transition"
-                    title="Next Page"
-                  >
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
+  onClick={() => {
+    flipBookRef.current?.pageFlip()?.flipPrev();
+    playPageFlipSound();
+  }}
+  className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white transition"
+  title="Previous Page"
+>
+  <ChevronLeft className="w-5 h-5" />
+</button>
+
+<button
+  onClick={() => {
+    flipBookRef.current?.pageFlip()?.flipNext();
+    playPageFlipSound();
+  }}
+  className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white transition"
+  title="Next Page"
+>
+  <ChevronRight className="w-5 h-5" />
+</button>
                 </div>
               </div>
             </div>
