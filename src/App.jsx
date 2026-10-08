@@ -1181,37 +1181,41 @@ export default function App() {
                   {savedBooks.includes(selectedBookForModal.id) ? 'Saved in Library' : 'Save for Later'}
                 </button>
 
-                <div className="flex items-center gap-2.5">
-                  <a
-                    href={sampleUrl || '#'}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs sm:text-sm font-bold px-4 py-2.5 rounded-xl transition inline-flex items-center gap-1.5"
-                  >
-                    <BookOpen className="w-3.5 h-3.5 text-blue-900" />
-                    <span>{isPaidBook ? 'Read Sample PDF' : 'Read Online'}</span>
-                  </a>
-
+               <div className="flex items-center gap-2.5">
                   {isPaidBook ? (
-                    <a
-                      href={selectedBookForModal.pdfUrl || '#'}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white text-xs sm:text-sm font-extrabold px-5 py-2.5 rounded-xl shadow-md transition flex items-center gap-2 transform active:scale-95"
-                    >
-                      <ShoppingCart className="w-4 h-4 text-white" />
-                      <span>Buy Now ({selectedBookForModal.badge})</span>
-                    </a>
+                    <>
+                      {/* Paid Book: Sample dekhne ka option */}
+                      <a
+                        href={sampleUrl || '#'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs sm:text-sm font-bold px-4 py-2.5 rounded-xl transition inline-flex items-center gap-1.5"
+                      >
+                        <BookOpen className="w-3.5 h-3.5 text-blue-900" />
+                        <span>Read Sample PDF</span>
+                      </a>
+
+                      {/* Paid Book: Buy Now */}
+                      <a
+                        href={selectedBookForModal.pdfUrl || '#'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white text-xs sm:text-sm font-extrabold px-5 py-2.5 rounded-xl shadow-md transition flex items-center gap-2 transform active:scale-95"
+                      >
+                        <ShoppingCart className="w-4 h-4 text-white" />
+                        <span>Buy Now ({selectedBookForModal.badge})</span>
+                      </a>
+                    </>
                   ) : (
+                    /* Free Material: Sample hatakar seedhe Poori PDF ka Single Button */
                     <a
-                      href={selectedBookForModal.pdfUrl || '#'}
+                      href={selectedBookForModal.pdfUrl || selectedBookForModal.samplePdfUrl || '#'}
                       target="_blank"
                       rel="noopener noreferrer"
-                      download={selectedBookForModal.title}
-                      className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs sm:text-sm font-extrabold px-5 py-2.5 rounded-xl shadow-md transition flex items-center gap-2"
+                      className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs sm:text-sm font-extrabold px-6 py-2.5 rounded-xl shadow-md transition flex items-center gap-2 transform active:scale-95"
                     >
                       <Download className="w-4 h-4 stroke-[2.5]" />
-                      <span>Download Free PDF</span>
+                      <span>Download Full Free PDF</span>
                     </a>
                   )}
                 </div>
