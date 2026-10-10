@@ -45,7 +45,7 @@ const getGoogleDocEmbedUrl = (docUrl) => {
     /^https?:\/\/docs\.google\.com\/document\/(?:u\/\d+\/)?d\/([^/?#]+)(?:\/(?:edit|view|preview|pub))?(?:[?#].*)?$/i
   );
   return match
-    ? `https://docs.google.com/document/d/${encodeURIComponent(match[1])}/pub?embedded=true`
+    ? `https://docs.google.com/document/d/${encodeURIComponent(match[1])}/preview`
     : '';
 };
 const getYouTubeEmbedUrl = (videoUrl) => {
@@ -1145,8 +1145,40 @@ export default function App() {
                   </div>
                 </header>
 
-                <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
+                <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
                   <div className="min-w-0 space-y-6">
+                    {cleanDocUrl ? (
+                      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <div className="flex items-center justify-between gap-3 px-4 py-3">
+                          <h2 className="text-sm font-extrabold text-blue-950">Full Exam Guide</h2>
+                          <a
+                            href={selectedBlog.articleDocUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-200"
+                          >
+                            Open in new window ↗
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                        </div>
+                        <iframe
+                          src={cleanDocUrl}
+                          className="h-[900px] w-full border-0 bg-white"
+                          title={selectedBlog.title}
+                          loading="lazy"
+                        />
+                      </section>
+                    ) : (
+                      <section className="flex min-h-[360px] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center shadow-sm sm:min-h-[480px]">
+                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700">
+                          <FileText className="h-7 w-7" />
+                        </div>
+                        <h2 className="mt-5 text-xl font-black text-blue-950">Detailed article coming soon</h2>
+                        <p className="mt-2 max-w-md text-sm leading-relaxed text-slate-600">
+                          The detailed article for this notification is being prepared. Check the official notification PDF and application link above in the meantime.
+                        </p>
+                      </section>
+                    )}
                     {youtubeEmbedUrl && (
                       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                         <div className="flex items-center justify-between gap-3 px-4 py-3">
@@ -1171,38 +1203,6 @@ export default function App() {
                             loading="lazy"
                           />
                         </div>
-                      </section>
-                    )}
-                    {cleanDocUrl ? (
-                      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-3">
-                        <div className="flex items-center justify-between gap-3 px-2 pb-3">
-                          <h2 className="text-sm font-extrabold text-blue-950">Full Exam Guide</h2>
-                          <a
-                            href={selectedBlog.articleDocUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-200"
-                          >
-                            Open in New Tab
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </a>
-                        </div>
-                        <iframe
-                          src={cleanDocUrl}
-                          className="min-h-[900px] w-full rounded-2xl border-0 bg-white shadow-sm"
-                          title={selectedBlog.title}
-                          loading="lazy"
-                        />
-                      </section>
-                    ) : (
-                      <section className="flex min-h-[360px] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center shadow-sm sm:min-h-[480px]">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700">
-                          <FileText className="h-7 w-7" />
-                        </div>
-                        <h2 className="mt-5 text-xl font-black text-blue-950">Detailed article coming soon</h2>
-                        <p className="mt-2 max-w-md text-sm leading-relaxed text-slate-600">
-                          The detailed article for this notification is being prepared. Check the official notification PDF and application link above in the meantime.
-                        </p>
                       </section>
                     )}
                   </div>
