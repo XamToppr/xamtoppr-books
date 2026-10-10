@@ -31,13 +31,20 @@ import {
   ExternalLink,
   ShoppingCart,
   Maximize2,
-  Minimize2
+  Minimize2,
+  CalendarDays,
+  Bell,
+  Users,
+  IndianRupee,
+  ClipboardCheck,
+  FileCheck2
 } from 'lucide-react';
 
 // ==========================================
 // APNA GOOGLE SHEET CSV LINK YAHAN DALEIN
 // ==========================================
 const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTWDpgH3DG7CxaaXFi1qado9DzZ_dykCwxZeaZ58_ddMo6RmtMOsfZfmm0FRPpsYMntSv5h9DgZ7Pq2/pub?output=csv";
+const GOOGLE_SHEET_BLOG_CSV_URL = `${GOOGLE_SHEET_CSV_URL}&gid=1105754566`;
 
 const INITIAL_BOOKS = [
   {
@@ -125,6 +132,14 @@ export default function App() {
   const [flipPageNumber, setFlipPageNumber] = useState(0);
   const [isMobileFullscreen, setIsMobileFullscreen] = useState(false);
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
+  const [currentTab, setCurrentTab] = useState('books');
+  const [selectedBlog, setSelectedBlog] = useState(null);
+  const [blogPosts, setBlogPosts] = useState([]);
+  const [isLoadingBlogs, setIsLoadingBlogs] = useState(true);
+  const [blogLoadError, setBlogLoadError] = useState('');
+  const [blogSearchQuery, setBlogSearchQuery] = useState('');
+  const [selectedBlogCategory, setSelectedBlogCategory] = useState('All');
+  const [selectedBlogState, setSelectedBlogState] = useState('All');
   const [viewportSize, setViewportSize] = useState(() => ({
     width: window.innerWidth,
     height: window.innerHeight
@@ -259,6 +274,37 @@ export default function App() {
     });
   }, []);
 
+  useEffect(() => {
+    Papa.parse(GOOGLE_SHEET_BLOG_CSV_URL, {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        const fields = [
+          'id', 'title', 'state', 'examCategory', 'postDate', 'totalVacancy',
+          'applyStartDate', 'applyEndDate', 'examDates', 'ageLimit', 'qualification',
+          'applicationFee', 'salary', 'selectionProcess', 'examPattern', 'syllabus',
+          'previousPapersUrl', 'howToApply', 'documentsRequired', 'officialPdfUrl',
+          'applyOnlineUrl', 'relatedBookId', 'articleDocUrl'
+        ];
+        const parsedPosts = (results.data || [])
+          .filter((row) => row.id?.trim() && row.title?.trim())
+          .map((row) => fields.reduce((post, field) => {
+            post[field] = String(row[field] || '').trim();
+            return post;
+          }, {}));
+        setBlogPosts(parsedPosts);
+        setBlogLoadError('');
+        setIsLoadingBlogs(false);
+      },
+      error: (error) => {
+        console.error('Failed to load exam notifications:', error);
+        setBlogLoadError('Exam notifications could not be loaded. Please try again later.');
+        setIsLoadingBlogs(false);
+      }
+    });
+  }, []);
+
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => {
@@ -351,6 +397,56 @@ export default function App() {
       return 0;
     });
   }, [booksList, searchQuery, selectedExam, selectedMedium, selectedSubject, quickFilterBadge, sortBy]);
+
+  const blogCategories = useMemo(
+    () => ['All', ...new Set([
+      'SSC',
+      'Railway',
+      'Banking',
+      'Police',
+      'Teaching',
+      'State Exams',
+      ...blogPosts.map((post) => post.examCategory)
+    ].filter(Boolean))],
+    [blogPosts]
+  );
+
+  const blogStates = useMemo(
+    () => ['All', ...new Set([
+      'All India / Central',
+      'All India',
+      'Central',
+      'Bihar',
+      'Uttar Pradesh',
+      'Rajasthan',
+      'MP',
+      'Madhya Pradesh',
+      ...blogPosts.map((post) => post.state)
+    ].filter(Boolean))],
+    [blogPosts]
+  );
+
+  const filteredBlogPosts = useMemo(() => {
+    const query = blogSearchQuery.trim().toLowerCase();
+    return blogPosts.filter((post) => {
+      const matchesQuery = !query || [
+        post.title,
+        post.examCategory,
+        post.state,
+        post.qualification
+      ].some((value) => value.toLowerCase().includes(query));
+      const matchesCategory = selectedBlogCategory === 'All'
+        || post.examCategory.toLowerCase().includes(selectedBlogCategory.toLowerCase());
+      const matchesState = selectedBlogState === 'All'
+        || post.state.toLowerCase().includes(selectedBlogState.toLowerCase())
+        || (selectedBlogState === 'MP' && post.state.toLowerCase().includes('madhya pradesh'))
+        || (selectedBlogState === 'Madhya Pradesh' && post.state.toLowerCase() === 'mp')
+        || (selectedBlogState === 'All India / Central'
+          && (post.state.toLowerCase().includes('all india') || post.state.toLowerCase().includes('central')))
+        || (selectedBlogState === 'All India' && post.state.toLowerCase().includes('central'));
+      return matchesQuery && matchesCategory && matchesState;
+    });
+  }, [blogPosts, blogSearchQuery, selectedBlogCategory, selectedBlogState]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-amber-500 selection:text-white">
@@ -465,6 +561,46 @@ export default function App() {
           </div>
         </div>
 
+        <div className="border-t border-blue-900/60 bg-[#0a1b3d]">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex gap-2 overflow-x-auto">
+            <button
+              type="button"
+              onClick={() => {
+                setCurrentTab('books');
+                setSelectedBlog(null);
+              }}
+              className={`shrink-0 inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs sm:text-sm font-bold transition ${
+                currentTab === 'books'
+                  ? 'bg-amber-400 text-slate-950'
+                  : 'text-slate-200 hover:bg-white/10'
+              }`}
+              aria-pressed={currentTab === 'books'}
+            >
+              <BookOpen className="h-4 w-4" />
+              Study Notes & Books
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setCurrentTab('blogs');
+                setSelectedBlog(null);
+              }}
+              className={`shrink-0 inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs sm:text-sm font-bold transition ${
+                currentTab === 'blogs'
+                  ? 'bg-gradient-to-r from-fuchsia-500 to-rose-500 text-white'
+                  : 'text-slate-200 hover:bg-white/10'
+              }`}
+              aria-pressed={currentTab === 'blogs'}
+            >
+              <Bell className="h-4 w-4" />
+              Exam Notifications & Blogs
+              <span className="rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-slate-950">
+                New
+              </span>
+            </button>
+          </div>
+        </div>
+
         {mobileMenuOpen && (
           <div className="lg:hidden bg-[#0a1b3d] border-b border-blue-900 px-4 pt-3 pb-5 space-y-2">
             <a href="https://www.xamtoppr.com/" className="block w-full text-left px-3 py-2.5 rounded-lg text-slate-200 hover:bg-blue-900/50">
@@ -502,10 +638,14 @@ export default function App() {
             <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
             <span className="text-slate-500">Study Resources</span>
             <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-blue-950 font-bold">Books & Study Material</span>
+            <span className="text-blue-950 font-bold">
+              {currentTab === 'books' ? 'Books & Study Material' : selectedBlog?.title || 'Exam Notifications & Blogs'}
+            </span>
           </div>
         </div>
 
+        {currentTab === 'books' ? (
+          <>
         {/* Hero Section */}
         <section className="bg-gradient-to-b from-[#0c2356] via-[#102d6b] to-[#153a8a] text-white py-10 sm:py-14 px-4 sm:px-6 lg:px-8 relative overflow-hidden shadow-inner">
           <div className="absolute inset-0 opacity-10 pointer-events-none bg-[radial-gradient(#f59e0b_1px,transparent_1px)] [background-size:16px_16px]"></div>
@@ -908,6 +1048,428 @@ export default function App() {
             </div>
           )}
         </section>
+          </>
+        ) : selectedBlog ? (
+          (() => {
+            const relatedBook = booksList.find(
+              (book) => book.id.toLowerCase() === selectedBlog.relatedBookId.toLowerCase()
+            );
+            const detailSections = [
+              {
+                id: 'dates',
+                title: 'Important Dates',
+                icon: CalendarDays,
+                fields: [
+                  ['Application Starts', selectedBlog.applyStartDate],
+                  ['Application Ends', selectedBlog.applyEndDate],
+                  ['Exam Dates', selectedBlog.examDates]
+                ]
+              },
+              {
+                id: 'posts',
+                title: 'Posts',
+                icon: FileText,
+                fields: [['Notification', selectedBlog.title]]
+              },
+              {
+                id: 'salary',
+                title: 'Salary',
+                icon: IndianRupee,
+                fields: [['Pay / Salary', selectedBlog.salary]]
+              },
+              {
+                id: 'vacancies',
+                title: 'Vacancies',
+                icon: Users,
+                fields: [['Total Vacancies', selectedBlog.totalVacancy]]
+              },
+              {
+                id: 'eligibility',
+                title: 'Eligibility',
+                icon: GraduationCap,
+                fields: [
+                  ['Age Limit', selectedBlog.ageLimit],
+                  ['Qualification', selectedBlog.qualification]
+                ]
+              },
+              {
+                id: 'fee',
+                title: 'Application Fee',
+                icon: IndianRupee,
+                fields: [['Fee Details', selectedBlog.applicationFee]]
+              },
+              {
+                id: 'selection',
+                title: 'Selection Process',
+                icon: ClipboardCheck,
+                fields: [['Stages', selectedBlog.selectionProcess]]
+              },
+              {
+                id: 'exam-pattern',
+                title: 'Exam Pattern',
+                icon: FileText,
+                fields: [['Pattern', selectedBlog.examPattern]]
+              },
+              {
+                id: 'syllabus',
+                title: 'Syllabus',
+                icon: BookOpen,
+                fields: [['Topics', selectedBlog.syllabus]]
+              },
+              {
+                id: 'previous-papers',
+                title: 'Previous Papers',
+                icon: FileCheck2,
+                fields: [['Practice Papers', selectedBlog.previousPapersUrl]]
+              },
+              {
+                id: 'how-to-apply',
+                title: 'How to Apply',
+                icon: ClipboardCheck,
+                fields: [['Steps', selectedBlog.howToApply]]
+              },
+              {
+                id: 'documents',
+                title: 'Documents Required',
+                icon: FileCheck2,
+                fields: [['Documents', selectedBlog.documentsRequired]]
+              }
+            ];
+            const pageNav = [
+              ['dates', 'Dates'],
+              ['posts', 'Posts'],
+              ['salary', 'Salary'],
+              ['vacancies', 'Vacancies'],
+              ['eligibility', 'Eligibility'],
+              ['fee', 'Fee'],
+              ['selection', 'Selection'],
+              ['exam-pattern', 'Exam Pattern'],
+              ['syllabus', 'Syllabus'],
+              ['previous-papers', 'Previous Papers'],
+              ['how-to-apply', 'How to Apply'],
+              ['documents', 'Documents'],
+              ['important-links', 'Important Links'],
+              ['faqs', 'FAQs']
+            ];
+            const renderActionLink = (url, label, className) => url ? (
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={className}
+              >
+                <ExternalLink className="h-4 w-4 shrink-0" />
+                {label}
+              </a>
+            ) : (
+              <span className={`${className} cursor-not-allowed opacity-50`} aria-disabled="true">
+                <ExternalLink className="h-4 w-4 shrink-0" />
+                {label} unavailable
+              </span>
+            );
+
+            return (
+              <article className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+                <button
+                  type="button"
+                  onClick={() => setSelectedBlog(null)}
+                  className="mb-5 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-blue-900 hover:bg-blue-50 transition"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Back to notifications
+                </button>
+
+                <header className="rounded-3xl bg-gradient-to-br from-[#0c2356] via-[#153a8a] to-indigo-800 p-6 sm:p-9 text-white shadow-xl">
+                  <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
+                    <span className="rounded-full bg-amber-400 px-3 py-1 text-slate-950">
+                      {selectedBlog.examCategory || 'Exam Notification'}
+                    </span>
+                    <span className="rounded-full border border-white/30 bg-white/10 px-3 py-1">
+                      {selectedBlog.state || 'All India / Central'}
+                    </span>
+                    <span className="rounded-full bg-emerald-400/20 px-3 py-1 text-emerald-100">
+                      {selectedBlog.totalVacancy || 'Vacancies'} Vacancies
+                    </span>
+                  </div>
+                  <h1 className="mt-4 text-2xl sm:text-4xl font-black leading-tight">{selectedBlog.title}</h1>
+                  <p className="mt-3 text-sm text-blue-100">
+                    {selectedBlog.postDate ? `Posted ${selectedBlog.postDate}` : 'Latest exam notification'}
+                  </p>
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    {renderActionLink(
+                      selectedBlog.officialPdfUrl,
+                      'Download Official PDF',
+                      'inline-flex items-center gap-2 rounded-xl bg-amber-400 px-4 py-3 text-sm font-extrabold text-slate-950 hover:bg-amber-300 transition'
+                    )}
+                    {renderActionLink(
+                      selectedBlog.applyOnlineUrl,
+                      'Apply Online',
+                      'inline-flex items-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 text-sm font-extrabold text-slate-950 hover:bg-emerald-300 transition'
+                    )}
+                  </div>
+                </header>
+
+                <nav aria-label="On this page" className="sticky top-[7.5rem] z-30 mt-6 overflow-x-auto rounded-xl border border-slate-200 bg-white/95 p-2 shadow-md backdrop-blur">
+                  <div className="flex min-w-max gap-2">
+                    {pageNav.map(([id, label]) => (
+                      <a
+                        key={id}
+                        href={`#notification-${id}`}
+                        className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-blue-900 hover:text-white transition"
+                      >
+                        {label}
+                      </a>
+                    ))}
+                  </div>
+                </nav>
+
+                <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    {detailSections.map(({ id, title, icon: SectionIcon, fields }) => (
+                      <section
+                        key={id}
+                        id={`notification-${id}`}
+                        className="scroll-mt-40 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                      >
+                        <h2 className="flex items-center gap-2 text-base font-extrabold text-blue-950">
+                          <SectionIcon className="h-5 w-5 text-amber-500" />
+                          {title}
+                        </h2>
+                        <div className="mt-4 space-y-3">
+                          {fields.map(([label, value]) => (
+                            <div key={label}>
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
+                              <p className="mt-1 whitespace-pre-line break-words text-sm leading-relaxed text-slate-700">
+                                {value || 'Details will be announced in the official notification.'}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </section>
+                    ))}
+
+                    <section
+                      id="notification-important-links"
+                      className="scroll-mt-40 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:col-span-2"
+                    >
+                      <h2 className="flex items-center gap-2 text-base font-extrabold text-blue-950">
+                        <ExternalLink className="h-5 w-5 text-amber-500" />
+                        Important Links
+                      </h2>
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        {renderActionLink(
+                          selectedBlog.officialPdfUrl,
+                          'Download Official PDF',
+                          'inline-flex items-center gap-2 rounded-xl bg-blue-950 px-4 py-3 text-sm font-bold text-white hover:bg-blue-900 transition'
+                        )}
+                        {renderActionLink(
+                          selectedBlog.applyOnlineUrl,
+                          'Apply Online',
+                          'inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-500 transition'
+                        )}
+                        {renderActionLink(
+                          selectedBlog.articleDocUrl,
+                          'Read Full Article',
+                          'inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-3 text-sm font-bold text-slate-800 hover:bg-slate-200 transition'
+                        )}
+                      </div>
+                    </section>
+
+                    <section
+                      id="notification-faqs"
+                      className="scroll-mt-40 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:col-span-2"
+                    >
+                      <h2 className="flex items-center gap-2 text-base font-extrabold text-blue-950">
+                        <HelpCircle className="h-5 w-5 text-amber-500" />
+                        FAQs
+                      </h2>
+                      <p className="mt-3 text-sm leading-relaxed text-slate-700">
+                        For confirmed eligibility, dates, and application guidance, refer to the official notification linked above.
+                      </p>
+                    </section>
+                  </div>
+
+                  {relatedBook && (
+                    <aside className="h-fit rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-5 shadow-sm lg:sticky lg:top-48">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600">
+                        Recommended Study Material
+                      </span>
+                      <h2 className="mt-2 text-lg font-black text-blue-950">{relatedBook.title}</h2>
+                      <p className="mt-2 text-xs leading-relaxed text-slate-600">
+                        {relatedBook.subject} · {relatedBook.language}
+                      </p>
+                      <div className="mt-4 flex flex-col gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowFlipbookModal(relatedBook);
+                            setFlipPageNumber(0);
+                            setActiveSlideIndex(0);
+                          }}
+                          className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-800 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 transition"
+                        >
+                          <BookOpen className="h-4 w-4" />
+                          Flipbook 3D
+                        </button>
+                        <a
+                          href={relatedBook.pdfUrl || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(event) => {
+                            if (!relatedBook.pdfUrl) {
+                              event.preventDefault();
+                              showToast(relatedBook.isFree ? 'Download link will be updated soon!' : 'Payment link will be updated soon!');
+                            }
+                          }}
+                          className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-500 transition"
+                        >
+                          {relatedBook.isFree ? <Download className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
+                          {relatedBook.isFree ? 'Download Free' : `Buy${relatedBook.price ? ` • ${relatedBook.price}` : ''}`}
+                        </a>
+                      </div>
+                    </aside>
+                  )}
+                </div>
+              </article>
+            );
+          })()
+        ) : (
+          <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+            <div className="rounded-3xl bg-gradient-to-br from-[#0c2356] via-indigo-900 to-fuchsia-900 p-6 sm:p-9 text-white shadow-xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-amber-200">
+                <Bell className="h-4 w-4" />
+                Exam Alerts & Career Updates
+              </div>
+              <h1 className="mt-4 text-2xl sm:text-4xl font-black">Exam Notifications & Blogs</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-indigo-100">
+                Find the latest vacancies, application dates, eligibility details, and official links in one place.
+              </p>
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm">
+              <label className="relative block">
+                <Search className="absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="search"
+                  value={blogSearchQuery}
+                  onChange={(event) => setBlogSearchQuery(event.target.value)}
+                  placeholder="Search exams, category, state, or qualification..."
+                  className="w-full rounded-xl border border-slate-300 bg-slate-50 py-3 pl-11 pr-4 text-sm outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
+                />
+              </label>
+
+              <div className="mt-5">
+                <h2 className="mb-2 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Exam Category</h2>
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  {blogCategories.map((category) => (
+                    <button
+                      type="button"
+                      key={category}
+                      onClick={() => setSelectedBlogCategory(category)}
+                      className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold transition ${
+                        selectedBlogCategory === category
+                          ? 'bg-blue-950 text-white shadow'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      {category}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-3">
+                <h2 className="mb-2 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">State / Region</h2>
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  {blogStates.map((state) => (
+                    <button
+                      type="button"
+                      key={state}
+                      onClick={() => setSelectedBlogState(state)}
+                      className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold transition ${
+                        selectedBlogState === state
+                          ? 'bg-fuchsia-700 text-white shadow'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      {state}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-xl font-black text-blue-950">Latest Notifications</h2>
+              {!isLoadingBlogs && (
+                <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-900">
+                  {filteredBlogPosts.length} {filteredBlogPosts.length === 1 ? 'notification' : 'notifications'}
+                </span>
+              )}
+            </div>
+
+            {isLoadingBlogs ? (
+              <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {[1, 2, 3].map((item) => (
+                  <div key={item} className="h-64 animate-pulse rounded-2xl border border-slate-200 bg-white p-5">
+                    <div className="h-5 w-1/3 rounded bg-slate-200" />
+                    <div className="mt-5 h-7 w-5/6 rounded bg-slate-200" />
+                    <div className="mt-3 h-4 w-2/3 rounded bg-slate-200" />
+                    <div className="mt-8 h-12 rounded bg-slate-100" />
+                  </div>
+                ))}
+              </div>
+            ) : blogLoadError ? (
+              <div role="alert" className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm font-medium text-rose-800">
+                {blogLoadError}
+              </div>
+            ) : filteredBlogPosts.length === 0 ? (
+              <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+                <Bell className="mx-auto h-10 w-10 text-slate-300" />
+                <h3 className="mt-3 text-lg font-bold text-slate-800">No notifications found</h3>
+                <p className="mt-1 text-sm text-slate-500">Try another search term or filter.</p>
+              </div>
+            ) : (
+              <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {filteredBlogPosts.map((post) => (
+                  <article key={post.id} className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-amber-300 hover:shadow-lg">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-blue-100 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide text-blue-900">
+                        {post.examCategory || 'Exam'}
+                      </span>
+                      <span className="rounded-full bg-fuchsia-50 px-3 py-1 text-[10px] font-bold text-fuchsia-800">
+                        {post.state || 'All India / Central'}
+                      </span>
+                    </div>
+                    <h3 className="mt-4 flex-1 text-lg font-black leading-snug text-slate-900">{post.title}</h3>
+                    <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Total Vacancies</p>
+                        <p className="mt-1 text-sm font-extrabold text-blue-950">{post.totalVacancy || 'Not announced'}</p>
+                      </div>
+                      <div>
+                        <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                          <CalendarDays className="h-3 w-3" /> Application Dates
+                        </p>
+                        <p className="mt-1 text-xs font-semibold text-slate-700">
+                          {post.applyStartDate || 'TBA'} – {post.applyEndDate || 'TBA'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedBlog(post)}
+                      className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-950 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-900"
+                    >
+                      Read Full Details
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
       </main>
 
       {/* ============================================================== */}
