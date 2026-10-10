@@ -29,7 +29,9 @@ import {
   Clock,
   HelpCircle,
   ExternalLink,
-  ShoppingCart
+  ShoppingCart,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 
 // ==========================================
@@ -121,6 +123,8 @@ export default function App() {
   const [isLoadingSkeleton, setIsLoadingSkeleton] = useState(false);
   const [quickFilterBadge, setQuickFilterBadge] = useState('ALL');
   const [flipPageNumber, setFlipPageNumber] = useState(0);
+  const [isMobileFullscreen, setIsMobileFullscreen] = useState(false);
+  const [fullscreenPageIndex, setFullscreenPageIndex] = useState(0);
 
   const flipBookRef = useRef(null);
   const flipAudioRef = useRef(null);
@@ -920,6 +924,20 @@ export default function App() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFullscreenPageIndex(pagesList.length
+                        ? Math.min(Math.max(flipPageNumber - 1, 0), pagesList.length - 1)
+                        : 0);
+                      setIsMobileFullscreen(true);
+                    }}
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold px-3 py-2 rounded-xl transition flex items-center gap-1.5"
+                    aria-label="Open full screen slide reader"
+                  >
+                    <Maximize2 className="w-4 h-4" />
+                    <span className="hidden sm:inline">Full Screen</span>
+                  </button>
                   {!book.isFree && book.pdfUrl && (
                     <a
                       href={book.pdfUrl}
@@ -943,8 +961,12 @@ export default function App() {
                     </a>
                   )}
                   <button
-                    onClick={() => setShowFlipbookModal(null)}
+                    onClick={() => {
+                      setIsMobileFullscreen(false);
+                      setShowFlipbookModal(null);
+                    }}
                     className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
+                    aria-label="Close flipbook"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -971,6 +993,9 @@ export default function App() {
   ref={flipBookRef}
   onFlip={(e) => {
     setFlipPageNumber(e.data);
+    if (pagesList.length > 0) {
+      setFullscreenPageIndex(Math.min(Math.max(e.data - 1, 0), pagesList.length - 1));
+    }
     playPageFlipSound();
   }}
 >
@@ -1155,6 +1180,70 @@ export default function App() {
                 </div>
               </div>
             </div>
+            {isMobileFullscreen && (
+              <div className="fixed inset-0 z-[100] bg-slate-950 flex flex-col">
+                <header className="shrink-0 flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-800 bg-slate-950">
+                  <h2 className="min-w-0 text-sm sm:text-base font-bold text-white truncate">
+                    {book.title}
+                  </h2>
+                  <div className="shrink-0 flex items-center gap-3">
+                    <span className="text-xs sm:text-sm text-slate-300 font-mono">
+                      Page {pagesList.length ? fullscreenPageIndex + 1 : 0} of {pagesList.length}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsMobileFullscreen(false)}
+                      className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition"
+                      aria-label="Exit full screen reader"
+                    >
+                      <Minimize2 className="w-5 h-5" />
+                    </button>
+                  </div>
+                </header>
+
+                <main className="flex-1 min-h-0 flex items-center justify-center overflow-hidden p-2 sm:p-4">
+                  {pagesList.length > 0 ? (
+                    <img
+                      src={pagesList[fullscreenPageIndex]}
+                      alt={`${book.title} sample page ${fullscreenPageIndex + 1}`}
+                      className="object-contain max-h-full max-w-full mx-auto select-none"
+                      draggable="false"
+                    />
+                  ) : (
+                    <p className="text-sm text-slate-400">No sample slides are available for this book.</p>
+                  )}
+                </main>
+
+                <footer className="shrink-0 flex items-center justify-center gap-6 px-4 py-3 border-t border-slate-800 bg-slate-950">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const previousIndex = Math.max(0, fullscreenPageIndex - 1);
+                      setFullscreenPageIndex(previousIndex);
+                      flipBookRef.current?.pageFlip()?.turnToPage(previousIndex + 1);
+                    }}
+                    disabled={fullscreenPageIndex <= 0}
+                    className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextIndex = Math.min(pagesList.length - 1, fullscreenPageIndex + 1);
+                      setFullscreenPageIndex(nextIndex);
+                      flipBookRef.current?.pageFlip()?.turnToPage(nextIndex + 1);
+                    }}
+                    disabled={fullscreenPageIndex >= pagesList.length - 1}
+                    className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  >
+                    Next
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </footer>
+              </div>
+            )}
           </div>
         );
       })()}
