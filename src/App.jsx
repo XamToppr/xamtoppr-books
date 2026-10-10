@@ -188,10 +188,17 @@ export default function App() {
 
           const parsed = validRows.map((b, index) => {
             const badgeStr = (b.badge || '').trim();
-            const isPaid = 
-              badgeStr.toUpperCase().includes('PAID') || 
-              badgeStr.toUpperCase().includes('PREMIUM') || 
-              badgeStr.includes('₹');
+            const rawPackType = (b.packType || b['Pack Type'] || '').trim().toLowerCase();
+            const isPaid = rawPackType
+              ? rawPackType === 'paid'
+              : badgeStr.toUpperCase().includes('PAID')
+                || badgeStr.toUpperCase().includes('PREMIUM')
+                || badgeStr.includes('₹');
+            const isFree = !isPaid;
+            const rawPrice = (b.price || b['Price'] || '').toString().trim();
+            const price = rawPrice
+              ? (rawPrice.startsWith('₹') ? rawPrice : `₹${rawPrice}`)
+              : (isFree ? 'FREE' : '');
 
             const samplePagesArr = b.samplePages 
               ? b.samplePages.split(',').map(s => s.trim()).filter(Boolean)
@@ -220,7 +227,10 @@ export default function App() {
               samplePdfUrl: b.samplePdfUrl ? b.samplePdfUrl.trim() : '',
               pdfUrl: b.pdfUrl ? b.pdfUrl.trim() : '',
               samplePages: samplePagesArr,
-              isFree: !isPaid,
+              isFree: isFree,
+              isPaid: isPaid,
+              packType: isPaid ? 'Paid' : 'Free',
+              price: price,
               publishedYear: b.publishedYear || '2026',
               description: b.description || '',
               tableOfContents: b.tableOfContents ? b.tableOfContents.split(/[,|\n]/).map(s => s.trim()).filter(Boolean) : []
