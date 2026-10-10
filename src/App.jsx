@@ -125,10 +125,21 @@ export default function App() {
   const [flipPageNumber, setFlipPageNumber] = useState(0);
   const [isMobileFullscreen, setIsMobileFullscreen] = useState(false);
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
-  const touchStartXRef = useRef(null);
+  const [viewportSize, setViewportSize] = useState(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight
+  }));
 
   const flipBookRef = useRef(null);
   const flipAudioRef = useRef(null);
+
+  useEffect(() => {
+    const updateViewportSize = () => {
+      setViewportSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+    window.addEventListener('resize', updateViewportSize);
+    return () => window.removeEventListener('resize', updateViewportSize);
+  }, []);
 
   // Realistic Page Flip Sound (Direct user-interaction play)
   const playPageFlipSound = () => {
@@ -908,94 +919,117 @@ export default function App() {
           ? book.samplePages 
           : (book.coverImage ? [book.coverImage] : []);
         const totalSlides = pagesList.length + 2;
-        const goToFullscreenSlide = (index) => {
-          const nextIndex = Math.min(Math.max(index, 0), totalSlides - 1);
-          setActiveSlideIndex(nextIndex);
-          playPageFlipSound();
-        };
+        const fullscreenPageWidth = Math.max(
+          160,
+          Math.min(viewportSize.width - 32, (viewportSize.height - 120) * (340 / 480), 600)
+        );
+        const fullscreenPageHeight = fullscreenPageWidth * (480 / 340);
         const exitFullscreenReader = () => {
           flipBookRef.current?.pageFlip()?.turnToPage(activeSlideIndex);
           setIsMobileFullscreen(false);
         };
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
-            <div className="bg-slate-900 text-white rounded-3xl max-w-4xl w-full max-h-[96vh] overflow-hidden shadow-2xl border border-slate-700 flex flex-col">
+          <div className={`fixed inset-0 z-50 flex items-center justify-center ${isMobileFullscreen ? 'p-0 bg-slate-950/95' : 'p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn'}`}>
+            <div className={isMobileFullscreen
+              ? 'fixed inset-0 z-[100] w-screen h-screen bg-slate-950/95 flex flex-col justify-between p-2 sm:p-4'
+              : 'bg-slate-900 text-white rounded-3xl max-w-4xl w-full max-h-[96vh] overflow-hidden shadow-2xl border border-slate-700 flex flex-col'}>
               
               {/* Flipbook Header */}
-              <div className="px-5 py-3.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white">
-                    <BookOpen className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm sm:text-base font-bold text-white line-clamp-1">{book.title}</h3>
-                    <p className="text-[11px] text-purple-300">Interactive 3D Page-Flip Experience</p>
-                  </div>
-                </div>
+              <div className={`shrink-0 px-4 sm:px-5 py-3.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between gap-3 ${isMobileFullscreen ? 'sticky top-0 z-10' : ''}`}>
+                {isMobileFullscreen ? (
+                  <>
+                    <h3 className="min-w-0 text-sm sm:text-base font-bold text-white truncate">{book.title}</h3>
+                    <div className="shrink-0 flex items-center gap-3">
+                      <span className="text-xs sm:text-sm text-slate-300 font-mono">
+                        Page {flipPageNumber + 1} of {totalSlides}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={exitFullscreenReader}
+                        className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition"
+                        aria-label="Exit full screen reader"
+                      >
+                        <Minimize2 className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white shrink-0">
+                        <BookOpen className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-sm sm:text-base font-bold text-white line-clamp-1">{book.title}</h3>
+                        <p className="text-[11px] text-purple-300">Interactive 3D Page-Flip Experience</p>
+                      </div>
+                    </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveSlideIndex(Math.min(flipPageNumber, totalSlides - 1));
-                      setIsMobileFullscreen(true);
-                    }}
-                    className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold px-3 py-2 rounded-xl transition flex items-center gap-1.5"
-                    aria-label="Open full screen slide reader"
-                  >
-                    <Maximize2 className="w-4 h-4" />
-                    <span className="hidden sm:inline">Full Screen</span>
-                  </button>
-                  {!book.isFree && book.pdfUrl && (
-                    <a
-                      href={book.pdfUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 text-white text-xs font-extrabold px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-md"
-                    >
-                      <ShoppingCart className="w-3.5 h-3.5" />
-                      <span>Buy Full ({book.badge})</span>
-                    </a>
-                  )}
-                  {book.isFree && book.pdfUrl && (
-                    <a
-                      href={book.pdfUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-md"
-                    >
-                      <Download className="w-3.5 h-3.5 stroke-[2.5]" />
-                      <span>Download PDF</span>
-                    </a>
-                  )}
-                  <button
-                    onClick={() => {
-                      setIsMobileFullscreen(false);
-                      setActiveSlideIndex(0);
-                      setShowFlipbookModal(null);
-                    }}
-                    className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
-                    aria-label="Close flipbook"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveSlideIndex(flipPageNumber);
+                          setIsMobileFullscreen(true);
+                        }}
+                        className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold px-3 py-2 rounded-xl transition flex items-center gap-1.5"
+                        aria-label="Open full screen slide reader"
+                      >
+                        <Maximize2 className="w-4 h-4" />
+                        <span className="hidden sm:inline">Full Screen</span>
+                      </button>
+                      {!book.isFree && book.pdfUrl && (
+                        <a
+                          href={book.pdfUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 text-white text-xs font-extrabold px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-md"
+                        >
+                          <ShoppingCart className="w-3.5 h-3.5" />
+                          <span>Buy Full ({book.badge})</span>
+                        </a>
+                      )}
+                      {book.isFree && book.pdfUrl && (
+                        <a
+                          href={book.pdfUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-md"
+                        >
+                          <Download className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <span>Download PDF</span>
+                        </a>
+                      )}
+                      <button
+                        onClick={() => {
+                          setIsMobileFullscreen(false);
+                          setActiveSlideIndex(0);
+                          setShowFlipbookModal(null);
+                        }}
+                        className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
+                        aria-label="Close flipbook"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Flipbook Viewer Container */}
-              <div className="flex-1 overflow-auto p-4 flex flex-col items-center justify-center bg-radial from-slate-800 to-slate-950 relative min-h-[460px]">
+              <div className={`flex-1 min-h-0 overflow-auto p-4 flex flex-col items-center justify-center bg-radial from-slate-800 to-slate-950 relative ${isMobileFullscreen ? 'w-full' : 'min-h-[460px]'}`}>
                 
                 {/* HTMLFlipBook Component */}
 
 <HTMLFlipBook
-  width={340}
-  height={480}
+  width={isMobileFullscreen ? fullscreenPageWidth : 340}
+  height={isMobileFullscreen ? fullscreenPageHeight : 480}
   size="stretch"
-  minWidth={280}
-  maxWidth={480}
-  minHeight={400}
-  maxHeight={640}
+  minWidth={isMobileFullscreen ? fullscreenPageWidth : 280}
+  maxWidth={isMobileFullscreen ? fullscreenPageWidth : 480}
+  minHeight={isMobileFullscreen ? fullscreenPageHeight : 400}
+  maxHeight={isMobileFullscreen ? fullscreenPageHeight : 640}
   maxShadowOpacity={0.5}
   showCover={true}
   mobileScrollSupport={true}
@@ -1003,6 +1037,7 @@ export default function App() {
   ref={flipBookRef}
   onFlip={(e) => {
     setFlipPageNumber(e.data);
+    setActiveSlideIndex(e.data);
     playPageFlipSound();
   }}
 >
@@ -1147,11 +1182,10 @@ export default function App() {
 </HTMLFlipBook>
 
                 {/* Flip Navigation Controls */}
-                <div className="mt-4 flex items-center gap-4 bg-slate-900/80 px-4 py-2 rounded-full border border-slate-700/80 backdrop-blur-md">
+                <div className={`shrink-0 mt-4 flex items-center gap-4 bg-slate-900/80 px-4 py-2 rounded-full border border-slate-700/80 backdrop-blur-md ${isMobileFullscreen ? 'mb-2' : ''}`}>
                   <button
                     onClick={() => {
                       flipBookRef.current?.pageFlip()?.flipPrev();
-                      playPageFlipSound();
                     }}
                     className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white transition"
                     title="Previous Page"
@@ -1160,143 +1194,19 @@ export default function App() {
                   </button>
 
                   <span className="text-xs text-slate-300 font-mono">
-                    Use mouse / finger to flip pages
+                    {isMobileFullscreen ? `Page ${flipPageNumber + 1} of ${totalSlides}` : 'Use mouse / finger to flip pages'}
                   </span>
 
                   <button
-  onClick={() => {
-    flipBookRef.current?.pageFlip()?.flipPrev();
-    playPageFlipSound();
-  }}
-  className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white transition"
-  title="Previous Page"
->
-  <ChevronLeft className="w-5 h-5" />
-</button>
-
-<button
-  onClick={() => {
-    flipBookRef.current?.pageFlip()?.flipNext();
-    playPageFlipSound();
-  }}
-  className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white transition"
-  title="Next Page"
->
-  <ChevronRight className="w-5 h-5" />
-</button>
+                    onClick={() => flipBookRef.current?.pageFlip()?.flipNext()}
+                    className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white transition"
+                    title="Next Page"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
                 </div>
               </div>
             </div>
-            {isMobileFullscreen && (
-              <div className="fixed inset-0 z-[100] bg-slate-950 flex flex-col">
-                <header className="shrink-0 flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-800 bg-slate-950">
-                  <h2 className="min-w-0 text-sm sm:text-base font-bold text-white truncate">
-                    {book.title}
-                  </h2>
-                  <div className="shrink-0 flex items-center gap-3">
-                    <span className="text-xs sm:text-sm text-slate-300 font-mono">
-                      Page {activeSlideIndex + 1} of {totalSlides}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={exitFullscreenReader}
-                      className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition"
-                      aria-label="Exit full screen reader"
-                    >
-                      <Minimize2 className="w-5 h-5" />
-                    </button>
-                  </div>
-                </header>
-
-                <main
-                  className="flex-1 min-h-0 flex items-center justify-center overflow-hidden p-2 sm:p-4 touch-pan-y"
-                  onTouchStart={(event) => {
-                    touchStartXRef.current = event.changedTouches[0]?.clientX ?? null;
-                  }}
-                  onTouchEnd={(event) => {
-                    if (touchStartXRef.current === null) return;
-                    const touchEndX = event.changedTouches[0]?.clientX;
-                    const distance = touchStartXRef.current - (touchEndX ?? touchStartXRef.current);
-                    touchStartXRef.current = null;
-                    if (distance > 50) goToFullscreenSlide(activeSlideIndex + 1);
-                    if (distance < -50) goToFullscreenSlide(activeSlideIndex - 1);
-                  }}
-                >
-                  {activeSlideIndex === 0 ? (
-                    <section className="w-full max-w-3xl max-h-full overflow-auto rounded-2xl border border-indigo-700/60 bg-gradient-to-br from-slate-950 via-indigo-950 to-purple-950 p-6 sm:p-10 text-white shadow-2xl">
-                      <span className="inline-flex rounded-full bg-amber-400 px-3 py-1 text-xs font-extrabold uppercase tracking-wider text-slate-950">
-                        {book.badge || 'Study Notes'}
-                      </span>
-                      <h3 className="mt-5 text-2xl sm:text-4xl font-black leading-tight">{book.title}</h3>
-                      <p className="mt-2 text-sm sm:text-base font-semibold text-amber-300">
-                        {book.subject || book.examCategory || 'Exam Preparation'}
-                      </p>
-                      <div className="mt-5 flex flex-wrap gap-3 text-xs sm:text-sm text-slate-300">
-                        <span>{book.pages ? `${book.pages} Pages` : 'Exam Special'}</span>
-                        <span>★ {book.rating || '4.9'}</span>
-                      </div>
-                      <div className="mt-6 border-t border-slate-700 pt-5 text-sm sm:text-base leading-relaxed whitespace-pre-line">
-                        {renderFlipbookDescription(book.description || '')}
-                      </div>
-                      <p className="mt-6 text-xs sm:text-sm font-semibold text-indigo-200">
-                        Swipe or use Next to view the sample pages.
-                      </p>
-                    </section>
-                  ) : activeSlideIndex <= pagesList.length ? (
-                    <img
-                      src={pagesList[activeSlideIndex - 1]}
-                      alt={`${book.title} sample page ${activeSlideIndex}`}
-                      className="object-contain max-h-full max-w-full mx-auto select-none"
-                      draggable="false"
-                    />
-                  ) : (
-                    <section className="w-full max-w-xl max-h-full overflow-auto rounded-2xl border border-indigo-700/60 bg-gradient-to-br from-indigo-950 via-slate-900 to-purple-950 p-6 sm:p-10 text-center text-white shadow-2xl">
-                      <Sparkles className="mx-auto h-10 w-10 text-amber-400" />
-                      <h3 className="mt-4 text-2xl font-black">Sample Preview Ended</h3>
-                      <p className="mt-3 text-sm leading-relaxed text-slate-300">
-                        {book.isFree
-                          ? 'Download the complete free PDF copy to keep revising offline.'
-                          : 'Unlock complete comprehensive visual notes with full high-resolution diagrams.'}
-                      </p>
-                      <a
-                        href={book.pdfUrl || '#'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`mt-6 inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-extrabold shadow-xl transition ${
-                          book.isFree
-                            ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
-                            : 'bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 hover:from-emerald-400'
-                        }`}
-                      >
-                        {book.isFree ? <Download className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
-                        {book.isFree ? 'Download Free PDF' : `Unlock Full Notes (${book.price || book.badge})`}
-                      </a>
-                    </section>
-                  )}
-                </main>
-
-                <footer className="shrink-0 flex items-center justify-center gap-6 px-4 py-3 border-t border-slate-800 bg-slate-950">
-                  <button
-                    type="button"
-                    onClick={() => goToFullscreenSlide(activeSlideIndex - 1)}
-                    disabled={activeSlideIndex <= 0}
-                    className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                    Previous
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => goToFullscreenSlide(activeSlideIndex + 1)}
-                    disabled={activeSlideIndex >= totalSlides - 1}
-                    className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                  >
-                    Next
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </footer>
-              </div>
-            )}
           </div>
         );
       })()}
