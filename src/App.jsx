@@ -27,17 +27,12 @@ import {
   GraduationCap,
   Award,
   Clock,
-  HelpCircle,
   ExternalLink,
   ShoppingCart,
   Maximize2,
   Minimize2,
   CalendarDays,
-  Bell,
-  Users,
-  IndianRupee,
-  ClipboardCheck,
-  FileCheck2
+  Bell
 } from 'lucide-react';
 
 // ==========================================
@@ -45,6 +40,32 @@ import {
 // ==========================================
 const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTWDpgH3DG7CxaaXFi1qado9DzZ_dykCwxZeaZ58_ddMo6RmtMOsfZfmm0FRPpsYMntSv5h9DgZ7Pq2/pub?output=csv";
 const GOOGLE_SHEET_BLOG_CSV_URL = `${GOOGLE_SHEET_CSV_URL}&gid=1105754566`;
+const getGoogleDocEmbedUrl = (docUrl) => {
+  const match = docUrl?.trim().match(
+    /^https?:\/\/docs\.google\.com\/document\/(?:u\/\d+\/)?d\/([^/?#]+)(?:\/(?:edit|view|preview|pub))?(?:[?#].*)?$/i
+  );
+  return match
+    ? `https://docs.google.com/document/d/${encodeURIComponent(match[1])}/pub?embedded=true`
+    : '';
+};
+const getYouTubeEmbedUrl = (videoUrl) => {
+  try {
+    const url = new URL(videoUrl);
+    let videoId = '';
+    if (url.hostname === 'youtu.be') {
+      videoId = url.pathname.slice(1);
+    } else if (url.hostname.endsWith('youtube.com')) {
+      videoId = url.pathname === '/watch'
+        ? url.searchParams.get('v') || ''
+        : url.pathname.startsWith('/embed/')
+          ? url.pathname.split('/')[2] || ''
+          : '';
+    }
+    return videoId ? `https://www.youtube.com/embed/${encodeURIComponent(videoId)}` : '';
+  } catch {
+    return '';
+  }
+};
 
 const INITIAL_BOOKS = [
   {
@@ -282,10 +303,8 @@ export default function App() {
       complete: (results) => {
         const fields = [
           'id', 'title', 'state', 'examCategory', 'postDate', 'totalVacancy',
-          'applyStartDate', 'applyEndDate', 'examDates', 'ageLimit', 'qualification',
-          'applicationFee', 'salary', 'selectionProcess', 'examPattern', 'syllabus',
-          'previousPapersUrl', 'howToApply', 'documentsRequired', 'officialPdfUrl',
-          'applyOnlineUrl', 'relatedBookId', 'articleDocUrl'
+          'applyStartDate', 'applyEndDate', 'examDates', 'officialPdfUrl',
+          'applyOnlineUrl', 'relatedBookId', 'youtubeVideoUrl', 'articleDocUrl'
         ];
         const parsedPosts = (results.data || [])
           .filter((row) => row.id?.trim() && row.title?.trim())
@@ -432,9 +451,8 @@ export default function App() {
       const matchesQuery = !query || [
         post.title,
         post.examCategory,
-        post.state,
-        post.qualification
-      ].some((value) => value.toLowerCase().includes(query));
+        post.state
+      ].some((value) => (value || '').toLowerCase().includes(query));
       const matchesCategory = selectedBlogCategory === 'All'
         || post.examCategory.toLowerCase().includes(selectedBlogCategory.toLowerCase());
       const matchesState = selectedBlogState === 'All'
@@ -1051,106 +1069,13 @@ export default function App() {
           </>
         ) : selectedBlog ? (
           (() => {
-            const relatedBook = booksList.find(
-              (book) => book.id.toLowerCase() === selectedBlog.relatedBookId.toLowerCase()
-            );
-            const detailSections = [
-              {
-                id: 'dates',
-                title: 'Important Dates',
-                icon: CalendarDays,
-                fields: [
-                  ['Application Starts', selectedBlog.applyStartDate],
-                  ['Application Ends', selectedBlog.applyEndDate],
-                  ['Exam Dates', selectedBlog.examDates]
-                ]
-              },
-              {
-                id: 'posts',
-                title: 'Posts',
-                icon: FileText,
-                fields: [['Notification', selectedBlog.title]]
-              },
-              {
-                id: 'salary',
-                title: 'Salary',
-                icon: IndianRupee,
-                fields: [['Pay / Salary', selectedBlog.salary]]
-              },
-              {
-                id: 'vacancies',
-                title: 'Vacancies',
-                icon: Users,
-                fields: [['Total Vacancies', selectedBlog.totalVacancy]]
-              },
-              {
-                id: 'eligibility',
-                title: 'Eligibility',
-                icon: GraduationCap,
-                fields: [
-                  ['Age Limit', selectedBlog.ageLimit],
-                  ['Qualification', selectedBlog.qualification]
-                ]
-              },
-              {
-                id: 'fee',
-                title: 'Application Fee',
-                icon: IndianRupee,
-                fields: [['Fee Details', selectedBlog.applicationFee]]
-              },
-              {
-                id: 'selection',
-                title: 'Selection Process',
-                icon: ClipboardCheck,
-                fields: [['Stages', selectedBlog.selectionProcess]]
-              },
-              {
-                id: 'exam-pattern',
-                title: 'Exam Pattern',
-                icon: FileText,
-                fields: [['Pattern', selectedBlog.examPattern]]
-              },
-              {
-                id: 'syllabus',
-                title: 'Syllabus',
-                icon: BookOpen,
-                fields: [['Topics', selectedBlog.syllabus]]
-              },
-              {
-                id: 'previous-papers',
-                title: 'Previous Papers',
-                icon: FileCheck2,
-                fields: [['Practice Papers', selectedBlog.previousPapersUrl]]
-              },
-              {
-                id: 'how-to-apply',
-                title: 'How to Apply',
-                icon: ClipboardCheck,
-                fields: [['Steps', selectedBlog.howToApply]]
-              },
-              {
-                id: 'documents',
-                title: 'Documents Required',
-                icon: FileCheck2,
-                fields: [['Documents', selectedBlog.documentsRequired]]
-              }
-            ];
-            const pageNav = [
-              ['dates', 'Dates'],
-              ['posts', 'Posts'],
-              ['salary', 'Salary'],
-              ['vacancies', 'Vacancies'],
-              ['eligibility', 'Eligibility'],
-              ['fee', 'Fee'],
-              ['selection', 'Selection'],
-              ['exam-pattern', 'Exam Pattern'],
-              ['syllabus', 'Syllabus'],
-              ['previous-papers', 'Previous Papers'],
-              ['how-to-apply', 'How to Apply'],
-              ['documents', 'Documents'],
-              ['important-links', 'Important Links'],
-              ['faqs', 'FAQs']
-            ];
+            const targetIds = (selectedBlog.relatedBookId || '')
+              .split(',')
+              .map((id) => id.trim())
+              .filter(Boolean);
+            const matchedBooks = booksList.filter((book) => targetIds.includes(book.id));
+            const cleanDocUrl = getGoogleDocEmbedUrl(selectedBlog.articleDocUrl);
+            const youtubeEmbedUrl = getYouTubeEmbedUrl(selectedBlog.youtubeVideoUrl);
             const renderActionLink = (url, label, className) => url ? (
               <a
                 href={url}
@@ -1161,12 +1086,7 @@ export default function App() {
                 <ExternalLink className="h-4 w-4 shrink-0" />
                 {label}
               </a>
-            ) : (
-              <span className={`${className} cursor-not-allowed opacity-50`} aria-disabled="true">
-                <ExternalLink className="h-4 w-4 shrink-0" />
-                {label} unavailable
-              </span>
-            );
+            ) : null;
 
             return (
               <article className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
@@ -1188,17 +1108,33 @@ export default function App() {
                       {selectedBlog.state || 'All India / Central'}
                     </span>
                     <span className="rounded-full bg-emerald-400/20 px-3 py-1 text-emerald-100">
-                      {selectedBlog.totalVacancy || 'Vacancies'} Vacancies
+                      {selectedBlog.totalVacancy || 'Vacancies'}{selectedBlog.totalVacancy ? ' Vacancies' : ''}
                     </span>
                   </div>
                   <h1 className="mt-4 text-2xl sm:text-4xl font-black leading-tight">{selectedBlog.title}</h1>
-                  <p className="mt-3 text-sm text-blue-100">
-                    {selectedBlog.postDate ? `Posted ${selectedBlog.postDate}` : 'Latest exam notification'}
+                  <p className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-blue-100">
+                    {selectedBlog.postDate && <span>Posted {selectedBlog.postDate}</span>}
                   </p>
+                  {(selectedBlog.applyStartDate || selectedBlog.applyEndDate || selectedBlog.examDates) && (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {(selectedBlog.applyStartDate || selectedBlog.applyEndDate) && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-blue-50">
+                          <CalendarDays className="h-4 w-4" />
+                          Applications: {selectedBlog.applyStartDate || 'TBA'} – {selectedBlog.applyEndDate || 'TBA'}
+                        </span>
+                      )}
+                      {selectedBlog.examDates && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-blue-50">
+                          <CalendarDays className="h-4 w-4" />
+                          Exam: {selectedBlog.examDates}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <div className="mt-6 flex flex-wrap gap-3">
                     {renderActionLink(
                       selectedBlog.officialPdfUrl,
-                      'Download Official PDF',
+                      'Official Notification PDF',
                       'inline-flex items-center gap-2 rounded-xl bg-amber-400 px-4 py-3 text-sm font-extrabold text-slate-950 hover:bg-amber-300 transition'
                     )}
                     {renderActionLink(
@@ -1209,123 +1145,127 @@ export default function App() {
                   </div>
                 </header>
 
-                <nav aria-label="On this page" className="sticky top-[7.5rem] z-30 mt-6 overflow-x-auto rounded-xl border border-slate-200 bg-white/95 p-2 shadow-md backdrop-blur">
-                  <div className="flex min-w-max gap-2">
-                    {pageNav.map(([id, label]) => (
-                      <a
-                        key={id}
-                        href={`#notification-${id}`}
-                        className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-blue-900 hover:text-white transition"
-                      >
-                        {label}
-                      </a>
-                    ))}
-                  </div>
-                </nav>
-
                 <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    {detailSections.map(({ id, title, icon: SectionIcon, fields }) => (
-                      <section
-                        key={id}
-                        id={`notification-${id}`}
-                        className="scroll-mt-40 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-                      >
-                        <h2 className="flex items-center gap-2 text-base font-extrabold text-blue-950">
-                          <SectionIcon className="h-5 w-5 text-amber-500" />
-                          {title}
-                        </h2>
-                        <div className="mt-4 space-y-3">
-                          {fields.map(([label, value]) => (
-                            <div key={label}>
-                              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
-                              <p className="mt-1 whitespace-pre-line break-words text-sm leading-relaxed text-slate-700">
-                                {value || 'Details will be announced in the official notification.'}
-                              </p>
-                            </div>
-                          ))}
+                  <div className="min-w-0 space-y-6">
+                    {youtubeEmbedUrl && (
+                      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <div className="flex items-center justify-between gap-3 px-4 py-3">
+                          <h2 className="text-sm font-extrabold text-blue-950">Video Guide</h2>
+                          <a
+                            href={selectedBlog.youtubeVideoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-800 hover:text-blue-950"
+                          >
+                            Watch on YouTube
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                        </div>
+                        <div className="aspect-video bg-slate-950">
+                          <iframe
+                            src={youtubeEmbedUrl}
+                            className="h-full w-full border-0"
+                            title={`${selectedBlog.title} video guide`}
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            allowFullScreen
+                            loading="lazy"
+                          />
                         </div>
                       </section>
-                    ))}
-
-                    <section
-                      id="notification-important-links"
-                      className="scroll-mt-40 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:col-span-2"
-                    >
-                      <h2 className="flex items-center gap-2 text-base font-extrabold text-blue-950">
-                        <ExternalLink className="h-5 w-5 text-amber-500" />
-                        Important Links
-                      </h2>
-                      <div className="mt-4 flex flex-wrap gap-3">
-                        {renderActionLink(
-                          selectedBlog.officialPdfUrl,
-                          'Download Official PDF',
-                          'inline-flex items-center gap-2 rounded-xl bg-blue-950 px-4 py-3 text-sm font-bold text-white hover:bg-blue-900 transition'
-                        )}
-                        {renderActionLink(
-                          selectedBlog.applyOnlineUrl,
-                          'Apply Online',
-                          'inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-500 transition'
-                        )}
-                        {renderActionLink(
-                          selectedBlog.articleDocUrl,
-                          'Read Full Article',
-                          'inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-3 text-sm font-bold text-slate-800 hover:bg-slate-200 transition'
-                        )}
-                      </div>
-                    </section>
-
-                    <section
-                      id="notification-faqs"
-                      className="scroll-mt-40 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:col-span-2"
-                    >
-                      <h2 className="flex items-center gap-2 text-base font-extrabold text-blue-950">
-                        <HelpCircle className="h-5 w-5 text-amber-500" />
-                        FAQs
-                      </h2>
-                      <p className="mt-3 text-sm leading-relaxed text-slate-700">
-                        For confirmed eligibility, dates, and application guidance, refer to the official notification linked above.
-                      </p>
-                    </section>
+                    )}
+                    {cleanDocUrl ? (
+                      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-3">
+                        <div className="flex items-center justify-between gap-3 px-2 pb-3">
+                          <h2 className="text-sm font-extrabold text-blue-950">Full Exam Guide</h2>
+                          <a
+                            href={selectedBlog.articleDocUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-200"
+                          >
+                            Open in New Tab
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                        </div>
+                        <iframe
+                          src={cleanDocUrl}
+                          className="min-h-[900px] w-full rounded-2xl border-0 bg-white shadow-sm"
+                          title={selectedBlog.title}
+                          loading="lazy"
+                        />
+                      </section>
+                    ) : (
+                      <section className="flex min-h-[360px] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center shadow-sm sm:min-h-[480px]">
+                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700">
+                          <FileText className="h-7 w-7" />
+                        </div>
+                        <h2 className="mt-5 text-xl font-black text-blue-950">Detailed article coming soon</h2>
+                        <p className="mt-2 max-w-md text-sm leading-relaxed text-slate-600">
+                          The detailed article for this notification is being prepared. Check the official notification PDF and application link above in the meantime.
+                        </p>
+                      </section>
+                    )}
                   </div>
 
-                  {relatedBook && (
-                    <aside className="h-fit rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-5 shadow-sm lg:sticky lg:top-48">
+                  {matchedBooks.length > 0 && (
+                    <aside className="h-fit rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-4 shadow-sm lg:sticky lg:top-48">
                       <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600">
-                        Recommended Study Material
+                        Recommended Study Notes & Solved Papers
                       </span>
-                      <h2 className="mt-2 text-lg font-black text-blue-950">{relatedBook.title}</h2>
-                      <p className="mt-2 text-xs leading-relaxed text-slate-600">
-                        {relatedBook.subject} · {relatedBook.language}
-                      </p>
-                      <div className="mt-4 flex flex-col gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowFlipbookModal(relatedBook);
-                            setFlipPageNumber(0);
-                            setActiveSlideIndex(0);
-                          }}
-                          className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-800 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 transition"
-                        >
-                          <BookOpen className="h-4 w-4" />
-                          Flipbook 3D
-                        </button>
-                        <a
-                          href={relatedBook.pdfUrl || '#'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(event) => {
-                            if (!relatedBook.pdfUrl) {
-                              event.preventDefault();
-                              showToast(relatedBook.isFree ? 'Download link will be updated soon!' : 'Payment link will be updated soon!');
-                            }
-                          }}
-                          className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-500 transition"
-                        >
-                          {relatedBook.isFree ? <Download className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
-                          {relatedBook.isFree ? 'Download Free' : `Buy${relatedBook.price ? ` • ${relatedBook.price}` : ''}`}
-                        </a>
+                      <div className="mt-4 space-y-4">
+                        {matchedBooks.map((book) => (
+                          <article key={book.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                            <div className="flex h-36 items-center justify-center overflow-hidden bg-slate-950">
+                              {book.coverImage ? (
+                                <img src={book.coverImage} alt={book.title} className="h-full w-full object-contain" loading="lazy" />
+                              ) : (
+                                <div className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${book.coverGradient} p-4 text-center`}>
+                                  <BookOpen className="h-10 w-10 text-amber-300" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="p-3">
+                              <h3 className="line-clamp-2 text-sm font-extrabold text-slate-900">{book.title}</h3>
+                              <p className="mt-2 text-xs font-bold text-emerald-700">
+                                {book.isFree ? 'FREE' : book.price || 'Price on request'}
+                              </p>
+                              <div className="mt-3 flex flex-col gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShowFlipbookModal(book);
+                                    setFlipPageNumber(0);
+                                    setActiveSlideIndex(0);
+                                  }}
+                                  className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-800 px-3 py-2 text-xs font-bold text-white transition hover:bg-indigo-700"
+                                >
+                                  <BookOpen className="h-3.5 w-3.5" />
+                                  3D Flipbook Sample
+                                </button>
+                                {book.pdfUrl ? (
+                                  <a
+                                    href={book.pdfUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-500"
+                                  >
+                                    {book.isFree ? <Download className="h-3.5 w-3.5" /> : <ShoppingCart className="h-3.5 w-3.5" />}
+                                    {book.isFree ? 'Download Free' : `Buy${book.price ? ` • ${book.price}` : ''}`}
+                                  </a>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => showToast(book.isFree ? 'Download link will be updated soon!' : 'Payment link will be updated soon!')}
+                                    className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-500"
+                                  >
+                                    {book.isFree ? <Download className="h-3.5 w-3.5" /> : <ShoppingCart className="h-3.5 w-3.5" />}
+                                    {book.isFree ? 'Download Free' : `Buy${book.price ? ` • ${book.price}` : ''}`}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </article>
+                        ))}
                       </div>
                     </aside>
                   )}
@@ -1353,7 +1293,7 @@ export default function App() {
                   type="search"
                   value={blogSearchQuery}
                   onChange={(event) => setBlogSearchQuery(event.target.value)}
-                  placeholder="Search exams, category, state, or qualification..."
+                  placeholder="Search exam title, category, or state..."
                   className="w-full rounded-xl border border-slate-300 bg-slate-50 py-3 pl-11 pr-4 text-sm outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
                 />
               </label>
@@ -1461,7 +1401,7 @@ export default function App() {
                       onClick={() => setSelectedBlog(post)}
                       className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-950 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-900"
                     >
-                      Read Full Details
+                      View Notification Details
                       <ArrowRight className="h-4 w-4" />
                     </button>
                   </article>
