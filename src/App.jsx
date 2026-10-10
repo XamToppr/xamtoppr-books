@@ -32,7 +32,9 @@ import {
   Maximize2,
   Minimize2,
   CalendarDays,
-  Bell
+  Bell,
+  ClipboardList,
+  FileCheck2
 } from 'lucide-react';
 
 // ==========================================
@@ -40,14 +42,6 @@ import {
 // ==========================================
 const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTWDpgH3DG7CxaaXFi1qado9DzZ_dykCwxZeaZ58_ddMo6RmtMOsfZfmm0FRPpsYMntSv5h9DgZ7Pq2/pub?output=csv";
 const GOOGLE_SHEET_BLOG_CSV_URL = `${GOOGLE_SHEET_CSV_URL}&gid=1105754566`;
-const getGoogleDocEmbedUrl = (docUrl) => {
-  const match = docUrl?.trim().match(
-    /^https?:\/\/docs\.google\.com\/document\/(?:u\/\d+\/)?d\/([^/?#]+)(?:\/(?:edit|view|preview|pub))?(?:[?#].*)?$/i
-  );
-  return match
-    ? `https://docs.google.com/document/d/${encodeURIComponent(match[1])}/preview`
-    : '';
-};
 const getYouTubeEmbedUrl = (videoUrl) => {
   try {
     const url = new URL(videoUrl);
@@ -65,6 +59,62 @@ const getYouTubeEmbedUrl = (videoUrl) => {
   } catch {
     return '';
   }
+};
+const renderNotificationContent = (content) => {
+  if (!content?.trim()) return null;
+
+  const lines = content.split(/\r?\n/);
+  const rendered = [];
+  let index = 0;
+  while (index < lines.length) {
+    const cellsFor = (line) => line.trim().replace(/^\|/, '').replace(/\|$/, '')
+      .split('|').map((cell) => cell.trim());
+    const isTableSeparator = (line) => cellsFor(line).every((cell) => /^:?-{3,}:?$/.test(cell));
+
+    if (lines[index].includes('|') && lines[index + 1]?.includes('|') && isTableSeparator(lines[index + 1])) {
+      const headers = cellsFor(lines[index]);
+      index += 2;
+      const rows = [];
+      while (index < lines.length && lines[index].includes('|')) {
+        rows.push(cellsFor(lines[index]));
+        index += 1;
+      }
+      rendered.push(
+        <div key={`table-${index}`} className="my-3 overflow-x-auto rounded-xl border border-slate-200">
+          <table className="w-full min-w-max border-collapse text-left text-sm">
+            <thead className="bg-slate-100 text-slate-700">
+              <tr>{headers.map((cell, cellIndex) => (
+                <th key={cellIndex} className="border-b border-slate-200 px-3 py-2 font-bold">{cell}</th>
+              ))}</tr>
+            </thead>
+            <tbody>
+              {rows.map((row, rowIndex) => (
+                <tr key={rowIndex} className="odd:bg-white even:bg-slate-50">
+                  {headers.map((_, cellIndex) => (
+                    <td key={cellIndex} className="border-b border-slate-100 px-3 py-2 align-top">
+                      {row[cellIndex] || ''}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      continue;
+    }
+
+    const line = lines[index].trim();
+    if (line) {
+      rendered.push(
+        <p key={`line-${index}`} className="whitespace-pre-wrap">
+          {line.replace(/^[-*]\s+/, '• ')}
+        </p>
+      );
+    }
+    index += 1;
+  }
+  return rendered;
 };
 
 const INITIAL_BOOKS = [
@@ -303,8 +353,10 @@ export default function App() {
       complete: (results) => {
         const fields = [
           'id', 'title', 'state', 'examCategory', 'postDate', 'totalVacancy',
-          'applyStartDate', 'applyEndDate', 'examDates', 'officialPdfUrl',
-          'applyOnlineUrl', 'relatedBookId', 'youtubeVideoUrl', 'articleDocUrl'
+          'applyStartDate', 'applyEndDate', 'examDates', 'ageLimit', 'qualification',
+          'applicationFee', 'salary', 'selectionProcess', 'examPattern', 'syllabus',
+          'howToApply', 'documentsRequired', 'officialPdfUrl', 'applyOnlineUrl',
+          'relatedBookId', 'youtubeVideoUrl'
         ];
         const parsedPosts = (results.data || [])
           .filter((row) => row.id?.trim() && row.title?.trim())
@@ -1074,8 +1126,59 @@ export default function App() {
               .map((id) => id.trim())
               .filter(Boolean);
             const matchedBooks = booksList.filter((book) => targetIds.includes(book.id));
-            const cleanDocUrl = getGoogleDocEmbedUrl(selectedBlog.articleDocUrl);
             const youtubeEmbedUrl = getYouTubeEmbedUrl(selectedBlog.youtubeVideoUrl);
+            const notificationSections = [
+              {
+                title: 'Important Dates & Overview',
+                icon: CalendarDays,
+                fallback: 'Notification dates and overview details will be updated soon.',
+                items: [
+                  ['Post Date', selectedBlog.postDate],
+                  ['State / Region', selectedBlog.state],
+                  ['Exam Category', selectedBlog.examCategory],
+                  ['Total Vacancies', selectedBlog.totalVacancy],
+                  ['Application Start Date', selectedBlog.applyStartDate],
+                  ['Application End Date', selectedBlog.applyEndDate],
+                  ['Exam Dates', selectedBlog.examDates],
+                  ['Age Limit', selectedBlog.ageLimit],
+                  ['Qualification', selectedBlog.qualification],
+                  ['Application Fee', selectedBlog.applicationFee]
+                ]
+              },
+              {
+                title: 'Salary & Pay Scale',
+                icon: Award,
+                fallback: 'Salary and pay scale details will be announced in the official notification.',
+                items: [['Salary / Pay Scale', selectedBlog.salary]]
+              },
+              {
+                title: 'Selection Process & Stages',
+                icon: ClipboardList,
+                fallback: 'Selection stages will be announced in the official notification.',
+                items: [['Selection Process', selectedBlog.selectionProcess]]
+              },
+              {
+                title: 'Exam Pattern & Minimum Qualifying Marks',
+                icon: FileText,
+                fallback: 'Exam pattern and qualifying marks will be announced in the official notification.',
+                items: [['Exam Pattern', selectedBlog.examPattern]]
+              },
+              {
+                title: 'Subject-wise Syllabus',
+                icon: BookOpen,
+                fallback: 'The detailed syllabus will be announced in the official notification.',
+                items: [['Syllabus', selectedBlog.syllabus]]
+              },
+              {
+                title: 'How to Apply & Documents Required',
+                icon: FileCheck2,
+                fallback: 'Application instructions and required documents will be announced in the official notification.',
+                items: [
+                  ['How to Apply', selectedBlog.howToApply],
+                  ['Documents Required', selectedBlog.documentsRequired]
+                ]
+              }
+            ];
             const renderActionLink = (url, label, className) => url ? (
               <a
                 href={url}
@@ -1147,38 +1250,28 @@ export default function App() {
 
                 <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
                   <div className="min-w-0 space-y-6">
-                    {cleanDocUrl ? (
-                      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                        <div className="flex items-center justify-between gap-3 px-4 py-3">
-                          <h2 className="text-sm font-extrabold text-blue-950">Full Exam Guide</h2>
-                          <a
-                            href={selectedBlog.articleDocUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-200"
-                          >
-                            Open in new window ↗
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </a>
+                    {notificationSections.map(({ title, icon: SectionIcon, items, fallback }) => (
+                      <section key={title} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                        <h2 className="flex items-center gap-2 text-base font-extrabold text-blue-950 sm:text-lg">
+                          <SectionIcon className="h-5 w-5 shrink-0 text-amber-500" />
+                          {title}
+                        </h2>
+                        <div className="mt-4 space-y-4">
+                          {items.map(([label, value]) => (
+                            <div key={label}>
+                              {items.length > 1 && (
+                                <h3 className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">{label}</h3>
+                              )}
+                              <div className="space-y-2 text-sm leading-relaxed text-slate-700">
+                                {renderNotificationContent(value) || (
+                                  <p className="text-slate-500">{items.length === 1 ? fallback : 'Details will be announced in the official notification.'}</p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                        <iframe
-                          src={cleanDocUrl}
-                          className="h-[900px] w-full border-0 bg-white"
-                          title={selectedBlog.title}
-                          loading="lazy"
-                        />
                       </section>
-                    ) : (
-                      <section className="flex min-h-[360px] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center shadow-sm sm:min-h-[480px]">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700">
-                          <FileText className="h-7 w-7" />
-                        </div>
-                        <h2 className="mt-5 text-xl font-black text-blue-950">Detailed article coming soon</h2>
-                        <p className="mt-2 max-w-md text-sm leading-relaxed text-slate-600">
-                          The detailed article for this notification is being prepared. Check the official notification PDF and application link above in the meantime.
-                        </p>
-                      </section>
-                    )}
+                    ))}
                     {youtubeEmbedUrl && (
                       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                         <div className="flex items-center justify-between gap-3 px-4 py-3">
