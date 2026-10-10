@@ -124,7 +124,8 @@ export default function App() {
   const [quickFilterBadge, setQuickFilterBadge] = useState('ALL');
   const [flipPageNumber, setFlipPageNumber] = useState(0);
   const [isMobileFullscreen, setIsMobileFullscreen] = useState(false);
-  const [fullscreenPageIndex, setFullscreenPageIndex] = useState(0);
+  const [activeSlideIndex, setActiveSlideIndex] = useState(0);
+  const touchStartXRef = useRef(null);
 
   const flipBookRef = useRef(null);
   const flipAudioRef = useRef(null);
@@ -906,6 +907,16 @@ export default function App() {
         const pagesList = book.samplePages.length > 0 
           ? book.samplePages 
           : (book.coverImage ? [book.coverImage] : []);
+        const totalSlides = pagesList.length + 2;
+        const goToFullscreenSlide = (index) => {
+          const nextIndex = Math.min(Math.max(index, 0), totalSlides - 1);
+          setActiveSlideIndex(nextIndex);
+          playPageFlipSound();
+        };
+        const exitFullscreenReader = () => {
+          flipBookRef.current?.pageFlip()?.turnToPage(activeSlideIndex);
+          setIsMobileFullscreen(false);
+        };
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
@@ -927,9 +938,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => {
-                      setFullscreenPageIndex(pagesList.length
-                        ? Math.min(Math.max(flipPageNumber - 1, 0), pagesList.length - 1)
-                        : 0);
+                      setActiveSlideIndex(Math.min(flipPageNumber, totalSlides - 1));
                       setIsMobileFullscreen(true);
                     }}
                     className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold px-3 py-2 rounded-xl transition flex items-center gap-1.5"
@@ -963,6 +972,7 @@ export default function App() {
                   <button
                     onClick={() => {
                       setIsMobileFullscreen(false);
+                      setActiveSlideIndex(0);
                       setShowFlipbookModal(null);
                     }}
                     className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
@@ -993,9 +1003,6 @@ export default function App() {
   ref={flipBookRef}
   onFlip={(e) => {
     setFlipPageNumber(e.data);
-    if (pagesList.length > 0) {
-      setFullscreenPageIndex(Math.min(Math.max(e.data - 1, 0), pagesList.length - 1));
-    }
     playPageFlipSound();
   }}
 >
@@ -1188,11 +1195,11 @@ export default function App() {
                   </h2>
                   <div className="shrink-0 flex items-center gap-3">
                     <span className="text-xs sm:text-sm text-slate-300 font-mono">
-                      Page {pagesList.length ? fullscreenPageIndex + 1 : 0} of {pagesList.length}
+                      Page {activeSlideIndex + 1} of {totalSlides}
                     </span>
                     <button
                       type="button"
-                      onClick={() => setIsMobileFullscreen(false)}
+                      onClick={exitFullscreenReader}
                       className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition"
                       aria-label="Exit full screen reader"
                     >
@@ -1201,28 +1208,78 @@ export default function App() {
                   </div>
                 </header>
 
-                <main className="flex-1 min-h-0 flex items-center justify-center overflow-hidden p-2 sm:p-4">
-                  {pagesList.length > 0 ? (
+                <main
+                  className="flex-1 min-h-0 flex items-center justify-center overflow-hidden p-2 sm:p-4 touch-pan-y"
+                  onTouchStart={(event) => {
+                    touchStartXRef.current = event.changedTouches[0]?.clientX ?? null;
+                  }}
+                  onTouchEnd={(event) => {
+                    if (touchStartXRef.current === null) return;
+                    const touchEndX = event.changedTouches[0]?.clientX;
+                    const distance = touchStartXRef.current - (touchEndX ?? touchStartXRef.current);
+                    touchStartXRef.current = null;
+                    if (distance > 50) goToFullscreenSlide(activeSlideIndex + 1);
+                    if (distance < -50) goToFullscreenSlide(activeSlideIndex - 1);
+                  }}
+                >
+                  {activeSlideIndex === 0 ? (
+                    <section className="w-full max-w-3xl max-h-full overflow-auto rounded-2xl border border-indigo-700/60 bg-gradient-to-br from-slate-950 via-indigo-950 to-purple-950 p-6 sm:p-10 text-white shadow-2xl">
+                      <span className="inline-flex rounded-full bg-amber-400 px-3 py-1 text-xs font-extrabold uppercase tracking-wider text-slate-950">
+                        {book.badge || 'Study Notes'}
+                      </span>
+                      <h3 className="mt-5 text-2xl sm:text-4xl font-black leading-tight">{book.title}</h3>
+                      <p className="mt-2 text-sm sm:text-base font-semibold text-amber-300">
+                        {book.subject || book.examCategory || 'Exam Preparation'}
+                      </p>
+                      <div className="mt-5 flex flex-wrap gap-3 text-xs sm:text-sm text-slate-300">
+                        <span>{book.pages ? `${book.pages} Pages` : 'Exam Special'}</span>
+                        <span>★ {book.rating || '4.9'}</span>
+                      </div>
+                      <div className="mt-6 border-t border-slate-700 pt-5 text-sm sm:text-base leading-relaxed whitespace-pre-line">
+                        {renderFlipbookDescription(book.description || '')}
+                      </div>
+                      <p className="mt-6 text-xs sm:text-sm font-semibold text-indigo-200">
+                        Swipe or use Next to view the sample pages.
+                      </p>
+                    </section>
+                  ) : activeSlideIndex <= pagesList.length ? (
                     <img
-                      src={pagesList[fullscreenPageIndex]}
-                      alt={`${book.title} sample page ${fullscreenPageIndex + 1}`}
+                      src={pagesList[activeSlideIndex - 1]}
+                      alt={`${book.title} sample page ${activeSlideIndex}`}
                       className="object-contain max-h-full max-w-full mx-auto select-none"
                       draggable="false"
                     />
                   ) : (
-                    <p className="text-sm text-slate-400">No sample slides are available for this book.</p>
+                    <section className="w-full max-w-xl max-h-full overflow-auto rounded-2xl border border-indigo-700/60 bg-gradient-to-br from-indigo-950 via-slate-900 to-purple-950 p-6 sm:p-10 text-center text-white shadow-2xl">
+                      <Sparkles className="mx-auto h-10 w-10 text-amber-400" />
+                      <h3 className="mt-4 text-2xl font-black">Sample Preview Ended</h3>
+                      <p className="mt-3 text-sm leading-relaxed text-slate-300">
+                        {book.isFree
+                          ? 'Download the complete free PDF copy to keep revising offline.'
+                          : 'Unlock complete comprehensive visual notes with full high-resolution diagrams.'}
+                      </p>
+                      <a
+                        href={book.pdfUrl || '#'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`mt-6 inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-extrabold shadow-xl transition ${
+                          book.isFree
+                            ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
+                            : 'bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 hover:from-emerald-400'
+                        }`}
+                      >
+                        {book.isFree ? <Download className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
+                        {book.isFree ? 'Download Free PDF' : `Unlock Full Notes (${book.price || book.badge})`}
+                      </a>
+                    </section>
                   )}
                 </main>
 
                 <footer className="shrink-0 flex items-center justify-center gap-6 px-4 py-3 border-t border-slate-800 bg-slate-950">
                   <button
                     type="button"
-                    onClick={() => {
-                      const previousIndex = Math.max(0, fullscreenPageIndex - 1);
-                      setFullscreenPageIndex(previousIndex);
-                      flipBookRef.current?.pageFlip()?.turnToPage(previousIndex + 1);
-                    }}
-                    disabled={fullscreenPageIndex <= 0}
+                    onClick={() => goToFullscreenSlide(activeSlideIndex - 1)}
+                    disabled={activeSlideIndex <= 0}
                     className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
                   >
                     <ChevronLeft className="w-4 h-4" />
@@ -1230,12 +1287,8 @@ export default function App() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      const nextIndex = Math.min(pagesList.length - 1, fullscreenPageIndex + 1);
-                      setFullscreenPageIndex(nextIndex);
-                      flipBookRef.current?.pageFlip()?.turnToPage(nextIndex + 1);
-                    }}
-                    disabled={fullscreenPageIndex >= pagesList.length - 1}
+                    onClick={() => goToFullscreenSlide(activeSlideIndex + 1)}
+                    disabled={activeSlideIndex >= totalSlides - 1}
                     className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
                   >
                     Next
