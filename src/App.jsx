@@ -188,7 +188,7 @@ export default function App() {
 
           const parsed = validRows.map((b, index) => {
             const badgeStr = (b.badge || '').trim();
-            const rawPackType = (b.packType || b['Pack Type'] || '').trim().toLowerCase();
+            const rawPackType = (b.packType || b['Pack Type'] || '').toString().trim().toLowerCase();
             const isPaid = rawPackType
               ? rawPackType === 'paid'
               : badgeStr.toUpperCase().includes('PAID')
@@ -196,9 +196,8 @@ export default function App() {
                 || badgeStr.includes('₹');
             const isFree = !isPaid;
             const rawPrice = (b.price || b['Price'] || '').toString().trim();
-            const price = rawPrice
-              ? (rawPrice.startsWith('₹') ? rawPrice : `₹${rawPrice}`)
-              : (isFree ? 'FREE' : '');
+            const priceAmount = rawPrice.match(/\d+(?:\.\d+)?/)?.[0];
+            const price = isFree ? 'FREE' : priceAmount ? `₹${priceAmount}` : '';
 
             const samplePagesArr = b.samplePages 
               ? b.samplePages.split(',').map(s => s.trim()).filter(Boolean)
@@ -872,7 +871,7 @@ export default function App() {
                             className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2.5 rounded-xl transition font-bold text-xs shadow-sm flex items-center gap-1.5"
                           >
                             <ShoppingCart className="w-3.5 h-3.5" />
-                            <span>Buy</span>
+                            <span>{book.price ? `Buy • ${book.price}` : 'Buy'}</span>
                           </a>
                         ) : (
                           <a
@@ -1063,7 +1062,7 @@ export default function App() {
           className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 text-slate-950 font-black text-xs py-2.5 rounded-xl shadow-xl flex items-center justify-center gap-2 transition"
         >
           <ShoppingCart className="w-4 h-4" />
-          <span>Unlock Full Notes ({book.badge})</span>
+          <span>Unlock Full Notes ({book.price || book.badge})</span>
         </a>
       )}
     </div>
@@ -1162,10 +1161,12 @@ export default function App() {
 
       {/* Book Detail Modal */}
       {selectedBookForModal && (() => {
-        const isPaidBook = 
-          selectedBookForModal.badge?.toUpperCase().includes('PAID') ||
-          selectedBookForModal.badge?.toUpperCase().includes('PREMIUM') ||
-          selectedBookForModal.badge?.includes('₹');
+        const isPaidBook = selectedBookForModal.isPaid
+          ?? (selectedBookForModal.isFree !== undefined
+            ? !selectedBookForModal.isFree
+            : selectedBookForModal.badge?.toUpperCase().includes('PAID')
+              || selectedBookForModal.badge?.toUpperCase().includes('PREMIUM')
+              || selectedBookForModal.badge?.includes('₹'));
 
         const sampleUrl = selectedBookForModal.samplePdfUrl || selectedBookForModal.pdfUrl;
 
@@ -1283,7 +1284,7 @@ export default function App() {
                         className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white text-xs sm:text-sm font-extrabold px-5 py-2.5 rounded-xl shadow-md transition flex items-center gap-2 transform active:scale-95"
                       >
                         <ShoppingCart className="w-4 h-4 text-white" />
-                        <span>Buy Now ({selectedBookForModal.badge})</span>
+                        <span>Buy Now ({selectedBookForModal.price || selectedBookForModal.badge})</span>
                       </a>
                     </>
                   ) : (
