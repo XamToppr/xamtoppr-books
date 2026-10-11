@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import Papa from 'papaparse';
 import HTMLFlipBook from 'react-pageflip';
 import { PortableText } from '@portabletext/react';
+import { Studio } from 'sanity';
+import sanityConfig from '../sanity.config.js';
 import sanityClient from './sanityClient';
 import { examNotificationDetailQuery, examNotificationsQuery } from './sanityQueries';
 import {
@@ -44,7 +46,6 @@ import {
 // APNA GOOGLE SHEET CSV LINK YAHAN DALEIN
 // ==========================================
 const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTWDpgH3DG7CxaaXFi1qado9DzZ_dykCwxZeaZ58_ddMo6RmtMOsfZfmm0FRPpsYMntSv5h9DgZ7Pq2/pub?output=csv";
-
 const INITIAL_BOOKS = [
   {
     id: 'xt-bk-001',
@@ -113,7 +114,7 @@ const SORT_OPTIONS = [
   { label: 'Pages: High to Low', value: 'pages-desc' }
 ];
 
-export default function App() {
+function BookStoreApp() {
   const [booksList, setBooksList] = useState(INITIAL_BOOKS);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -181,6 +182,7 @@ export default function App() {
           </strong>
         );
       }
+
       return part;
     });
   };
@@ -301,6 +303,107 @@ export default function App() {
       isCurrentRequest = false;
     };
   }, []);
+
+  useEffect(() => {
+    const notification = selectedBlogDetail || selectedBlog;
+    if (!notification) return undefined;
+
+    const overviewText = Array.isArray(notification.overview)
+      ? notification.overview
+        .flatMap((block) => block.children || [])
+        .map((child) => child.text || '')
+        .join(' ')
+      : notification.overview || '';
+    const description = overviewText.replace(/\s+/g, ' ').trim().slice(0, 160);
+    const pageTitle = `${notification.title} - Eligibility, Syllabus, Exam Pattern | XamToppr`;
+    const pageUrl = window.location.href;
+    const faqItems = (notification.faqs || [])
+      .filter((faq) => faq.question && faq.answer)
+      .map((faq) => ({
+        '@type': 'Question',
+        name: faq.question,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: faq.answer
+        }
+      }));
+    const structuredData = [
+      ...(faqItems.length ? [{
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: faqItems
+      }] : []),
+      {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: window.location.origin },
+          { '@type': 'ListItem', position: 2, name: 'Exam Notifications', item: `${window.location.origin}/?tab=blogs` },
+          { '@type': 'ListItem', position: 3, name: notification.title, item: pageUrl }
+        ]
+      }
+    ];
+
+    const originalTitle = document.title;
+    const changedMeta = [];
+    let createdCanonical = false;
+    let previousCanonicalHref;
+    const upsertMeta = (selector, attribute, key, content) => {
+      let element = document.head.querySelector(selector);
+      if (!element) {
+        element = document.createElement('meta');
+        element.setAttribute(attribute, key);
+        document.head.appendChild(element);
+        changedMeta.push({ element, originalContent: null });
+      } else {
+        changedMeta.push({ element, originalContent: element.getAttribute('content') });
+      }
+      element.setAttribute('content', content);
+    };
+
+    document.title = pageTitle;
+    upsertMeta('meta[name="description"]', 'name', 'description', description);
+    upsertMeta('meta[property="og:title"]', 'property', 'og:title', pageTitle);
+    upsertMeta('meta[property="og:description"]', 'property', 'og:description', description);
+    upsertMeta('meta[property="og:type"]', 'property', 'og:type', 'article');
+
+    let canonical = document.head.querySelector('link[rel="canonical"]');
+    if (!canonical) {
+      canonical = document.createElement('link');
+      canonical.rel = 'canonical';
+      document.head.appendChild(canonical);
+      createdCanonical = true;
+    } else {
+      previousCanonicalHref = canonical.href;
+    }
+    canonical.href = pageUrl;
+
+    let jsonLd = document.getElementById('notification-structured-data');
+    if (!jsonLd) {
+      jsonLd = document.createElement('script');
+      jsonLd.id = 'notification-structured-data';
+      jsonLd.type = 'application/ld+json';
+      document.head.appendChild(jsonLd);
+    }
+    jsonLd.textContent = JSON.stringify(structuredData);
+
+    return () => {
+      document.title = originalTitle;
+      changedMeta.forEach(({ element, originalContent }) => {
+        if (originalContent === null) {
+          element.remove();
+        } else {
+          element.setAttribute('content', originalContent);
+        }
+      });
+      if (createdCanonical) {
+        canonical.remove();
+      } else if (previousCanonicalHref) {
+        canonical.href = previousCanonicalHref;
+      }
+      document.getElementById('notification-structured-data')?.remove();
+    };
+  }, [selectedBlog, selectedBlogDetail]);
 
   useEffect(() => {
     let isCurrentRequest = true;
@@ -1179,16 +1282,16 @@ export default function App() {
                       )}
                     </div>
                   )}
-                  <div className="mt-6 flex flex-wrap gap-3">
+                  <div className="mt-6 inline-flex max-w-full flex-wrap items-center gap-3">
                     {renderActionLink(
                       blog.officialPdfUrl,
                       'Official Notification PDF',
-                      'inline-flex items-center gap-2 rounded-xl bg-amber-400 px-4 py-3 text-sm font-extrabold text-slate-950 hover:bg-amber-300 transition'
+                      'inline-flex max-w-full items-center gap-2 whitespace-nowrap rounded-full bg-white px-4 py-3 text-sm font-extrabold text-blue-950 shadow-sm transition hover:bg-sky-50'
                     )}
                     {renderActionLink(
                       blog.applyOnlineUrl,
                       'Apply Online',
-                      'inline-flex items-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 text-sm font-extrabold text-slate-950 hover:bg-emerald-300 transition'
+                      'inline-flex max-w-full items-center gap-2 whitespace-nowrap rounded-full bg-emerald-300 px-4 py-3 text-sm font-extrabold text-slate-950 shadow-sm transition hover:bg-emerald-200'
                     )}
                   </div>
                 </header>
@@ -1197,7 +1300,7 @@ export default function App() {
                   <div className="min-w-0 space-y-6">
                     <nav
                       aria-label="Notification sections"
-                      className="sticky top-28 z-30 overflow-x-auto rounded-xl border border-slate-200 bg-white/95 p-2 shadow-md backdrop-blur"
+                      className="sticky top-16 z-30 -mx-4 overflow-x-auto border-b border-slate-200 bg-white/95 px-4 py-2.5 shadow-sm backdrop-blur sm:top-20"
                     >
                       <div className="flex min-w-max gap-2">
                         {sections.map(([id, label]) => (
@@ -1205,7 +1308,7 @@ export default function App() {
                             type="button"
                             key={id}
                             onClick={() => document.getElementById(`notification-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                            className="rounded-lg bg-sky-50 px-3 py-2 text-xs font-bold text-sky-900 transition hover:bg-sky-100"
+                            className="rounded-full border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-900 transition hover:border-sky-300 hover:bg-sky-100"
                           >
                             {label}
                           </button>
@@ -1346,7 +1449,25 @@ export default function App() {
                           <article key={book.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                             <div className="flex h-36 items-center justify-center overflow-hidden bg-slate-950">
                               {book.coverImage ? (
-                                <img src={book.coverImage} alt={book.title} className="h-full w-full object-contain" loading="lazy" />
+                                <>
+                                  <img
+                                    src={book.coverImage}
+                                    alt={book.title}
+                                    className="h-full w-full object-contain"
+                                    loading="lazy"
+                                    onError={(event) => {
+                                      event.currentTarget.style.display = 'none';
+                                      const fallback = event.currentTarget.nextElementSibling;
+                                      if (fallback) fallback.style.display = 'flex';
+                                    }}
+                                  />
+                                  <div
+                                    className={`hidden h-full w-full items-center justify-center bg-gradient-to-br ${book.coverGradient} p-4 text-center`}
+                                    aria-label={`${book.title} cover unavailable`}
+                                  >
+                                    <BookOpen className="h-10 w-10 text-amber-300" />
+                                  </div>
+                                </>
                               ) : (
                                 <div className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${book.coverGradient} p-4 text-center`}>
                                   <BookOpen className="h-10 w-10 text-amber-300" />
@@ -1996,4 +2117,17 @@ export default function App() {
       </footer>
     </div>
   );
+}
+
+export default function App() {
+  const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
+  if (pathname === '/admin' || pathname.startsWith('/admin/')) {
+    return (
+      <div style={{ height: '100vh', width: '100vw', position: 'fixed', inset: 0, zIndex: 99999 }}>
+        <Studio config={sanityConfig} />
+      </div>
+    );
+  }
+
+  return <BookStoreApp />;
 }
