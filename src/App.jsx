@@ -42,6 +42,118 @@ import {
 // ==========================================
 const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTWDpgH3DG7CxaaXFi1qado9DzZ_dykCwxZeaZ58_ddMo6RmtMOsfZfmm0FRPpsYMntSv5h9DgZ7Pq2/pub?output=csv";
 const GOOGLE_SHEET_BLOG_CSV_URL = `${GOOGLE_SHEET_CSV_URL}&gid=1105754566`;
+const getPublishedGoogleDocUrl = (docUrl) => {
+  try {
+    const url = new URL(docUrl);
+    if (url.hostname !== 'docs.google.com') return '';
+    const match = url.pathname.match(/\/document\/(?:u\/\d+\/)?d\/(e\/)?([^/]+)/i);
+    if (!match) return '';
+    const publishedPrefix = match[1] || '';
+    return `https://docs.google.com/document/d/${publishedPrefix}${encodeURIComponent(match[2])}/pub`;
+  } catch {
+    return '';
+  }
+};
+const parsePublishedGoogleDocHtml = (html) => {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const content = doc.querySelector('#contents') || doc.body;
+  const root = content.cloneNode(true);
+  [...root.attributes].forEach((attribute) => root.removeAttribute(attribute.name));
+  root.querySelectorAll('script,style,link,meta,iframe,object,embed,form,button,input,textarea,select').forEach((el) => el.remove());
+
+  const allowedTags = new Set([
+    'A', 'B', 'BLOCKQUOTE', 'BR', 'CODE', 'DIV', 'EM', 'H1', 'H2', 'H3', 'H4',
+    'H5', 'H6', 'HR', 'I', 'IMG', 'LI', 'OL', 'P', 'PRE', 'S', 'SPAN', 'STRONG',
+    'SUB', 'SUP', 'TABLE', 'TBODY', 'TD', 'TFOOT', 'TH', 'THEAD', 'TR', 'U', 'UL'
+  ]);
+  const headingItems = [];
+  root.querySelectorAll('*').forEach((element) => {
+    const tag = element.tagName;
+    if (!allowedTags.has(tag)) {
+      element.replaceWith(...element.childNodes);
+      return;
+    }
+
+    const originalHref = tag === 'A' ? element.getAttribute('href') : null;
+    const originalSrc = tag === 'IMG' ? element.getAttribute('src') : null;
+    const colSpan = tag === 'TD' || tag === 'TH' ? element.getAttribute('colspan') : null;
+    const rowSpan = tag === 'TD' || tag === 'TH' ? element.getAttribute('rowspan') : null;
+    [...element.attributes].forEach((attribute) => element.removeAttribute(attribute.name));
+
+    if (tag === 'SPAN') {
+      element.replaceWith(...element.childNodes);
+      return;
+    }
+    if (tag === 'A' && originalHref) {
+      try {
+        const link = new URL(originalHref, 'https://docs.google.com');
+        if (['http:', 'https:', 'mailto:'].includes(link.protocol)) {
+          element.setAttribute('href', link.href);
+          element.setAttribute('target', '_blank');
+          element.setAttribute('rel', 'noopener noreferrer');
+          element.className = 'font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900';
+        }
+      } catch {
+        element.removeAttribute('href');
+      }
+    }
+    if (tag === 'IMG' && originalSrc) {
+      try {
+        const image = new URL(originalSrc, 'https://docs.google.com');
+        if (['http:', 'https:'].includes(image.protocol)) {
+          element.setAttribute('src', image.href);
+          element.setAttribute('loading', 'lazy');
+          element.setAttribute('alt', '');
+          element.className = 'my-4 h-auto max-w-full rounded-lg';
+        } else {
+          element.remove();
+        }
+      } catch {
+        element.remove();
+      }
+    }
+    if ((tag === 'TD' || tag === 'TH') && colSpan && /^\d+$/.test(colSpan)) {
+      element.setAttribute('colspan', colSpan);
+    }
+    if ((tag === 'TD' || tag === 'TH') && rowSpan && /^\d+$/.test(rowSpan)) {
+      element.setAttribute('rowspan', rowSpan);
+    }
+
+    if (/^H[2-3]$/.test(tag)) {
+      const title = element.textContent.trim();
+      if (title) {
+        const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'section';
+        const id = `article-${slug}-${headingItems.length}`;
+        element.id = id;
+        element.className = `scroll-mt-36 font-extrabold text-slate-900 ${tag === 'H2' ? 'mt-8 text-2xl' : 'mt-6 text-xl'}`;
+        headingItems.push({ id, title });
+      }
+    } else if (tag === 'H1' || tag === 'H4' || tag === 'H5' || tag === 'H6') {
+      element.className = 'mt-5 font-bold text-slate-900';
+    } else if (tag === 'P') {
+      element.className = 'my-3 leading-7 text-slate-700';
+    } else if (tag === 'UL' || tag === 'OL') {
+      element.className = `${tag === 'UL' ? 'list-disc' : 'list-decimal'} my-3 space-y-1 pl-6 text-slate-700`;
+    } else if (tag === 'BLOCKQUOTE') {
+      element.className = 'my-4 border-l-4 border-sky-300 pl-4 italic text-slate-600';
+    } else if (tag === 'TABLE') {
+      element.className = 'w-full min-w-[36rem] border-collapse text-left text-sm';
+    } else if (tag === 'TH') {
+      element.className = 'border-b border-sky-200 bg-sky-50 px-4 py-3 text-left font-semibold text-sky-900';
+    } else if (tag === 'TD') {
+      element.className = 'border-b border-slate-100 px-4 py-2.5 text-slate-700 hover:bg-slate-50';
+    }
+  });
+
+  root.querySelectorAll('table').forEach((table) => {
+    const wrapper = doc.createElement('div');
+    wrapper.className = 'mb-6 overflow-x-auto rounded-xl border border-slate-200';
+    table.parentNode.insertBefore(wrapper, table);
+    wrapper.appendChild(table);
+  });
+
+  return { html: root.innerHTML, headings: headingItems };
+};
 const getYouTubeEmbedUrl = (videoUrl) => {
   try {
     const url = new URL(videoUrl);
@@ -205,6 +317,10 @@ export default function App() {
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
   const [currentTab, setCurrentTab] = useState('books');
   const [selectedBlog, setSelectedBlog] = useState(null);
+  const [articleHtml, setArticleHtml] = useState('');
+  const [articleHeadings, setArticleHeadings] = useState([]);
+  const [isLoadingArticle, setIsLoadingArticle] = useState(false);
+  const [articleLoadError, setArticleLoadError] = useState('');
   const [blogPosts, setBlogPosts] = useState([]);
   const [isLoadingBlogs, setIsLoadingBlogs] = useState(true);
   const [blogLoadError, setBlogLoadError] = useState('');
@@ -356,7 +472,7 @@ export default function App() {
           'applyStartDate', 'applyEndDate', 'examDates', 'ageLimit', 'qualification',
           'applicationFee', 'salary', 'selectionProcess', 'examPattern', 'syllabus',
           'howToApply', 'documentsRequired', 'officialPdfUrl', 'applyOnlineUrl',
-          'relatedBookId', 'youtubeVideoUrl'
+          'relatedBookId', 'youtubeVideoUrl', 'articleDocUrl'
         ];
         const parsedPosts = (results.data || [])
           .filter((row) => row.id?.trim() && row.title?.trim())
@@ -375,6 +491,60 @@ export default function App() {
       }
     });
   }, []);
+
+  useEffect(() => {
+    let isCurrentRequest = true;
+    const publishedUrl = getPublishedGoogleDocUrl(selectedBlog?.articleDocUrl);
+
+    setArticleHtml('');
+    setArticleHeadings([]);
+    setArticleLoadError('');
+    setIsLoadingArticle(Boolean(selectedBlog?.articleDocUrl));
+
+    if (!publishedUrl) {
+      setIsLoadingArticle(false);
+      if (selectedBlog?.articleDocUrl) {
+        setArticleLoadError('The article link is not a valid Google Docs URL.');
+      }
+      return () => {
+        isCurrentRequest = false;
+      };
+    }
+
+    const loadPublishedArticle = async () => {
+      try {
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(publishedUrl)}`;
+        const response = await fetch(proxyUrl);
+        if (!response.ok) {
+          throw new Error(`Article request failed with status ${response.status}.`);
+        }
+        const html = await response.text();
+        if (!html.trim()) {
+          throw new Error('The published article returned an empty response.');
+        }
+        const parsedArticle = parsePublishedGoogleDocHtml(html);
+        if (!parsedArticle.html.trim()) {
+          throw new Error('No readable article content was found in the published document.');
+        }
+        if (isCurrentRequest) {
+          setArticleHtml(parsedArticle.html);
+          setArticleHeadings(parsedArticle.headings);
+        }
+      } catch (error) {
+        console.error('Failed to load published notification article:', error);
+        if (isCurrentRequest) {
+          setArticleLoadError('The article could not be loaded. Please try again later or use the official notification links.');
+        }
+      } finally {
+        if (isCurrentRequest) setIsLoadingArticle(false);
+      }
+    };
+
+    loadPublishedArticle();
+    return () => {
+      isCurrentRequest = false;
+    };
+  }, [selectedBlog?.id, selectedBlog?.articleDocUrl]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -1250,28 +1420,73 @@ export default function App() {
 
                 <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
                   <div className="min-w-0 space-y-6">
-                    {notificationSections.map(({ title, icon: SectionIcon, items, fallback }) => (
-                      <section key={title} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                        <h2 className="flex items-center gap-2 text-base font-extrabold text-blue-950 sm:text-lg">
-                          <SectionIcon className="h-5 w-5 shrink-0 text-amber-500" />
-                          {title}
-                        </h2>
-                        <div className="mt-4 space-y-4">
-                          {items.map(([label, value]) => (
-                            <div key={label}>
-                              {items.length > 1 && (
-                                <h3 className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">{label}</h3>
-                              )}
-                              <div className="space-y-2 text-sm leading-relaxed text-slate-700">
-                                {renderNotificationContent(value) || (
-                                  <p className="text-slate-500">{items.length === 1 ? fallback : 'Details will be announced in the official notification.'}</p>
-                                )}
-                              </div>
+                    {selectedBlog.articleDocUrl ? (
+                      <>
+                        {articleHeadings.length > 0 && (
+                          <nav
+                            aria-label="Article sections"
+                            className="sticky top-28 z-30 overflow-x-auto rounded-xl border border-slate-200 bg-white/95 p-2 shadow-md backdrop-blur"
+                          >
+                            <div className="flex min-w-max gap-2">
+                              {articleHeadings.map(({ id, title }) => (
+                                <button
+                                  type="button"
+                                  key={id}
+                                  onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                                  className="rounded-lg bg-sky-50 px-3 py-2 text-xs font-bold text-sky-900 transition hover:bg-sky-100"
+                                >
+                                  {title}
+                                </button>
+                              ))}
                             </div>
-                          ))}
-                        </div>
-                      </section>
-                    ))}
+                          </nav>
+                        )}
+                        {isLoadingArticle ? (
+                          <section aria-label="Loading article" className="animate-pulse rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
+                            <div className="h-7 w-2/3 rounded-lg bg-slate-200" />
+                            <div className="mt-5 h-4 w-full rounded bg-slate-100" />
+                            <div className="mt-2 h-4 w-11/12 rounded bg-slate-100" />
+                            <div className="mt-2 h-4 w-4/5 rounded bg-slate-100" />
+                            <div className="mt-8 h-6 w-1/2 rounded bg-slate-200" />
+                            <div className="mt-4 h-36 w-full rounded-xl bg-slate-100" />
+                            <div className="mt-7 h-4 w-full rounded bg-slate-100" />
+                            <div className="mt-2 h-4 w-5/6 rounded bg-slate-100" />
+                          </section>
+                        ) : articleLoadError ? (
+                          <section role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm leading-relaxed text-rose-800">
+                            {articleLoadError}
+                          </section>
+                        ) : (
+                          <section
+                            className="rounded-2xl border border-slate-200 bg-white p-5 text-[15px] leading-7 shadow-sm sm:p-8"
+                            dangerouslySetInnerHTML={{ __html: articleHtml }}
+                          />
+                        )}
+                      </>
+                    ) : (
+                      notificationSections.map(({ title, icon: SectionIcon, items, fallback }) => (
+                        <section key={title} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                          <h2 className="flex items-center gap-2 text-base font-extrabold text-blue-950 sm:text-lg">
+                            <SectionIcon className="h-5 w-5 shrink-0 text-amber-500" />
+                            {title}
+                          </h2>
+                          <div className="mt-4 space-y-4">
+                            {items.map(([label, value]) => (
+                              <div key={label}>
+                                {items.length > 1 && (
+                                  <h3 className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">{label}</h3>
+                                )}
+                                <div className="space-y-2 text-sm leading-relaxed text-slate-700">
+                                  {renderNotificationContent(value) || (
+                                    <p className="text-slate-500">{items.length === 1 ? fallback : 'Details will be announced in the official notification.'}</p>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </section>
+                      ))
+                    )}
                     {youtubeEmbedUrl && (
                       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                         <div className="flex items-center justify-between gap-3 px-4 py-3">
