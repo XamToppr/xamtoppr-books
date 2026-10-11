@@ -13,7 +13,6 @@
     "@portabletext/react": "^8.0.1",
     "@sanity/client": "^8.9.0",
     "lucide-react": "^1.45.0",
-    "papaparse": "^5.7.0",
     "react": "^19.2.8",
     "react-dom": "^19.3.0",
     "react-pageflip": "^2.0.3",

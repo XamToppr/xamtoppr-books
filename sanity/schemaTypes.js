@@ -237,7 +237,233 @@ const examNotification = defineType({
   ]
 });
 
+const book = defineType({
+  name: 'book',
+  title: 'Book',
+  type: 'document',
+  groups: [
+    { name: 'details', title: 'Book Details', default: true },
+    { name: 'taxonomy', title: 'Exam & Subject' },
+    { name: 'media', title: 'Media & Specifications' },
+    { name: 'pricing', title: 'Pricing & Links' }
+  ],
+  initialValue: () => {
+    const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
+    return {
+      bookId: `XB-${new Date().getFullYear()}-${suffix}`,
+      author: 'XamToppr Editorial Team',
+      publisher: 'XamToppr Publications',
+      language: 'Hindi',
+      format: 'eBook (PDF)',
+      isFeatured: false
+    };
+  },
+  fields: [
+    defineField({
+      name: 'bookId',
+      title: 'Book ID',
+      type: 'string',
+      group: 'details',
+      readOnly: true,
+      validation: (Rule) => Rule.required()
+    }),
+    defineField({
+      name: 'title',
+      title: 'Book Title',
+      type: 'string',
+      group: 'details',
+      validation: (Rule) => Rule.required()
+    }),
+    defineField({
+      name: 'slug',
+      title: 'Slug',
+      type: 'slug',
+      group: 'details',
+      options: { source: 'title', maxLength: 96 },
+      validation: (Rule) => Rule.required()
+    }),
+    defineField({
+      name: 'badge',
+      title: 'Badge',
+      type: 'string',
+      group: 'details',
+      options: { list: ['Bestseller', 'New Launch', 'Trending', 'Free Sample', 'Special Offer'] }
+    }),
+    defineField({
+      name: 'author',
+      title: 'Author',
+      type: 'string',
+      group: 'details',
+      initialValue: 'XamToppr Editorial Team'
+    }),
+    defineField({
+      name: 'publisher',
+      title: 'Publisher',
+      type: 'string',
+      group: 'details',
+      initialValue: 'XamToppr Publications'
+    }),
+    defineField({
+      name: 'language',
+      title: 'Language',
+      type: 'string',
+      group: 'details',
+      options: { list: ['Hindi', 'English', 'Bilingual'] },
+      initialValue: 'Hindi'
+    }),
+    defineField({
+      name: 'exam',
+      title: 'Exam / Conducting Body',
+      type: 'array',
+      group: 'taxonomy',
+      of: [defineArrayMember({ type: 'string' })],
+      options: { layout: 'tags' },
+      description: 'Enter one or more conducting bodies. Common values: SSC, Railway (RRB), Banking (IBPS/SBI), Defense, Teaching, Bihar State, UP State, MP State, Rajasthan State, Haryana State, and Other State Exams. Custom values are supported.'
+    }),
+    defineField({
+      name: 'examCategory',
+      title: 'Exam Categories',
+      type: 'array',
+      group: 'taxonomy',
+      of: [defineArrayMember({ type: 'string' })],
+      description: 'Add exams covered, such as CGL, CHSL, MTS, NTPC, Group D, Daroga/SI, or Constable.'
+    }),
+    defineField({
+      name: 'subject',
+      title: 'Subject',
+      type: 'string',
+      group: 'taxonomy',
+      description: 'Enter any subject, such as Maths, Reasoning, Static GK, History, Geography, or Computer.'
+    }),
+    defineField({
+      name: 'coverImage',
+      title: 'Cover Image',
+      type: 'image',
+      group: 'media',
+      options: { hotspot: true },
+      description: 'Recommended Dimensions: 600x850 px (Portrait) or 1200x630 px (Landscape Banner). WebP / PNG / JPG under 2MB.'
+    }),
+    defineField({
+      name: 'samplePages',
+      title: '3D Flipbook Sample Pages',
+      type: 'array',
+      group: 'media',
+      of: [defineArrayMember({ type: 'image', options: { hotspot: true } })],
+      description: 'Upload images in the order they should appear in the sample flipbook.'
+    }),
+    defineField({
+      name: 'sampleFlipbookUrl',
+      title: 'External Sample Flipbook URL',
+      type: 'url',
+      group: 'media'
+    }),
+    defineField({
+      name: 'samplePdfFile',
+      title: 'Sample PDF',
+      type: 'file',
+      group: 'media',
+      options: { accept: '.pdf,application/pdf' }
+    }),
+    defineField({ name: 'fileSize', title: 'File Size', type: 'string', group: 'media' }),
+    defineField({ name: 'totalPages', title: 'Total Pages', type: 'number', group: 'media', validation: (Rule) => Rule.min(0) }),
+    defineField({
+      name: 'format',
+      title: 'Format',
+      type: 'string',
+      group: 'media',
+      options: { list: ['eBook (PDF)', 'Printed Book', 'eBook + Test Series'] },
+      initialValue: 'eBook (PDF)'
+    }),
+    defineField({ name: 'mrp', title: 'MRP', type: 'number', group: 'pricing', validation: (Rule) => Rule.min(0) }),
+    defineField({
+      name: 'offerPrice',
+      title: 'Offer Price',
+      type: 'number',
+      group: 'pricing',
+      validation: (Rule) => Rule.required().min(0)
+    }),
+    defineField({ name: 'buyUrl', title: 'Checkout / Payment URL', type: 'url', group: 'pricing' }),
+    defineField({ name: 'amazonUrl', title: 'Amazon URL', type: 'url', group: 'pricing' }),
+    defineField({
+      name: 'isFeatured',
+      title: 'Featured Book',
+      type: 'boolean',
+      group: 'pricing',
+      initialValue: false
+    }),
+    defineField({
+      name: 'description',
+      title: 'Key Features & Syllabus Coverage',
+      type: 'array',
+      group: 'details',
+      of: [
+        defineArrayMember({
+          type: 'block',
+          styles: [
+            { title: 'Normal', value: 'normal' },
+            { title: 'Heading 2', value: 'h2' },
+            { title: 'Heading 3', value: 'h3' }
+          ],
+          lists: [
+            { title: 'Bullet', value: 'bullet' },
+            { title: 'Numbered', value: 'number' }
+          ],
+          marks: {
+            decorators: [
+              { title: 'Bold', value: 'strong' },
+              { title: 'Italic', value: 'em' }
+            ],
+            annotations: []
+          }
+        })
+      ]
+    }),
+    defineField({
+      name: 'tableOfContents',
+      title: 'Table of Contents (Book Index / Chapters)',
+      type: 'array',
+      group: 'details',
+      of: [
+        defineArrayMember({
+          type: 'object',
+          fields: [
+            defineField({ name: 'chapterNo', title: 'Chapter / Unit No.', type: 'string' }),
+            defineField({
+              name: 'title',
+              title: 'Chapter Title / Topic',
+              type: 'string',
+              validation: (Rule) => Rule.required()
+            }),
+            defineField({ name: 'pageRange', title: 'Page Range (Optional)', type: 'string' })
+          ],
+          preview: {
+            select: {
+              title: 'title',
+              subtitle: 'chapterNo'
+            }
+          }
+        })
+      ],
+      description: 'Add chapters, units, or topic breakdown included in this book/notes.'
+    })
+  ],
+  preview: {
+    select: { title: 'title', subtitle: 'exam', media: 'coverImage', price: 'offerPrice' },
+    prepare: ({ title, subtitle, media, price }) => ({
+      title,
+      subtitle: [subtitle, price == null ? '' : `₹${price}`].filter(Boolean).join(' · '),
+      media
+    })
+  },
+  orderings: [
+    { title: 'Newest first', name: 'createdAtDesc', by: [{ field: '_createdAt', direction: 'desc' }] },
+    { title: 'Title A–Z', name: 'titleAsc', by: [{ field: 'title', direction: 'asc' }] },
+    { title: 'Featured first', name: 'featuredFirst', by: [{ field: 'isFeatured', direction: 'desc' }] }
+  ]
+});
+
 export const schemaTypes = [
+  book,
   examNotification,
   importantDate,
   salaryEntry,

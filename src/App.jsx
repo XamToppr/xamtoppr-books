@@ -1,11 +1,10 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import Papa from 'papaparse';
 import HTMLFlipBook from 'react-pageflip';
 import { PortableText } from '@portabletext/react';
 import { Studio } from 'sanity';
 import sanityConfig from '../sanity.config.js';
 import sanityClient from './sanityClient';
-import { examNotificationDetailQuery, examNotificationsQuery } from './sanityQueries';
+import { BOOKS_FOR_STORE_QUERY, examNotificationDetailQuery, examNotificationsQuery } from './sanityQueries';
 import {
   Search,
   BookOpen,
@@ -35,47 +34,11 @@ import {
   ExternalLink,
   ShoppingCart,
   Maximize2,
-  Minimize2,
   CalendarDays,
   Bell,
   ClipboardList,
   FileCheck2
 } from 'lucide-react';
-
-// ==========================================
-// APNA GOOGLE SHEET CSV LINK YAHAN DALEIN
-// ==========================================
-const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTWDpgH3DG7CxaaXFi1qado9DzZ_dykCwxZeaZ58_ddMo6RmtMOsfZfmm0FRPpsYMntSv5h9DgZ7Pq2/pub?output=csv";
-const INITIAL_BOOKS = [
-  {
-    id: 'xt-bk-001',
-    slug: 'ssc-advance-arithmetic-maths-2026',
-    title: 'SSC Comprehensive Advance & Arithmetic Mathematics (2026 Edition)',
-    author: 'XamToppr Quant Faculty Board',
-    publisher: 'XamToppr Academic Press',
-    exam: 'SSC',
-    examCategory: 'SSC CGL / CHSL / CPO',
-    subject: 'Quantitative Aptitude',
-    language: 'Bilingual (Hindi + English)',
-    pages: 486,
-    fileSize: '18.4 MB',
-    rating: 4.9,
-    reviewsCount: 1420,
-    downloadsCount: '48.5K',
-    badge: 'POPULAR',
-    badgeColor: 'bg-amber-500',
-    coverGradient: 'from-blue-900 via-indigo-950 to-slate-900',
-    coverAccent: 'text-amber-400',
-    coverImage: '',
-    samplePdfUrl: '',
-    pdfUrl: '',
-    samplePages: [],
-    isFree: true,
-    publishedYear: '2026',
-    description: 'Complete chapter-wise theoretical concepts and TCS PYQ solved questions.',
-    tableOfContents: ['Number System', 'Algebra', 'Trigonometry', 'Geometry', 'Arithmetic']
-  }
-];
 
 const EXAM_CATEGORIES = [
   'All Exams',
@@ -86,6 +49,48 @@ const EXAM_CATEGORIES = [
   'State Exams',
   'Defence',
   'Teaching'
+];
+
+const getPortableTextPlainText = (content) => {
+  if (Array.isArray(content)) {
+    return content
+      .flatMap((block) => block.children || [])
+      .map((child) => child.text || '')
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  return String(content || '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/(\*\*|__|`|~~|\*)/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+const getHighDefinitionSanityImageUrl = (assetUrl) => {
+  if (!assetUrl) return '';
+  try {
+    const imageUrl = new URL(assetUrl);
+    if (imageUrl.hostname !== 'cdn.sanity.io') return assetUrl;
+    imageUrl.searchParams.set('w', '1600');
+    imageUrl.searchParams.set('q', '95');
+    imageUrl.searchParams.set('auto', 'format');
+    imageUrl.searchParams.set('dpr', String(window.devicePixelRatio || 1));
+    return imageUrl.toString();
+  } catch (error) {
+    console.error('Unable to prepare Sanity image URL:', error);
+    return assetUrl;
+  }
+};
+
+const SUPPORT_LINKS = [
+  { label: 'About Us', href: 'https://xamtoppr.com/about-us' },
+  { label: 'Terms & Conditions', href: 'https://xamtoppr.com/terms-and-condition' },
+  { label: 'Privacy Policy', href: 'https://xamtoppr.com/privacy-and-policy' },
+  { label: 'Refunds & Cancellations', href: 'https://xamtoppr.com/refunds-and-cancellations' }
 ];
 
 const MEDIUM_OPTIONS = ['All Mediums', 'Bilingual (Hindi + English)', 'Hindi Medium', 'English Medium'];
@@ -115,7 +120,7 @@ const SORT_OPTIONS = [
 ];
 
 function BookStoreApp() {
-  const [booksList, setBooksList] = useState(INITIAL_BOOKS);
+  const [booksList, setBooksList] = useState([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedExam, setSelectedExam] = useState('All Exams');
@@ -127,7 +132,10 @@ function BookStoreApp() {
   const [showFlipbookModal, setShowFlipbookModal] = useState(null);
   const [showRequestBookModal, setShowRequestBookModal] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
-  const [isLoadingSkeleton, setIsLoadingSkeleton] = useState(false);
+  const [isLoadingSkeleton, setIsLoadingSkeleton] = useState(true);
+  const [bookLoadError, setBookLoadError] = useState('');
+  const [featuredBookIndex, setFeaturedBookIndex] = useState(0);
+  const [isFeaturedCarouselPaused, setIsFeaturedCarouselPaused] = useState(false);
   const [quickFilterBadge, setQuickFilterBadge] = useState('ALL');
   const [flipPageNumber, setFlipPageNumber] = useState(0);
   const [isMobileFullscreen, setIsMobileFullscreen] = useState(false);
@@ -159,6 +167,19 @@ function BookStoreApp() {
     return () => window.removeEventListener('resize', updateViewportSize);
   }, []);
 
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isFullscreen = Boolean(document.fullscreenElement);
+      setIsMobileFullscreen(isFullscreen);
+      if (!isFullscreen && showFlipbookModal) {
+        flipBookRef.current?.pageFlip()?.turnToPage(activeSlideIndex);
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, [activeSlideIndex, showFlipbookModal]);
+
   // Realistic Page Flip Sound (Direct user-interaction play)
   const playPageFlipSound = () => {
     try {
@@ -173,6 +194,9 @@ function BookStoreApp() {
   // 1. PDF DETAIL MODAL KE LIYE: Light background par Sharp Black Bold Text
   const renderPdfModalDescription = (text) => {
     if (!text) return '';
+    if (Array.isArray(text)) {
+      return <PortableText value={text} />;
+    }
     const parts = text.split(/(\*\*.*?\*\*)/g);
     return parts.map((part, index) => {
       if (part.startsWith('**') && part.endsWith('**')) {
@@ -183,13 +207,20 @@ function BookStoreApp() {
         );
       }
 
-      return part;
+      return part.replace(/\*/g, '');
     });
   };
 
   // 2. HANDWRITTEN 3D FLIPBOOK KE LIYE: Dark background par Glowing Amber-Yellow Bold Text
   const renderFlipbookDescription = (text) => {
     if (!text) return '';
+    if (Array.isArray(text)) {
+      return (
+        <div className="prose prose-invert prose-sm max-w-none">
+          <PortableText value={text} />
+        </div>
+      );
+    }
     const parts = text.split(/(\*\*.*?\*\*)/g);
     return parts.map((part, index) => {
       if (part.startsWith('**') && part.endsWith('**')) {
@@ -199,83 +230,92 @@ function BookStoreApp() {
           </strong>
         );
       }
-      return part;
+      return part.replace(/\*/g, '');
     });
   };
 
-  // Google Sheet Data Auto-Fetch
+  // Load the catalog from Sanity and adapt its documents to the existing store card model.
   useEffect(() => {
-    if (!GOOGLE_SHEET_CSV_URL || GOOGLE_SHEET_CSV_URL.includes("YAHAN_APNA_GOOGLE_SHEET")) {
-      return;
-    }
-
-    setIsLoadingSkeleton(true);
-    Papa.parse(GOOGLE_SHEET_CSV_URL, {
-      download: true,
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        if (results.data && results.data.length > 0) {
-          // STRICT FILTER: Sirf valid ID aur Title wali rows hi render hongi
-          const validRows = results.data.filter(
-            (b) => b.id && b.id.trim() !== '' && b.title && b.title.trim() !== ''
-          );
-
-          const parsed = validRows.map((b, index) => {
-            const badgeStr = (b.badge || '').trim();
-            const rawPackType = (b.packType || b['Pack Type'] || '').toString().trim().toLowerCase();
-            const isPaid = rawPackType
-              ? rawPackType === 'paid'
-              : badgeStr.toUpperCase().includes('PAID')
-                || badgeStr.toUpperCase().includes('PREMIUM')
-                || badgeStr.includes('₹');
-            const isFree = !isPaid;
-            const rawPrice = (b.price || b['Price'] || '').toString().trim();
-            const priceAmount = rawPrice.match(/\d+(?:\.\d+)?/)?.[0];
-            const price = isFree ? 'FREE' : priceAmount ? `₹${priceAmount}` : '';
-
-            const samplePagesArr = b.samplePages 
-              ? b.samplePages.split(',').map(s => s.trim()).filter(Boolean)
-              : [];
+    let isCurrentRequest = true;
+    sanityClient.fetch(BOOKS_FOR_STORE_QUERY)
+      .then((documents) => {
+        if (!isCurrentRequest) return;
+        if (!Array.isArray(documents)) {
+          throw new Error('Sanity books query did not return a list.');
+        }
+        const books = documents
+          .filter((book) => book.title)
+          .map((book) => {
+            const offerPrice = Number(book.offerPrice) || 0;
+            const isFree = offerPrice === 0;
+            const badge = book.badge || (isFree ? 'Free Sample' : 'Bestseller');
+            const language = book.language === 'Bilingual'
+              ? 'Bilingual (Hindi + English)'
+              : book.language === 'English' ? 'English Medium' : 'Hindi Medium';
 
             return {
-              id: b.id.trim(),
-              slug: b.slug ? b.slug.trim() : b.id.trim(),
-              title: b.title.trim(),
-              author: b.author || 'XamToppr Faculty',
-              publisher: b.publisher || 'XamToppr Publications',
-              exam: b.exam || 'All Exams',
-              examCategory: b.examCategory || 'All Competitive Exams',
-              subject: b.subject || 'General Studies',
-              language: b.language || 'Bilingual (Hindi + English)',
-              pages: Number(b.pages) || 0,
-              fileSize: b.fileSize || '',
-              rating: Number(b.rating) || 4.8,
-              reviewsCount: Number(b.reviewsCount) || 100,
-              downloadsCount: b.downloadsCount || '10K',
-              badge: badgeStr || 'FREE PDF',
-              badgeColor: b.badgeColor || (isPaid ? 'bg-emerald-600' : 'bg-amber-500'),
+              id: book.bookId || book._id,
+              slug: book.slug || book.bookId || book._id,
+              title: book.title,
+              author: book.author || 'XamToppr Editorial Team',
+              publisher: book.publisher || 'XamToppr Publications',
+              exam: Array.isArray(book.exam) && book.exam.length
+                ? book.exam.join(' / ')
+                : book.exam || 'All Exams',
+              examCategory: Array.isArray(book.examCategory)
+                ? book.examCategory.join(' / ') || 'All Competitive Exams'
+                : book.examCategory || 'All Competitive Exams',
+              subject: book.subject || 'General Studies',
+              language,
+              pages: Number(book.totalPages) || 0,
+              fileSize: book.fileSize || '',
+              rating: 4.8,
+              reviewsCount: 100,
+              downloadsCount: '10K',
+              badge,
+              badgeColor: isFree ? 'bg-amber-500' : 'bg-emerald-600',
               coverGradient: 'from-blue-900 via-indigo-950 to-slate-900',
               coverAccent: 'text-amber-400',
-              coverImage: b.coverImage ? b.coverImage.trim() : '',
-              samplePdfUrl: b.samplePdfUrl ? b.samplePdfUrl.trim() : '',
-              pdfUrl: b.pdfUrl ? b.pdfUrl.trim() : '',
-              samplePages: samplePagesArr,
-              isFree: isFree,
-              isPaid: isPaid,
-              packType: isPaid ? 'Paid' : 'Free',
-              price: price,
-              publishedYear: b.publishedYear || '2026',
-              description: b.description || '',
-              tableOfContents: b.tableOfContents ? b.tableOfContents.split(/[,|\n]/).map(s => s.trim()).filter(Boolean) : []
+              coverImage: getHighDefinitionSanityImageUrl(book.coverImageUrl),
+              samplePdfUrl: book.samplePdfUrl || '',
+              pdfUrl: book.buyUrl || (isFree ? book.samplePdfUrl : ''),
+              samplePages: Array.isArray(book.samplePages)
+                ? book.samplePages.filter(Boolean).map(getHighDefinitionSanityImageUrl)
+                : [],
+              isFree,
+              isPaid: !isFree,
+              packType: isFree ? 'Free' : 'Paid',
+              price: isFree ? 'FREE' : `₹${offerPrice}`,
+              mrp: Number(book.mrp) || 0,
+              offerPrice,
+              format: book.format || 'eBook (PDF)',
+              amazonUrl: book.amazonUrl || '',
+              sampleFlipbookUrl: book.sampleFlipbookUrl || '',
+              isFeatured: Boolean(book.isFeatured),
+              publishedYear: new Date().getFullYear().toString(),
+              description: book.description || '',
+              descriptionText: getPortableTextPlainText(book.description),
+              tableOfContents: Array.isArray(book.tableOfContents)
+                ? book.tableOfContents.filter((chapter) => chapter?.title)
+                : []
             };
           });
-          setBooksList(parsed);
+        setBooksList(books);
+        setBookLoadError('');
+      })
+      .catch((error) => {
+        console.error('Failed to load books from Sanity:', error);
+        if (isCurrentRequest) {
+          setBookLoadError('Books could not be loaded from Sanity. Please try again later.');
         }
-        setIsLoadingSkeleton(false);
-      },
-      error: () => setIsLoadingSkeleton(false)
-    });
+      })
+      .finally(() => {
+        if (isCurrentRequest) setIsLoadingSkeleton(false);
+      });
+
+    return () => {
+      isCurrentRequest = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -486,7 +526,7 @@ function BookStoreApp() {
         const matchSubject = book.subject.toLowerCase().includes(query);
         const matchExam = book.exam.toLowerCase().includes(query) || book.examCategory.toLowerCase().includes(query);
         const matchAuthor = book.author.toLowerCase().includes(query);
-        const matchDesc = book.description.toLowerCase().includes(query);
+        const matchDesc = book.descriptionText.toLowerCase().includes(query);
         if (!matchTitle && !matchSubject && !matchExam && !matchAuthor && !matchDesc) {
           return false;
         }
@@ -535,6 +575,25 @@ function BookStoreApp() {
       return 0;
     });
   }, [booksList, searchQuery, selectedExam, selectedMedium, selectedSubject, quickFilterBadge, sortBy]);
+
+  const featuredBooks = useMemo(() => {
+    const highlightedBooks = booksList.filter((book) =>
+      book.isFeatured || ['bestseller', 'new launch', 'trending'].includes(book.badge.toLowerCase())
+    );
+    return highlightedBooks.length >= 2 ? highlightedBooks : booksList.slice(0, 4);
+  }, [booksList]);
+
+  useEffect(() => {
+    setFeaturedBookIndex((index) => featuredBooks.length ? index % featuredBooks.length : 0);
+  }, [featuredBooks.length]);
+
+  useEffect(() => {
+    if (isFeaturedCarouselPaused || featuredBooks.length < 2) return undefined;
+    const intervalId = window.setInterval(() => {
+      setFeaturedBookIndex((index) => (index + 1) % featuredBooks.length);
+    }, 4000);
+    return () => window.clearInterval(intervalId);
+  }, [featuredBooks.length, isFeaturedCarouselPaused]);
 
   const blogCategories = useMemo(
     () => ['All', ...new Set([
@@ -608,8 +667,8 @@ function BookStoreApp() {
             <a href="tel:+917717707121" className="flex items-center gap-1.5 hover:text-white transition">
               <Phone className="w-3.5 h-3.5 text-slate-400" /> Student Helpline: +91 77177 07121
             </a>
-            <a href="mailto:xamtoppr@gmail.com" className="hidden lg:flex items-center gap-1.5 hover:text-white transition">
-              <Mail className="w-3.5 h-3.5 text-slate-400" /> xamtoppr@gmail.com
+            <a href="mailto:info@xamtoppr.com" className="hidden lg:flex items-center gap-1.5 hover:text-white transition">
+              <Mail className="w-3.5 h-3.5 text-slate-400" /> info@xamtoppr.com
             </a>
           </div>
           <div className="flex items-center gap-4">
@@ -664,6 +723,19 @@ function BookStoreApp() {
               <a href="https://xamtoppr.com/blog" className="px-3.5 py-2 rounded-lg text-slate-200 hover:text-white hover:bg-white/5 transition">
                 PYQ Papers
               </a>
+              <details className="group relative">
+                <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-lg px-3.5 py-2 text-slate-200 transition hover:bg-white/5 hover:text-white">
+                  Support / About
+                  <ChevronRight className="h-3.5 w-3.5 rotate-90 transition-transform group-open:-rotate-90" />
+                </summary>
+                <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 text-sm text-slate-800 shadow-xl">
+                  {SUPPORT_LINKS.map(({ label, href }) => (
+                    <a key={href} href={href} className="block rounded-lg px-3 py-2.5 font-medium transition hover:bg-blue-50 hover:text-blue-900">
+                      {label}
+                    </a>
+                  ))}
+                </div>
+              </details>
             </nav>
 
             <div className="hidden sm:flex items-center gap-3">
@@ -761,44 +833,182 @@ function BookStoreApp() {
             <a href="https://xamtoppr.com/blog" className="block w-full text-left px-3 py-2.5 rounded-lg text-slate-200 hover:bg-blue-900/50">
               PYQ Papers
             </a>
+            <div className="border-t border-blue-800/70 pt-3">
+              <p className="px-3 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-amber-300">Support / About</p>
+              {SUPPORT_LINKS.map(({ label, href }) => (
+                <a key={href} href={href} className="block w-full rounded-lg px-3 py-2.5 text-slate-200 transition hover:bg-blue-900/50 hover:text-white">
+                  {label}
+                </a>
+              ))}
+            </div>
           </div>
         )}
       </header>
 
       <main className="flex-1 pb-16">
-        {/* Breadcrumb */}
-        <div className="bg-slate-100 border-b border-slate-200 py-2.5 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-7xl mx-auto flex items-center text-xs text-slate-600 gap-1.5 flex-wrap">
-            <a href="https://www.xamtoppr.com/" className="hover:text-blue-900 font-medium transition">
-              Home
-            </a>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-slate-500">Study Resources</span>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-blue-950 font-bold">
-              {currentTab === 'books' ? 'Books & Study Material' : selectedBlog?.title || 'Exam Notifications & Blogs'}
-            </span>
-          </div>
-        </div>
-
         {currentTab === 'books' ? (
           <>
-        {/* Hero Section */}
-        <section className="bg-gradient-to-b from-[#0c2356] via-[#102d6b] to-[#153a8a] text-white py-10 sm:py-14 px-4 sm:px-6 lg:px-8 relative overflow-hidden shadow-inner">
-          <div className="absolute inset-0 opacity-10 pointer-events-none bg-[radial-gradient(#f59e0b_1px,transparent_1px)] [background-size:16px_16px]"></div>
-          <div className="max-w-7xl mx-auto relative z-10">
-            <div className="max-w-3xl">
-              <div className="inline-flex items-center gap-2 bg-amber-400/20 text-amber-300 border border-amber-400/30 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4">
-                <BookOpen className="w-3.5 h-3.5 text-amber-400" />
-                XamToppr Digital e-Library
+        {/* Featured Books Carousel */}
+        <section
+          aria-label="Featured books"
+          onMouseEnter={() => setIsFeaturedCarouselPaused(true)}
+          onMouseLeave={() => setIsFeaturedCarouselPaused(false)}
+          className="relative overflow-hidden bg-gradient-to-br from-[#0c2356] via-[#102d6b] to-[#153a8a] text-white shadow-inner"
+        >
+          <div className="pointer-events-none absolute inset-0 opacity-10 bg-[radial-gradient(#f59e0b_1px,transparent_1px)] [background-size:16px_16px]" />
+          <div className="relative mx-auto h-[720px] max-w-7xl px-4 py-6 sm:h-[470px] sm:px-6 sm:py-12 lg:h-[500px] lg:px-8">
+            {featuredBooks.length > 0 ? (
+              <>
+                {featuredBooks.map((book, index) => (
+                  <article
+                    key={book.id}
+                    aria-hidden={index !== featuredBookIndex}
+                    className={`featured-slide absolute inset-0 grid min-w-0 grid-cols-1 grid-rows-[210px_1fr] items-center gap-3 overflow-hidden px-11 pb-12 pt-5 transition-opacity duration-500 sm:grid-rows-1 sm:gap-7 sm:px-12 sm:py-10 lg:grid-cols-[minmax(0,1fr)_minmax(250px,300px)] lg:gap-10 lg:px-16 ${
+                      index === featuredBookIndex ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+                    }`}
+                  >
+                    <div className="relative z-10 order-2 min-w-0 max-w-3xl sm:order-1">
+                      <div className="inline-flex max-w-full items-center gap-2 truncate rounded-full border border-amber-300/40 bg-amber-400/15 px-3 py-1.5 text-xs font-black uppercase tracking-wider text-amber-200">
+                        <Sparkles className="h-3.5 w-3.5" />
+                        {book.badge === 'New Launch' ? '🔥 HOT LAUNCH' : book.badge.toUpperCase()}
+                      </div>
+                      <h1 className="mt-2 line-clamp-2 max-w-3xl text-2xl font-black leading-tight tracking-tight text-white sm:mt-4 sm:text-4xl lg:text-5xl">
+                        {book.title}
+                      </h1>
+                      <div className="mt-2 flex max-w-full flex-wrap gap-1.5 overflow-hidden text-[10px] font-bold sm:mt-4 sm:gap-2 sm:text-xs">
+                        {[book.subject, book.exam].filter(Boolean).slice(0, 2).map((tag) => (
+                          <span key={tag} className="max-w-full truncate rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-blue-50">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="mt-2 line-clamp-2 max-w-2xl text-xs leading-relaxed text-blue-100 sm:mt-4 sm:text-base">
+                        {book.descriptionText || `Prepare smarter with ${book.subject} resources curated for ${book.exam} aspirants.`}
+                      </p>
+                      <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-5 sm:gap-3">
+                        <span className="rounded-xl bg-amber-300 px-3 py-1.5 text-base font-black text-slate-950 shadow-lg sm:px-4 sm:py-2 sm:text-lg">
+                          {book.isFree ? 'FREE' : book.price}
+                        </span>
+                        {!book.isFree && book.mrp > book.offerPrice && (
+                          <span className="text-sm font-semibold text-blue-200 line-through">MRP ₹{book.mrp}</span>
+                        )}
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-6 sm:gap-3">
+                        {book.isFree ? (
+                          <a
+                            href={book.pdfUrl || '#'}
+                            onClick={(event) => {
+                              if (!book.pdfUrl) {
+                                event.preventDefault();
+                                showToast('Download link will be updated soon!');
+                              }
+                            }}
+                            className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-4 py-2.5 text-xs font-extrabold text-slate-950 shadow-lg transition hover:bg-amber-300 sm:px-5 sm:py-3 sm:text-sm"
+                          >
+                            <Download className="h-4 w-4" /> Download Free
+                          </a>
+                        ) : (
+                          <a
+                            href={book.pdfUrl || '#'}
+                            target={book.pdfUrl ? '_blank' : undefined}
+                            rel={book.pdfUrl ? 'noopener noreferrer' : undefined}
+                            onClick={(event) => {
+                              if (!book.pdfUrl) {
+                                event.preventDefault();
+                                showToast('Payment link will be updated soon!');
+                              }
+                            }}
+                            className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-4 py-2.5 text-xs font-extrabold text-slate-950 shadow-lg transition hover:bg-amber-300 sm:px-5 sm:py-3 sm:text-sm"
+                          >
+                            <ShoppingCart className="h-4 w-4" /> Buy Now
+                          </a>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowFlipbookModal(book);
+                            setFlipPageNumber(0);
+                            setActiveSlideIndex(0);
+                          }}
+                          className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/10 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-white/20 sm:px-5 sm:py-3 sm:text-sm"
+                        >
+                          <BookOpen className="h-4 w-4" /> 3D Flipbook Sample
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="relative z-10 order-1 mx-auto flex h-[190px] w-[142px] items-center justify-center sm:order-2 sm:h-[300px] sm:w-[225px] lg:h-[380px] lg:w-[285px]">
+                      <div className="absolute inset-3 rounded-full bg-amber-300/20 blur-3xl" />
+                      <div className="relative aspect-[3/4] h-full max-h-full w-full overflow-hidden rounded-r-2xl rounded-l-md border border-white/20 bg-slate-950 shadow-[18px_22px_35px_rgba(0,0,0,0.45)] transition duration-300 hover:-translate-y-2 hover:rotate-1">
+                        {book.coverImage ? (
+                          <img
+                            src={book.coverImage}
+                            alt={`${book.title} book cover`}
+                            className="h-full w-full object-contain"
+                            onError={(event) => {
+                              event.currentTarget.style.display = 'none';
+                              const fallback = event.currentTarget.nextElementSibling;
+                              if (fallback) fallback.style.display = 'flex';
+                            }}
+                          />
+                        ) : null}
+                        <div className={`${book.coverImage ? 'hidden' : 'flex'} absolute inset-0 flex-col items-center justify-center bg-gradient-to-br from-indigo-900 via-blue-950 to-slate-950 p-3 text-center sm:p-6`}>
+                          <BookOpen className="mb-2 h-8 w-8 text-amber-300 sm:mb-5 sm:h-12 sm:w-12" />
+                          <span className="text-[8px] font-bold uppercase tracking-[0.2em] text-amber-300 sm:text-[10px]">{book.exam}</span>
+                          <span className="mt-2 line-clamp-5 text-xs font-black leading-tight text-white sm:mt-3 sm:text-xl">{book.title}</span>
+                          <span className="mt-2 text-[9px] font-semibold text-blue-200 sm:mt-4 sm:text-xs">{book.subject}</span>
+                        </div>
+                        <div className="pointer-events-none absolute inset-y-0 left-0 w-3 bg-gradient-to-r from-black/50 to-transparent" />
+                      </div>
+                    </div>
+                  </article>
+                ))}
+
+                {featuredBooks.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      aria-label="Previous featured book"
+                      onClick={() => setFeaturedBookIndex((featuredBookIndex - 1 + featuredBooks.length) % featuredBooks.length)}
+                      className="absolute left-3 top-1/2 z-20 -translate-y-1/2 rounded-full border border-white/30 bg-slate-950/40 p-2.5 text-white backdrop-blur transition hover:bg-white/20 sm:left-6"
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Next featured book"
+                      onClick={() => setFeaturedBookIndex((featuredBookIndex + 1) % featuredBooks.length)}
+                      className="absolute right-3 top-1/2 z-20 -translate-y-1/2 rounded-full border border-white/30 bg-slate-950/40 p-2.5 text-white backdrop-blur transition hover:bg-white/20 sm:right-6"
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
+                    <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2">
+                      {featuredBooks.map((book, index) => (
+                        <button
+                          type="button"
+                          key={book.id}
+                          aria-label={`Show featured book ${index + 1}`}
+                          aria-current={index === featuredBookIndex ? 'true' : undefined}
+                          onClick={() => setFeaturedBookIndex(index)}
+                          className={`h-2.5 rounded-full transition-all ${index === featuredBookIndex ? 'w-7 bg-amber-300' : 'w-2.5 bg-white/50 hover:bg-white/80'}`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
+            ) : (
+              <div className="relative z-10 flex min-h-[390px] max-w-3xl flex-col justify-center">
+                <div className="inline-flex w-fit items-center gap-2 rounded-full border border-amber-300/40 bg-amber-400/15 px-3 py-1.5 text-xs font-black uppercase tracking-wider text-amber-200">
+                  <BookOpen className="h-3.5 w-3.5" /> XamToppr Digital e-Library
+                </div>
+                <h1 className="mt-4 text-3xl font-black leading-tight sm:text-4xl">Competitive Exam Books & Visual Study Notes</h1>
+                <p className="mt-3 text-sm leading-relaxed text-blue-100 sm:text-base">
+                  Explore curated books, topper notes, and 3D flipbook samples for competitive exams.
+                </p>
+                {isLoadingSkeleton && <p className="mt-5 text-sm text-blue-200">Loading featured books…</p>}
               </div>
-              <h1 className="text-2xl sm:text-4xl lg:text-4xl font-extrabold tracking-tight text-white leading-tight">
-                Competitive Exam Books & Visual Study Notes
-              </h1>
-              <p className="mt-3 sm:mt-4 text-slate-200 text-sm sm:text-base leading-relaxed">
-                Access curated competitive exam books, topper handwritten notes, subject-wise infographics, and 3D interactive flipbooks for SSC, Banking, Railways, UPSC, and State exams.
-              </p>
-            </div>
+            )}
           </div>
         </section>
 
@@ -986,7 +1196,11 @@ function BookStoreApp() {
             </div>
           </div>
 
-          {isLoadingSkeleton ? (
+          {bookLoadError ? (
+            <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-800">
+              {bookLoadError}
+            </div>
+          ) : isLoadingSkeleton ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {[1, 2, 3, 4].map((n) => (
                 <div key={n} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm animate-pulse">
@@ -1676,19 +1890,64 @@ function BookStoreApp() {
           Math.min(viewportSize.width - 32, (viewportSize.height - 120) * (340 / 480), 600)
         );
         const fullscreenPageHeight = fullscreenPageWidth * (480 / 340);
-        const exitFullscreenReader = () => {
+        const enterFullscreenReader = async () => {
+          setActiveSlideIndex(flipPageNumber);
+          setIsMobileFullscreen(true);
+          try {
+            if (!document.fullscreenElement) {
+              await document.documentElement.requestFullscreen();
+            }
+          } catch (error) {
+            console.error('Failed to enter browser fullscreen:', error);
+            showToast('Browser fullscreen was blocked. Use the fullscreen control again to retry.');
+          }
+        };
+        const exitFullscreenReader = async () => {
           flipBookRef.current?.pageFlip()?.turnToPage(activeSlideIndex);
+          if (document.fullscreenElement) {
+            try {
+              await document.exitFullscreen();
+            } catch (error) {
+              console.error('Failed to exit browser fullscreen:', error);
+              showToast('Could not exit browser fullscreen. Press Escape to leave fullscreen.');
+            }
+          } else {
+            setIsMobileFullscreen(false);
+          }
+        };
+        const closeFlipbook = async () => {
+          if (document.fullscreenElement) {
+            try {
+              await document.exitFullscreen();
+            } catch (error) {
+              console.error('Failed to exit browser fullscreen while closing flipbook:', error);
+              showToast('Could not close the fullscreen reader. Press Escape and try again.');
+              return;
+            }
+          }
           setIsMobileFullscreen(false);
+          setActiveSlideIndex(0);
+          setShowFlipbookModal(null);
         };
 
         return (
           <div className={`fixed inset-0 z-50 flex items-center justify-center ${isMobileFullscreen ? 'p-0 bg-slate-950/95' : 'p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn'}`}>
+            {isMobileFullscreen && (
+              <button
+                type="button"
+                onClick={exitFullscreenReader}
+                className="fixed right-3 top-3 z-[120] inline-flex min-h-11 items-center gap-2 rounded-full border border-white/30 bg-rose-600 px-4 py-2.5 text-sm font-extrabold text-white shadow-xl transition hover:bg-rose-500 focus:outline-none focus:ring-2 focus:ring-white"
+                aria-label="Exit fullscreen"
+              >
+                <X className="h-4 w-4" /> Exit Fullscreen
+              </button>
+            )}
             <div className={isMobileFullscreen
               ? 'fixed inset-0 z-[100] w-screen h-screen bg-slate-950/95 flex flex-col justify-between p-2 sm:p-4'
               : 'bg-slate-900 text-white rounded-3xl max-w-4xl w-full max-h-[96vh] overflow-hidden shadow-2xl border border-slate-700 flex flex-col'}>
               
               {/* Flipbook Header */}
-              <div className={`shrink-0 px-4 sm:px-5 py-3.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between gap-3 ${isMobileFullscreen ? 'sticky top-0 z-10' : ''}`}>
+              <div className={`shrink-0 px-4 sm:px-5 py-3.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between gap-3 ${isMobileFullscreen ? 'sticky top-0 z-10 pr-44' : ''}`}>
                 {isMobileFullscreen ? (
                   <>
                     <h3 className="min-w-0 text-sm sm:text-base font-bold text-white truncate">{book.title}</h3>
@@ -1696,14 +1955,6 @@ function BookStoreApp() {
                       <span className="text-xs sm:text-sm text-slate-300 font-mono">
                         Page {flipPageNumber + 1} of {totalSlides}
                       </span>
-                      <button
-                        type="button"
-                        onClick={exitFullscreenReader}
-                        className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition"
-                        aria-label="Exit full screen reader"
-                      >
-                        <Minimize2 className="w-5 h-5" />
-                      </button>
                     </div>
                   </>
                 ) : (
@@ -1721,10 +1972,7 @@ function BookStoreApp() {
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => {
-                          setActiveSlideIndex(flipPageNumber);
-                          setIsMobileFullscreen(true);
-                        }}
+                        onClick={enterFullscreenReader}
                         className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold px-3 py-2 rounded-xl transition flex items-center gap-1.5"
                         aria-label="Open full screen slide reader"
                       >
@@ -1754,11 +2002,7 @@ function BookStoreApp() {
                         </a>
                       )}
                       <button
-                        onClick={() => {
-                          setIsMobileFullscreen(false);
-                          setActiveSlideIndex(0);
-                          setShowFlipbookModal(null);
-                        }}
+                        onClick={closeFlipbook}
                         className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
                         aria-label="Close flipbook"
                       >
@@ -1844,10 +2088,17 @@ function BookStoreApp() {
     </div>
   </div>
 
-  {/* Sample Pages (From Google Sheet) */}
+  {/* High-resolution Sanity sample pages */}
   {pagesList.map((pageImg, idx) => (
     <div key={idx} className="bg-white text-slate-900 h-full flex flex-col items-center justify-center p-2 shadow-inner border border-slate-300">
-      <img src={pageImg} alt={`Page ${idx + 1}`} className="w-full h-full object-contain" />
+      <img
+        src={getHighDefinitionSanityImageUrl(pageImg)}
+        alt={`Page ${idx + 1}`}
+        className="h-full w-full object-contain"
+        loading="eager"
+        decoding="async"
+        draggable="false"
+      />
       <div className="text-[10px] text-slate-400 mt-1">Page {idx + 1}</div>
     </div>
   ))}
@@ -2034,26 +2285,34 @@ function BookStoreApp() {
 </div>
                 </div>
 
-                {selectedBookForModal.tableOfContents && selectedBookForModal.tableOfContents.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-2.5 flex items-center gap-2">
-                      <Layers className="w-4 h-4 text-blue-900" />
-                      Table of Contents & Key Chapters ({selectedBookForModal.tableOfContents.length})
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                      {selectedBookForModal.tableOfContents.map((chap, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-center gap-2.5 p-2.5 bg-slate-50 rounded-lg border border-slate-200/80 text-slate-700"
+                {selectedBookForModal.tableOfContents.length > 0 && (
+                  <details className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-slate-50 px-4 py-3.5 text-sm font-extrabold text-slate-900 transition hover:bg-slate-100 sm:px-5">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <Layers className="h-4 w-4 shrink-0 text-blue-900" />
+                        <span className="truncate">Table of Contents / Complete Index</span>
+                      </span>
+                      <span className="shrink-0 rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold text-blue-900">
+                        {selectedBookForModal.tableOfContents.length} Chapters
+                      </span>
+                    </summary>
+                    <ol className="grid grid-cols-1 gap-2 p-3 text-xs sm:grid-cols-2 sm:p-4">
+                      {selectedBookForModal.tableOfContents.map((chapter, index) => (
+                        <li
+                          key={chapter._key || `${chapter.chapterNo || index}-${chapter.title}`}
+                          className="flex min-w-0 items-start gap-2.5 rounded-xl border border-slate-200/80 bg-slate-50 p-3 text-slate-700"
                         >
-                          <span className="w-5 h-5 bg-blue-100 text-blue-950 font-bold text-[10px] rounded flex items-center justify-center shrink-0">
-                            {idx + 1}
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-blue-100 text-[10px] font-bold text-blue-950">
+                            {chapter.chapterNo || index + 1}
                           </span>
-                          <span className="font-medium line-clamp-1">{chap}</span>
-                        </div>
+                          <span className="min-w-0 flex-1">
+                            <span className="block break-words font-semibold">{chapter.title}</span>
+                            {chapter.pageRange && <span className="mt-1 block text-[10px] text-slate-500">Pages {chapter.pageRange}</span>}
+                          </span>
+                        </li>
                       ))}
-                    </div>
-                  </div>
+                    </ol>
+                  </details>
                 )}
               </div>
 
@@ -2112,8 +2371,48 @@ function BookStoreApp() {
       })()}
 
       {/* Footer */}
-      <footer className="bg-[#08152e] text-slate-300 border-t border-blue-950 py-10 px-4 text-center text-xs">
-        <p>© 2026 XamToppr Edutech Private Limited. All Rights Reserved.</p>
+      <footer className="border-t border-blue-950 bg-[#08152e] px-4 py-10 text-slate-300 sm:px-6 lg:px-8">
+        <div className="mx-auto grid max-w-7xl grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-[1.2fr_1fr_1fr]">
+          <div>
+            <div className="flex items-center gap-2">
+              <GraduationCap className="h-6 w-6 text-amber-400" />
+              <span className="text-lg font-black text-white">Xam<span className="text-amber-400">Toppr</span></span>
+            </div>
+            <p className="mt-3 max-w-sm text-sm leading-relaxed text-slate-400">
+              Exam preparation books, study notes, and notification updates to help students learn, practice, and excel.
+            </p>
+          </div>
+
+          <div>
+            <h2 className="text-sm font-extrabold uppercase tracking-wider text-white">Support & Legal</h2>
+            <ul className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-1">
+              {SUPPORT_LINKS.map(({ label, href }) => (
+                <li key={href}>
+                  <a href={href} className="inline-flex min-h-8 items-center text-slate-400 transition hover:text-amber-300">
+                    {label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div>
+            <h2 className="text-sm font-extrabold uppercase tracking-wider text-white">Contact Student Support</h2>
+            <div className="mt-3 flex flex-col items-start gap-3 text-sm">
+              <a href="tel:+917717707121" className="inline-flex min-h-8 items-center gap-2 text-slate-300 transition hover:text-amber-300">
+                <Phone className="h-4 w-4 shrink-0 text-amber-400" />
+                +91 77177 07121
+              </a>
+              <a href="mailto:info@xamtoppr.com" className="inline-flex min-h-8 items-center gap-2 break-all text-slate-300 transition hover:text-amber-300">
+                <Mail className="h-4 w-4 shrink-0 text-amber-400" />
+                info@xamtoppr.com
+              </a>
+            </div>
+          </div>
+        </div>
+        <div className="mx-auto mt-8 max-w-7xl border-t border-slate-700/70 pt-5 text-center text-xs text-slate-500">
+          © 2026 XamToppr Edutech Private Limited. All Rights Reserved.
+        </div>
       </footer>
     </div>
   );

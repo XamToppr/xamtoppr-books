@@ -1,3 +1,35 @@
+export const ALL_BOOKS_QUERY = '*[_type == "book"] | order(_createdAt desc)';
+
+export const BOOKS_FOR_STORE_QUERY = `*[_type == "book"] | order(_createdAt desc) {
+  _id,
+  bookId,
+  title,
+  "slug": slug.current,
+  badge,
+  author,
+  publisher,
+  language,
+  exam,
+  examCategory,
+  subject,
+  "coverImageUrl": coverImage.asset->url,
+  "samplePages": samplePages[].asset->url,
+  sampleFlipbookUrl,
+  "samplePdfUrl": samplePdfFile.asset->url,
+  fileSize,
+  totalPages,
+  format,
+  mrp,
+  offerPrice,
+  buyUrl,
+  amazonUrl,
+  isFeatured,
+  description,
+  tableOfContents[] { _key, chapterNo, title, pageRange }
+}`;
+
+export const BOOK_BY_SLUG_QUERY = '*[_type == "book" && slug.current == $slug][0]';
+
 export const examNotificationsQuery = `*[_type == "examNotification"] | order(_createdAt desc) {
   _id,
   title,
