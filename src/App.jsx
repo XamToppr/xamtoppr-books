@@ -1,6 +1,9 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import Papa from 'papaparse';
 import HTMLFlipBook from 'react-pageflip';
+import { PortableText } from '@portabletext/react';
+import sanityClient from './sanityClient';
+import { examNotificationDetailQuery, examNotificationsQuery } from './sanityQueries';
 import {
   Search,
   BookOpen,
@@ -41,193 +44,6 @@ import {
 // APNA GOOGLE SHEET CSV LINK YAHAN DALEIN
 // ==========================================
 const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTWDpgH3DG7CxaaXFi1qado9DzZ_dykCwxZeaZ58_ddMo6RmtMOsfZfmm0FRPpsYMntSv5h9DgZ7Pq2/pub?output=csv";
-const GOOGLE_SHEET_BLOG_CSV_URL = `${GOOGLE_SHEET_CSV_URL}&gid=1105754566`;
-const getPublishedGoogleDocUrl = (docUrl) => {
-  try {
-    const url = new URL(docUrl);
-    if (url.hostname !== 'docs.google.com') return '';
-    const match = url.pathname.match(/\/document\/(?:u\/\d+\/)?d\/(e\/)?([^/]+)/i);
-    if (!match) return '';
-    const publishedPrefix = match[1] || '';
-    return `https://docs.google.com/document/d/${publishedPrefix}${encodeURIComponent(match[2])}/pub`;
-  } catch {
-    return '';
-  }
-};
-const parsePublishedGoogleDocHtml = (html) => {
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  const content = doc.querySelector('#contents') || doc.body;
-  const root = content.cloneNode(true);
-  [...root.attributes].forEach((attribute) => root.removeAttribute(attribute.name));
-  root.querySelectorAll('script,style,link,meta,iframe,object,embed,form,button,input,textarea,select').forEach((el) => el.remove());
-
-  const allowedTags = new Set([
-    'A', 'B', 'BLOCKQUOTE', 'BR', 'CODE', 'DIV', 'EM', 'H1', 'H2', 'H3', 'H4',
-    'H5', 'H6', 'HR', 'I', 'IMG', 'LI', 'OL', 'P', 'PRE', 'S', 'SPAN', 'STRONG',
-    'SUB', 'SUP', 'TABLE', 'TBODY', 'TD', 'TFOOT', 'TH', 'THEAD', 'TR', 'U', 'UL'
-  ]);
-  const headingItems = [];
-  root.querySelectorAll('*').forEach((element) => {
-    const tag = element.tagName;
-    if (!allowedTags.has(tag)) {
-      element.replaceWith(...element.childNodes);
-      return;
-    }
-
-    const originalHref = tag === 'A' ? element.getAttribute('href') : null;
-    const originalSrc = tag === 'IMG' ? element.getAttribute('src') : null;
-    const colSpan = tag === 'TD' || tag === 'TH' ? element.getAttribute('colspan') : null;
-    const rowSpan = tag === 'TD' || tag === 'TH' ? element.getAttribute('rowspan') : null;
-    [...element.attributes].forEach((attribute) => element.removeAttribute(attribute.name));
-
-    if (tag === 'SPAN') {
-      element.replaceWith(...element.childNodes);
-      return;
-    }
-    if (tag === 'A' && originalHref) {
-      try {
-        const link = new URL(originalHref, 'https://docs.google.com');
-        if (['http:', 'https:', 'mailto:'].includes(link.protocol)) {
-          element.setAttribute('href', link.href);
-          element.setAttribute('target', '_blank');
-          element.setAttribute('rel', 'noopener noreferrer');
-          element.className = 'font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900';
-        }
-      } catch {
-        element.removeAttribute('href');
-      }
-    }
-    if (tag === 'IMG' && originalSrc) {
-      try {
-        const image = new URL(originalSrc, 'https://docs.google.com');
-        if (['http:', 'https:'].includes(image.protocol)) {
-          element.setAttribute('src', image.href);
-          element.setAttribute('loading', 'lazy');
-          element.setAttribute('alt', '');
-          element.className = 'my-4 h-auto max-w-full rounded-lg';
-        } else {
-          element.remove();
-        }
-      } catch {
-        element.remove();
-      }
-    }
-    if ((tag === 'TD' || tag === 'TH') && colSpan && /^\d+$/.test(colSpan)) {
-      element.setAttribute('colspan', colSpan);
-    }
-    if ((tag === 'TD' || tag === 'TH') && rowSpan && /^\d+$/.test(rowSpan)) {
-      element.setAttribute('rowspan', rowSpan);
-    }
-
-    if (/^H[2-3]$/.test(tag)) {
-      const title = element.textContent.trim();
-      if (title) {
-        const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'section';
-        const id = `article-${slug}-${headingItems.length}`;
-        element.id = id;
-        element.className = `scroll-mt-36 font-extrabold text-slate-900 ${tag === 'H2' ? 'mt-8 text-2xl' : 'mt-6 text-xl'}`;
-        headingItems.push({ id, title });
-      }
-    } else if (tag === 'H1' || tag === 'H4' || tag === 'H5' || tag === 'H6') {
-      element.className = 'mt-5 font-bold text-slate-900';
-    } else if (tag === 'P') {
-      element.className = 'my-3 leading-7 text-slate-700';
-    } else if (tag === 'UL' || tag === 'OL') {
-      element.className = `${tag === 'UL' ? 'list-disc' : 'list-decimal'} my-3 space-y-1 pl-6 text-slate-700`;
-    } else if (tag === 'BLOCKQUOTE') {
-      element.className = 'my-4 border-l-4 border-sky-300 pl-4 italic text-slate-600';
-    } else if (tag === 'TABLE') {
-      element.className = 'w-full min-w-[36rem] border-collapse text-left text-sm';
-    } else if (tag === 'TH') {
-      element.className = 'border-b border-sky-200 bg-sky-50 px-4 py-3 text-left font-semibold text-sky-900';
-    } else if (tag === 'TD') {
-      element.className = 'border-b border-slate-100 px-4 py-2.5 text-slate-700 hover:bg-slate-50';
-    }
-  });
-
-  root.querySelectorAll('table').forEach((table) => {
-    const wrapper = doc.createElement('div');
-    wrapper.className = 'mb-6 overflow-x-auto rounded-xl border border-slate-200';
-    table.parentNode.insertBefore(wrapper, table);
-    wrapper.appendChild(table);
-  });
-
-  return { html: root.innerHTML, headings: headingItems };
-};
-const getYouTubeEmbedUrl = (videoUrl) => {
-  try {
-    const url = new URL(videoUrl);
-    let videoId = '';
-    if (url.hostname === 'youtu.be') {
-      videoId = url.pathname.slice(1);
-    } else if (url.hostname.endsWith('youtube.com')) {
-      videoId = url.pathname === '/watch'
-        ? url.searchParams.get('v') || ''
-        : url.pathname.startsWith('/embed/')
-          ? url.pathname.split('/')[2] || ''
-          : '';
-    }
-    return videoId ? `https://www.youtube.com/embed/${encodeURIComponent(videoId)}` : '';
-  } catch {
-    return '';
-  }
-};
-const renderNotificationContent = (content) => {
-  if (!content?.trim()) return null;
-
-  const lines = content.split(/\r?\n/);
-  const rendered = [];
-  let index = 0;
-  while (index < lines.length) {
-    const cellsFor = (line) => line.trim().replace(/^\|/, '').replace(/\|$/, '')
-      .split('|').map((cell) => cell.trim());
-    const isTableSeparator = (line) => cellsFor(line).every((cell) => /^:?-{3,}:?$/.test(cell));
-
-    if (lines[index].includes('|') && lines[index + 1]?.includes('|') && isTableSeparator(lines[index + 1])) {
-      const headers = cellsFor(lines[index]);
-      index += 2;
-      const rows = [];
-      while (index < lines.length && lines[index].includes('|')) {
-        rows.push(cellsFor(lines[index]));
-        index += 1;
-      }
-      rendered.push(
-        <div key={`table-${index}`} className="my-3 overflow-x-auto rounded-xl border border-slate-200">
-          <table className="w-full min-w-max border-collapse text-left text-sm">
-            <thead className="bg-slate-100 text-slate-700">
-              <tr>{headers.map((cell, cellIndex) => (
-                <th key={cellIndex} className="border-b border-slate-200 px-3 py-2 font-bold">{cell}</th>
-              ))}</tr>
-            </thead>
-            <tbody>
-              {rows.map((row, rowIndex) => (
-                <tr key={rowIndex} className="odd:bg-white even:bg-slate-50">
-                  {headers.map((_, cellIndex) => (
-                    <td key={cellIndex} className="border-b border-slate-100 px-3 py-2 align-top">
-                      {row[cellIndex] || ''}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      );
-      continue;
-    }
-
-    const line = lines[index].trim();
-    if (line) {
-      rendered.push(
-        <p key={`line-${index}`} className="whitespace-pre-wrap">
-          {line.replace(/^[-*]\s+/, '• ')}
-        </p>
-      );
-    }
-    index += 1;
-  }
-  return rendered;
-};
 
 const INITIAL_BOOKS = [
   {
@@ -317,10 +133,9 @@ export default function App() {
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
   const [currentTab, setCurrentTab] = useState('books');
   const [selectedBlog, setSelectedBlog] = useState(null);
-  const [articleHtml, setArticleHtml] = useState('');
-  const [articleHeadings, setArticleHeadings] = useState([]);
-  const [isLoadingArticle, setIsLoadingArticle] = useState(false);
-  const [articleLoadError, setArticleLoadError] = useState('');
+  const [selectedBlogDetail, setSelectedBlogDetail] = useState(null);
+  const [isLoadingBlogDetail, setIsLoadingBlogDetail] = useState(false);
+  const [blogDetailError, setBlogDetailError] = useState('');
   const [blogPosts, setBlogPosts] = useState([]);
   const [isLoadingBlogs, setIsLoadingBlogs] = useState(true);
   const [blogLoadError, setBlogLoadError] = useState('');
@@ -462,89 +277,68 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    Papa.parse(GOOGLE_SHEET_BLOG_CSV_URL, {
-      download: true,
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        const fields = [
-          'id', 'title', 'state', 'examCategory', 'postDate', 'totalVacancy',
-          'applyStartDate', 'applyEndDate', 'examDates', 'ageLimit', 'qualification',
-          'applicationFee', 'salary', 'selectionProcess', 'examPattern', 'syllabus',
-          'howToApply', 'documentsRequired', 'officialPdfUrl', 'applyOnlineUrl',
-          'relatedBookId', 'youtubeVideoUrl', 'articleDocUrl'
-        ];
-        const parsedPosts = (results.data || [])
-          .filter((row) => row.id?.trim() && row.title?.trim())
-          .map((row) => fields.reduce((post, field) => {
-            post[field] = String(row[field] || '').trim();
-            return post;
-          }, {}));
-        setBlogPosts(parsedPosts);
+    let isCurrentRequest = true;
+    sanityClient.fetch(examNotificationsQuery)
+      .then((notifications) => {
+        if (!isCurrentRequest) return;
+        if (!Array.isArray(notifications)) {
+          throw new Error('Sanity notifications query did not return a list.');
+        }
+        setBlogPosts(notifications);
         setBlogLoadError('');
-        setIsLoadingBlogs(false);
-      },
-      error: (error) => {
-        console.error('Failed to load exam notifications:', error);
-        setBlogLoadError('Exam notifications could not be loaded. Please try again later.');
-        setIsLoadingBlogs(false);
-      }
-    });
+      })
+      .catch((error) => {
+        console.error('Failed to load exam notifications from Sanity:', error);
+        if (isCurrentRequest) {
+          setBlogLoadError('Exam notifications could not be loaded. Please try again later.');
+        }
+      })
+      .finally(() => {
+        if (isCurrentRequest) setIsLoadingBlogs(false);
+      });
+
+    return () => {
+      isCurrentRequest = false;
+    };
   }, []);
 
   useEffect(() => {
     let isCurrentRequest = true;
-    const publishedUrl = getPublishedGoogleDocUrl(selectedBlog?.articleDocUrl);
+    const notificationId = selectedBlog?._id;
+    setSelectedBlogDetail(null);
+    setBlogDetailError('');
+    setIsLoadingBlogDetail(Boolean(notificationId));
 
-    setArticleHtml('');
-    setArticleHeadings([]);
-    setArticleLoadError('');
-    setIsLoadingArticle(Boolean(selectedBlog?.articleDocUrl));
-
-    if (!publishedUrl) {
-      setIsLoadingArticle(false);
-      if (selectedBlog?.articleDocUrl) {
-        setArticleLoadError('The article link is not a valid Google Docs URL.');
-      }
+    if (!notificationId) {
+      setIsLoadingBlogDetail(false);
       return () => {
         isCurrentRequest = false;
       };
     }
 
-    const loadPublishedArticle = async () => {
-      try {
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(publishedUrl)}`;
-        const response = await fetch(proxyUrl);
-        if (!response.ok) {
-          throw new Error(`Article request failed with status ${response.status}.`);
+    sanityClient.fetch(examNotificationDetailQuery, { id: notificationId })
+      .then((notification) => {
+        if (!isCurrentRequest) return;
+        if (!notification) {
+          setBlogDetailError('This notification could not be found.');
+          return;
         }
-        const html = await response.text();
-        if (!html.trim()) {
-          throw new Error('The published article returned an empty response.');
-        }
-        const parsedArticle = parsePublishedGoogleDocHtml(html);
-        if (!parsedArticle.html.trim()) {
-          throw new Error('No readable article content was found in the published document.');
-        }
+        setSelectedBlogDetail(notification);
+      })
+      .catch((error) => {
+        console.error('Failed to load exam notification details from Sanity:', error);
         if (isCurrentRequest) {
-          setArticleHtml(parsedArticle.html);
-          setArticleHeadings(parsedArticle.headings);
+          setBlogDetailError('Notification details could not be loaded. Please try again.');
         }
-      } catch (error) {
-        console.error('Failed to load published notification article:', error);
-        if (isCurrentRequest) {
-          setArticleLoadError('The article could not be loaded. Please try again later or use the official notification links.');
-        }
-      } finally {
-        if (isCurrentRequest) setIsLoadingArticle(false);
-      }
-    };
+      })
+      .finally(() => {
+        if (isCurrentRequest) setIsLoadingBlogDetail(false);
+      });
 
-    loadPublishedArticle();
     return () => {
       isCurrentRequest = false;
     };
-  }, [selectedBlog?.id, selectedBlog?.articleDocUrl]);
+  }, [selectedBlog?._id]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -674,16 +468,16 @@ export default function App() {
         post.title,
         post.examCategory,
         post.state
-      ].some((value) => (value || '').toLowerCase().includes(query));
+      ].some((value) => String(value || '').toLowerCase().includes(query));
       const matchesCategory = selectedBlogCategory === 'All'
-        || post.examCategory.toLowerCase().includes(selectedBlogCategory.toLowerCase());
+        || String(post.examCategory || '').toLowerCase().includes(selectedBlogCategory.toLowerCase());
       const matchesState = selectedBlogState === 'All'
-        || post.state.toLowerCase().includes(selectedBlogState.toLowerCase())
-        || (selectedBlogState === 'MP' && post.state.toLowerCase().includes('madhya pradesh'))
-        || (selectedBlogState === 'Madhya Pradesh' && post.state.toLowerCase() === 'mp')
+        || String(post.state || '').toLowerCase().includes(selectedBlogState.toLowerCase())
+        || (selectedBlogState === 'MP' && String(post.state || '').toLowerCase().includes('madhya pradesh'))
+        || (selectedBlogState === 'Madhya Pradesh' && String(post.state || '').toLowerCase() === 'mp')
         || (selectedBlogState === 'All India / Central'
-          && (post.state.toLowerCase().includes('all india') || post.state.toLowerCase().includes('central')))
-        || (selectedBlogState === 'All India' && post.state.toLowerCase().includes('central'));
+          && (String(post.state || '').toLowerCase().includes('all india') || String(post.state || '').toLowerCase().includes('central')))
+        || (selectedBlogState === 'All India' && String(post.state || '').toLowerCase().includes('central'));
       return matchesQuery && matchesCategory && matchesState;
     });
   }, [blogPosts, blogSearchQuery, selectedBlogCategory, selectedBlogState]);
@@ -1291,64 +1085,45 @@ export default function App() {
           </>
         ) : selectedBlog ? (
           (() => {
-            const targetIds = (selectedBlog.relatedBookId || '')
+            const blog = selectedBlogDetail || selectedBlog;
+            const targetIds = (blog.relatedBookId || '')
               .split(',')
               .map((id) => id.trim())
               .filter(Boolean);
             const matchedBooks = booksList.filter((book) => targetIds.includes(book.id));
-            const youtubeEmbedUrl = getYouTubeEmbedUrl(selectedBlog.youtubeVideoUrl);
-            const notificationSections = [
-              {
-                title: 'Important Dates & Overview',
-                icon: CalendarDays,
-                fallback: 'Notification dates and overview details will be updated soon.',
-                items: [
-                  ['Post Date', selectedBlog.postDate],
-                  ['State / Region', selectedBlog.state],
-                  ['Exam Category', selectedBlog.examCategory],
-                  ['Total Vacancies', selectedBlog.totalVacancy],
-                  ['Application Start Date', selectedBlog.applyStartDate],
-                  ['Application End Date', selectedBlog.applyEndDate],
-                  ['Exam Dates', selectedBlog.examDates],
-                  ['Age Limit', selectedBlog.ageLimit],
-                  ['Qualification', selectedBlog.qualification],
-                  ['Application Fee', selectedBlog.applicationFee]
-                ]
-              },
-              {
-                title: 'Salary & Pay Scale',
-                icon: Award,
-                fallback: 'Salary and pay scale details will be announced in the official notification.',
-                items: [['Salary / Pay Scale', selectedBlog.salary]]
-              },
-              {
-                title: 'Selection Process & Stages',
-                icon: ClipboardList,
-                fallback: 'Selection stages will be announced in the official notification.',
-                items: [['Selection Process', selectedBlog.selectionProcess]]
-              },
-              {
-                title: 'Exam Pattern & Minimum Qualifying Marks',
-                icon: FileText,
-                fallback: 'Exam pattern and qualifying marks will be announced in the official notification.',
-                items: [['Exam Pattern', selectedBlog.examPattern]]
-              },
-              {
-                title: 'Subject-wise Syllabus',
-                icon: BookOpen,
-                fallback: 'The detailed syllabus will be announced in the official notification.',
-                items: [['Syllabus', selectedBlog.syllabus]]
-              },
-              {
-                title: 'How to Apply & Documents Required',
-                icon: FileCheck2,
-                fallback: 'Application instructions and required documents will be announced in the official notification.',
-                items: [
-                  ['How to Apply', selectedBlog.howToApply],
-                  ['Documents Required', selectedBlog.documentsRequired]
-                ]
-              }
+            const sections = [
+              ['overview', 'Overview'],
+              ['dates', 'Dates'],
+              ['salary', 'Salary'],
+              ['selection', 'Selection'],
+              ['pattern', 'Pattern'],
+              ['syllabus', 'Syllabus'],
+              ['apply', 'Apply'],
+              ['documents', 'Documents'],
+              ['faqs', 'FAQs']
             ];
+            const renderTable = (rows, columns) => rows?.length ? (
+              <div className="mb-2 overflow-x-auto rounded-xl border border-slate-200">
+                <table className="w-full min-w-max border-collapse text-left text-sm">
+                  <thead className="bg-sky-50 text-sky-900">
+                    <tr>{columns.map(([key, label]) => (
+                      <th key={key} className="border-b border-sky-200 px-4 py-3 font-semibold">{label}</th>
+                    ))}</tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row, rowIndex) => (
+                      <tr key={row._key || rowIndex} className="group">
+                        {columns.map(([key]) => (
+                          <td key={key} className="border-b border-slate-100 px-4 py-2.5 text-slate-700 group-hover:bg-slate-50">
+                            {row[key] ?? '—'}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : <p className="text-sm text-slate-500">Details will be announced in the official notification.</p>;
             const renderActionLink = (url, label, className) => url ? (
               <a
                 href={url}
@@ -1375,43 +1150,43 @@ export default function App() {
                 <header className="rounded-3xl bg-gradient-to-br from-[#0c2356] via-[#153a8a] to-indigo-800 p-6 sm:p-9 text-white shadow-xl">
                   <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
                     <span className="rounded-full bg-amber-400 px-3 py-1 text-slate-950">
-                      {selectedBlog.examCategory || 'Exam Notification'}
+                      {blog.examCategory || 'Exam Notification'}
                     </span>
                     <span className="rounded-full border border-white/30 bg-white/10 px-3 py-1">
-                      {selectedBlog.state || 'All India / Central'}
+                      {blog.state || 'All India / Central'}
                     </span>
                     <span className="rounded-full bg-emerald-400/20 px-3 py-1 text-emerald-100">
-                      {selectedBlog.totalVacancy || 'Vacancies'}{selectedBlog.totalVacancy ? ' Vacancies' : ''}
+                      {blog.totalVacancies || 'Vacancies'}{blog.totalVacancies ? ' Vacancies' : ''}
                     </span>
                   </div>
-                  <h1 className="mt-4 text-2xl sm:text-4xl font-black leading-tight">{selectedBlog.title}</h1>
+                  <h1 className="mt-4 text-2xl sm:text-4xl font-black leading-tight">{blog.title}</h1>
                   <p className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-blue-100">
-                    {selectedBlog.postDate && <span>Posted {selectedBlog.postDate}</span>}
+                    {blog.postDate && <span>Posted {blog.postDate}</span>}
                   </p>
-                  {(selectedBlog.applyStartDate || selectedBlog.applyEndDate || selectedBlog.examDates) && (
+                  {(blog.applicationWindow || blog.examDate) && (
                     <div className="mt-4 flex flex-wrap gap-2">
-                      {(selectedBlog.applyStartDate || selectedBlog.applyEndDate) && (
+                      {blog.applicationWindow && (
                         <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-blue-50">
                           <CalendarDays className="h-4 w-4" />
-                          Applications: {selectedBlog.applyStartDate || 'TBA'} – {selectedBlog.applyEndDate || 'TBA'}
+                          Applications: {blog.applicationWindow}
                         </span>
                       )}
-                      {selectedBlog.examDates && (
+                      {blog.examDate && (
                         <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-blue-50">
                           <CalendarDays className="h-4 w-4" />
-                          Exam: {selectedBlog.examDates}
+                          Exam: {blog.examDate}
                         </span>
                       )}
                     </div>
                   )}
                   <div className="mt-6 flex flex-wrap gap-3">
                     {renderActionLink(
-                      selectedBlog.officialPdfUrl,
+                      blog.officialPdfUrl,
                       'Official Notification PDF',
                       'inline-flex items-center gap-2 rounded-xl bg-amber-400 px-4 py-3 text-sm font-extrabold text-slate-950 hover:bg-amber-300 transition'
                     )}
                     {renderActionLink(
-                      selectedBlog.applyOnlineUrl,
+                      blog.applyOnlineUrl,
                       'Apply Online',
                       'inline-flex items-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 text-sm font-extrabold text-slate-950 hover:bg-emerald-300 transition'
                     )}
@@ -1420,98 +1195,144 @@ export default function App() {
 
                 <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
                   <div className="min-w-0 space-y-6">
-                    {selectedBlog.articleDocUrl ? (
-                      <>
-                        {articleHeadings.length > 0 && (
-                          <nav
-                            aria-label="Article sections"
-                            className="sticky top-28 z-30 overflow-x-auto rounded-xl border border-slate-200 bg-white/95 p-2 shadow-md backdrop-blur"
+                    <nav
+                      aria-label="Notification sections"
+                      className="sticky top-28 z-30 overflow-x-auto rounded-xl border border-slate-200 bg-white/95 p-2 shadow-md backdrop-blur"
+                    >
+                      <div className="flex min-w-max gap-2">
+                        {sections.map(([id, label]) => (
+                          <button
+                            type="button"
+                            key={id}
+                            onClick={() => document.getElementById(`notification-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                            className="rounded-lg bg-sky-50 px-3 py-2 text-xs font-bold text-sky-900 transition hover:bg-sky-100"
                           >
-                            <div className="flex min-w-max gap-2">
-                              {articleHeadings.map(({ id, title }) => (
-                                <button
-                                  type="button"
-                                  key={id}
-                                  onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                                  className="rounded-lg bg-sky-50 px-3 py-2 text-xs font-bold text-sky-900 transition hover:bg-sky-100"
-                                >
-                                  {title}
-                                </button>
-                              ))}
-                            </div>
-                          </nav>
-                        )}
-                        {isLoadingArticle ? (
-                          <section aria-label="Loading article" className="animate-pulse rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
-                            <div className="h-7 w-2/3 rounded-lg bg-slate-200" />
-                            <div className="mt-5 h-4 w-full rounded bg-slate-100" />
-                            <div className="mt-2 h-4 w-11/12 rounded bg-slate-100" />
-                            <div className="mt-2 h-4 w-4/5 rounded bg-slate-100" />
-                            <div className="mt-8 h-6 w-1/2 rounded bg-slate-200" />
-                            <div className="mt-4 h-36 w-full rounded-xl bg-slate-100" />
-                            <div className="mt-7 h-4 w-full rounded bg-slate-100" />
-                            <div className="mt-2 h-4 w-5/6 rounded bg-slate-100" />
-                          </section>
-                        ) : articleLoadError ? (
-                          <section role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm leading-relaxed text-rose-800">
-                            {articleLoadError}
-                          </section>
-                        ) : (
-                          <section
-                            className="rounded-2xl border border-slate-200 bg-white p-5 text-[15px] leading-7 shadow-sm sm:p-8"
-                            dangerouslySetInnerHTML={{ __html: articleHtml }}
-                          />
-                        )}
-                      </>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </nav>
+
+                    {isLoadingBlogDetail ? (
+                      <section aria-label="Loading notification details" className="animate-pulse space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
+                        <div className="h-6 w-1/2 rounded bg-slate-200" />
+                        <div className="h-4 w-full rounded bg-slate-100" />
+                        <div className="h-4 w-5/6 rounded bg-slate-100" />
+                        <div className="h-32 rounded-xl bg-slate-100" />
+                      </section>
+                    ) : blogDetailError ? (
+                      <section role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-800">
+                        {blogDetailError}
+                      </section>
                     ) : (
-                      notificationSections.map(({ title, icon: SectionIcon, items, fallback }) => (
-                        <section key={title} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                          <h2 className="flex items-center gap-2 text-base font-extrabold text-blue-950 sm:text-lg">
-                            <SectionIcon className="h-5 w-5 shrink-0 text-amber-500" />
-                            {title}
+                      <>
+                        <section id="notification-overview" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                          <h2 className="flex items-center gap-2 text-lg font-extrabold text-blue-950">
+                            <BookOpen className="h-5 w-5 text-amber-500" /> Overview
                           </h2>
-                          <div className="mt-4 space-y-4">
-                            {items.map(([label, value]) => (
-                              <div key={label}>
-                                {items.length > 1 && (
-                                  <h3 className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">{label}</h3>
-                                )}
-                                <div className="space-y-2 text-sm leading-relaxed text-slate-700">
-                                  {renderNotificationContent(value) || (
-                                    <p className="text-slate-500">{items.length === 1 ? fallback : 'Details will be announced in the official notification.'}</p>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
+                          <div className="prose prose-slate mt-4 max-w-none text-sm leading-7">
+                            {Array.isArray(blog.overview)
+                              ? <PortableText value={blog.overview} />
+                              : <p className="whitespace-pre-line">{blog.overview || 'Notification overview will be updated soon.'}</p>}
                           </div>
                         </section>
-                      ))
-                    )}
-                    {youtubeEmbedUrl && (
-                      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                        <div className="flex items-center justify-between gap-3 px-4 py-3">
-                          <h2 className="text-sm font-extrabold text-blue-950">Video Guide</h2>
-                          <a
-                            href={selectedBlog.youtubeVideoUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-800 hover:text-blue-950"
-                          >
-                            Watch on YouTube
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </a>
-                        </div>
-                        <div className="aspect-video bg-slate-950">
-                          <iframe
-                            src={youtubeEmbedUrl}
-                            className="h-full w-full border-0"
-                            title={`${selectedBlog.title} video guide`}
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                            allowFullScreen
-                            loading="lazy"
-                          />
-                        </div>
-                      </section>
+
+                        <section id="notification-dates" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                          <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
+                            <CalendarDays className="h-5 w-5 text-amber-500" /> Important Dates
+                          </h2>
+                          {renderTable(blog.importantDates, [['eventName', 'Event'], ['dateText', 'Date']])}
+                        </section>
+
+                        <section id="notification-salary" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                          <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
+                            <Award className="h-5 w-5 text-amber-500" /> Salary Structure
+                          </h2>
+                          {renderTable(blog.salaryStructure, [
+                            ['postName', 'Post'], ['payLevel', 'Pay Level'], ['basicPay', 'Basic Pay'], ['inHandSalary', 'In-hand Salary']
+                          ])}
+                        </section>
+
+                        <section id="notification-selection" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                          <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
+                            <ClipboardList className="h-5 w-5 text-amber-500" /> Selection Process
+                          </h2>
+                          {blog.selectionProcess?.length ? (
+                            <div className="space-y-3">
+                              {blog.selectionProcess.map((stage, index) => (
+                                <article key={stage._key || index} className="flex gap-4 rounded-xl border border-slate-100 bg-slate-50 p-4">
+                                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-900 text-sm font-black text-white">
+                                    {stage.stageNumber || index + 1}
+                                  </span>
+                                  <div>
+                                    <h3 className="font-bold text-slate-900">{stage.title || `Stage ${index + 1}`}</h3>
+                                    <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-slate-600">{stage.description}</p>
+                                  </div>
+                                </article>
+                              ))}
+                            </div>
+                          ) : <p className="text-sm text-slate-500">Selection process details will be announced in the official notification.</p>}
+                        </section>
+
+                        <section id="notification-pattern" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                          <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
+                            <FileText className="h-5 w-5 text-amber-500" /> Exam Pattern
+                          </h2>
+                          {renderTable(blog.examPattern, [
+                            ['subject', 'Subject'], ['questions', 'Questions'], ['marks', 'Marks'], ['duration', 'Duration']
+                          ])}
+                        </section>
+
+                        <section id="notification-syllabus" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                          <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
+                            <BookOpen className="h-5 w-5 text-amber-500" /> Syllabus
+                          </h2>
+                          {blog.syllabusDetails?.length ? (
+                            <div className="space-y-3">
+                              {blog.syllabusDetails.map((item, index) => (
+                                <details key={item._key || index} className="group rounded-xl border border-slate-200 p-4">
+                                  <summary className="cursor-pointer font-bold text-slate-800">{item.sectionTitle || `Section ${index + 1}`}</summary>
+                                  <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-slate-600">{item.topics}</p>
+                                </details>
+                              ))}
+                            </div>
+                          ) : <p className="text-sm text-slate-500">Syllabus details will be announced in the official notification.</p>}
+                        </section>
+
+                        <section id="notification-apply" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                          <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
+                            <FileCheck2 className="h-5 w-5 text-amber-500" /> How to Apply
+                          </h2>
+                          {blog.howToApplySteps?.length ? (
+                            <ol className="list-inside list-decimal space-y-2 text-sm leading-relaxed text-slate-700">
+                              {blog.howToApplySteps.map((step, index) => <li key={step._key || index}>{typeof step === 'string' ? step : step.text}</li>)}
+                            </ol>
+                          ) : <p className="text-sm text-slate-500">Application instructions will be announced in the official notification.</p>}
+                        </section>
+
+                        <section id="notification-documents" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                          <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
+                            <FileCheck2 className="h-5 w-5 text-amber-500" /> Document Specifications
+                          </h2>
+                          {renderTable(blog.documentSpecs, [
+                            ['docName', 'Document'], ['dimension', 'Dimensions'], ['fileSize', 'File Size'], ['format', 'Format']
+                          ])}
+                        </section>
+
+                        <section id="notification-faqs" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                          <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">Frequently Asked Questions</h2>
+                          {blog.faqs?.length ? (
+                            <div className="space-y-3">
+                              {blog.faqs.map((faq, index) => (
+                                <details key={faq._key || index} className="group rounded-xl border border-slate-200 p-4">
+                                  <summary className="cursor-pointer font-bold text-slate-800">{faq.question}</summary>
+                                  <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-slate-600">{faq.answer}</p>
+                                </details>
+                              ))}
+                            </div>
+                          ) : <p className="text-sm text-slate-500">FAQs will be added soon.</p>}
+                        </section>
+                      </>
                     )}
                   </div>
 
@@ -1680,7 +1501,7 @@ export default function App() {
             ) : (
               <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {filteredBlogPosts.map((post) => (
-                  <article key={post.id} className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-amber-300 hover:shadow-lg">
+                  <article key={post._id} className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-amber-300 hover:shadow-lg">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-full bg-blue-100 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide text-blue-900">
                         {post.examCategory || 'Exam'}
@@ -1693,14 +1514,14 @@ export default function App() {
                     <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3">
                       <div>
                         <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Total Vacancies</p>
-                        <p className="mt-1 text-sm font-extrabold text-blue-950">{post.totalVacancy || 'Not announced'}</p>
+                        <p className="mt-1 text-sm font-extrabold text-blue-950">{post.totalVacancies || 'Not announced'}</p>
                       </div>
                       <div>
                         <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
                           <CalendarDays className="h-3 w-3" /> Application Dates
                         </p>
                         <p className="mt-1 text-xs font-semibold text-slate-700">
-                          {post.applyStartDate || 'TBA'} – {post.applyEndDate || 'TBA'}
+                          {post.applicationWindow || 'TBA'}
                         </p>
                       </div>
                     </div>
