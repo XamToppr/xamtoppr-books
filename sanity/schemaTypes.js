@@ -521,10 +521,14 @@ const bookRequest = defineType({
     })
   ],
   preview: {
-    select: { title: 'requestedBookTitle', subtitle: 'studentName' },
-    prepare: ({ title, subtitle }) => ({
-      title: title || 'Untitled book request',
-      subtitle: subtitle || 'Student name not provided'
+    select: {
+      title: 'requestedBookTitle',
+      subtitle: 'studentName',
+      status: 'status'
+    },
+    prepare: ({ title, subtitle, status }) => ({
+      title: title || 'Untitled Request',
+      subtitle: `${subtitle || 'Student'} • [${status || 'Pending'}]`
     })
   },
   orderings: [

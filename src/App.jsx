@@ -145,15 +145,6 @@ function BookStoreApp() {
   const [showRequestBookModal, setShowRequestBookModal] = useState(false);
   const [isSubmittingBookRequest, setIsSubmittingBookRequest] = useState(false);
   const [bookRequestError, setBookRequestError] = useState('');
-  const [localBookRequests, setLocalBookRequests] = useState(() => {
-    try {
-      const savedRequests = JSON.parse(localStorage.getItem('bookRequests') || '[]');
-      return Array.isArray(savedRequests) ? savedRequests : [];
-    } catch (error) {
-      console.error('Unable to load saved local book requests:', error);
-      return [];
-    }
-  });
   const [siteSettings, setSiteSettings] = useState(DEFAULT_SITE_SETTINGS);
   const [toastMessage, setToastMessage] = useState(null);
   const [isLoadingSkeleton, setIsLoadingSkeleton] = useState(true);
@@ -634,35 +625,33 @@ function BookStoreApp() {
     const form = event.currentTarget;
     const formData = new FormData(form);
     const request = {
-      _type: 'bookRequest',
       studentName: String(formData.get('studentName') || '').trim(),
       contactNumber: String(formData.get('contactNumber') || '').trim(),
       email: String(formData.get('email') || '').trim(),
       requestedBookTitle: String(formData.get('requestedBookTitle') || '').trim(),
       examCategory: String(formData.get('examCategory') || '').trim(),
-      additionalDetails: String(formData.get('additionalDetails') || '').trim(),
-      status: 'Pending',
-      requestedAt: new Date().toISOString()
+      additionalDetails: String(formData.get('additionalDetails') || '').trim()
     };
 
     try {
-      if (sanityClient.config().token) {
-        await sanityClient.create(request);
-      } else {
-        const nextRequests = [request, ...localBookRequests];
-        setLocalBookRequests(nextRequests);
-        try {
-          localStorage.setItem('bookRequests', JSON.stringify(nextRequests));
-        } catch (storageError) {
-          console.error('Unable to persist the local book request:', storageError);
-        }
+      const response = await fetch('/api/request-book', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request)
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'The request could not be submitted.');
       }
+
       form.reset();
       setShowRequestBookModal(false);
-      showToast('Request submitted successfully!');
+      showToast('Your book request has been submitted successfully!');
     } catch (error) {
       console.error('Failed to submit the book request:', error);
-      setBookRequestError('Your request could not be submitted. Please try again.');
+      setBookRequestError(error instanceof Error && error.message
+        ? error.message
+        : 'Your request could not be submitted. Please try again.');
     } finally {
       setIsSubmittingBookRequest(false);
     }
