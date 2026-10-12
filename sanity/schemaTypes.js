@@ -297,7 +297,14 @@ const examNotification = defineType({
       }
     }),
     defineField({ name: 'totalVacancies', title: 'Total Vacancies', type: 'string', group: 'overview' }),
-    defineField({ name: 'cardImage', title: 'Notification Card Image', type: 'image', group: 'overview', options: { hotspot: true } }),
+    defineField({
+      name: 'cardImage',
+      title: 'Notification Card Image (Recommended: 1200 x 630 px, 16:9)',
+      type: 'image',
+      group: 'overview',
+      description: 'Recommended size: 1200 x 630 px (Aspect ratio 16:9). Used for card banner preview and WhatsApp/Telegram share thumbnail.',
+      options: { hotspot: true }
+    }),
     defineField({ name: 'postDate', title: 'Post Date', type: 'date', group: 'overview' }),
     defineField({
       name: 'comparisonPreviousYear',
