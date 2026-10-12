@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import HTMLFlipBook from 'react-pageflip';
 import { PortableText } from '@portabletext/react';
 import { Studio } from 'sanity';
+import { createClient } from '@sanity/client';
 import sanityConfig from '../sanity.config.js';
 import sanityClient from './sanityClient';
 import {
@@ -98,6 +99,17 @@ const DEFAULT_SITE_SETTINGS = {
   privacyUrl: 'https://xamtoppr.com/privacy-and-policy',
   refundUrl: 'https://xamtoppr.com/refunds-and-cancellations'
 };
+
+const sanityWriteToken = import.meta.env.VITE_SANITY_API_WRITE_TOKEN;
+const sanityWriteClient = sanityWriteToken
+  ? createClient({
+    projectId: import.meta.env.VITE_SANITY_PROJECT_ID || 'rkev3aui',
+    dataset: import.meta.env.VITE_SANITY_DATASET || 'production',
+    useCdn: false,
+    apiVersion: '2024-01-01',
+    token: sanityWriteToken
+  })
+  : null;
 
 const MEDIUM_OPTIONS = ['All Mediums', 'Bilingual (Hindi + English)', 'Hindi Medium', 'English Medium'];
 
@@ -629,19 +641,38 @@ function BookStoreApp() {
       contactNumber: String(formData.get('contactNumber') || '').trim(),
       email: String(formData.get('email') || '').trim(),
       requestedBookTitle: String(formData.get('requestedBookTitle') || '').trim(),
-      examCategory: String(formData.get('examCategory') || '').trim(),
+      examCategory: String(formData.get('examCategory') || '').trim() || 'Other',
       additionalDetails: String(formData.get('additionalDetails') || '').trim()
     };
 
     try {
-      const response = await fetch('/api/request-book', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(request)
-      });
-      const result = await response.json();
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || 'The request could not be submitted.');
+      if (sanityWriteClient) {
+        await sanityWriteClient.create({
+          _type: 'bookRequest',
+          ...request,
+          status: 'Pending',
+          requestedAt: new Date().toISOString()
+        });
+      } else {
+        const response = await fetch('/api/request-book', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(request)
+        });
+        const responseText = await response.text();
+        let result;
+        try {
+          result = responseText ? JSON.parse(responseText) : null;
+        } catch {
+          throw new Error(
+            response.ok
+              ? 'The book request service is unavailable. Use the configured Sanity client or run the Vercel development server.'
+              : `The request service returned an invalid response (HTTP ${response.status}).`
+          );
+        }
+        if (!response.ok || !result?.success) {
+          throw new Error(result?.error || `The request could not be submitted (HTTP ${response.status}).`);
+        }
       }
 
       form.reset();
@@ -2642,7 +2673,7 @@ function BookStoreApp() {
                     name="studentName"
                     type="text"
                     autoComplete="name"
-                    className="mt-1.5 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-normal text-slate-900 outline-none transition focus:border-blue-700 focus:ring-2 focus:ring-blue-100"
+                    className="mt-2 block min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-normal leading-5 text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-700 focus:ring-2 focus:ring-blue-100"
                     placeholder="Your name"
                   />
                 </label>
@@ -2652,7 +2683,7 @@ function BookStoreApp() {
                     name="contactNumber"
                     type="tel"
                     autoComplete="tel"
-                    className="mt-1.5 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-normal text-slate-900 outline-none transition focus:border-blue-700 focus:ring-2 focus:ring-blue-100"
+                    className="mt-2 block min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-normal leading-5 text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-700 focus:ring-2 focus:ring-blue-100"
                     placeholder="Your phone number"
                   />
                 </label>
@@ -2663,7 +2694,7 @@ function BookStoreApp() {
                   name="email"
                   type="email"
                   autoComplete="email"
-                  className="mt-1.5 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-normal text-slate-900 outline-none transition focus:border-blue-700 focus:ring-2 focus:ring-blue-100"
+                  className="mt-2 block min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-normal leading-5 text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-700 focus:ring-2 focus:ring-blue-100"
                   placeholder="you@example.com"
                 />
               </label>
@@ -2674,7 +2705,7 @@ function BookStoreApp() {
                   type="text"
                   required
                   maxLength={200}
-                  className="mt-1.5 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-normal text-slate-900 outline-none transition focus:border-blue-700 focus:ring-2 focus:ring-blue-100"
+                  className="mt-2 block min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-normal leading-5 text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-700 focus:ring-2 focus:ring-blue-100"
                   placeholder="Enter the book title or topic"
                 />
               </label>
@@ -2683,7 +2714,7 @@ function BookStoreApp() {
                 <input
                   name="examCategory"
                   type="text"
-                  className="mt-1.5 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-normal text-slate-900 outline-none transition focus:border-blue-700 focus:ring-2 focus:ring-blue-100"
+                  className="mt-2 block min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-normal leading-5 text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-700 focus:ring-2 focus:ring-blue-100"
                   placeholder="e.g. SSC, Banking, Railway"
                 />
               </label>
@@ -2693,7 +2724,7 @@ function BookStoreApp() {
                   name="additionalDetails"
                   rows={3}
                   maxLength={2000}
-                  className="mt-1.5 w-full resize-y rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-normal text-slate-900 outline-none transition focus:border-blue-700 focus:ring-2 focus:ring-blue-100"
+                  className="mt-2 block min-h-24 w-full resize-y rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-normal leading-5 text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-700 focus:ring-2 focus:ring-blue-100"
                   placeholder="Share anything else that will help us find the right book."
                 />
               </label>
@@ -2702,19 +2733,19 @@ function BookStoreApp() {
                   {bookRequestError}
                 </p>
               )}
-              <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
+              <div className="mt-2 flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={() => setShowRequestBookModal(false)}
                   disabled={isSubmittingBookRequest}
-                  className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                  className="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 sm:w-auto"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingBookRequest}
-                  className="rounded-xl bg-blue-950 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-blue-900 disabled:cursor-wait disabled:opacity-60"
+                  className="min-h-11 w-full rounded-xl bg-blue-950 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-blue-900 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
                 >
                   {isSubmittingBookRequest ? 'Submitting…' : 'Submit Request'}
                 </button>
