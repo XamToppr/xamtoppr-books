@@ -75,6 +75,18 @@ const getPortableTextPlainText = (content) => {
     .trim();
 };
 
+const hasRealContent = (value) => {
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (typeof value === 'number' || typeof value === 'boolean') return true;
+  if (Array.isArray(value)) return value.some(hasRealContent);
+  if (value && typeof value === 'object') {
+    return Object.entries(value)
+      .filter(([key]) => key !== '_key' && key !== '_type')
+      .some(([, item]) => hasRealContent(item));
+  }
+  return false;
+};
+
 const getHighDefinitionSanityImageUrl = (assetUrl) => {
   if (!assetUrl) return '';
   try {
@@ -1660,7 +1672,64 @@ function BookStoreApp() {
               .map((id) => id.trim())
               .filter(Boolean);
             const matchedBooks = booksList.filter((book) => targetIds.includes(book.id));
+            const salaryRows = Array.isArray(blog.salaryStructure)
+              ? blog.salaryStructure
+              : blog.salaryStructure?.columns || [];
+            const examStages = blog.examStages?.length
+              ? blog.examStages
+              : blog.examPattern?.length
+                ? [{
+                  stageName: 'Exam Pattern',
+                  totalQuestions: blog.examPattern.reduce((total, row) => total + (Number(row.questions) || 0), 0),
+                  totalMarks: blog.examPattern.reduce((total, row) => total + (Number(row.marks) || 0), 0),
+                  sections: blog.examPattern.map((row) => ({
+                    sectionName: row.subject,
+                    questions: row.questions,
+                    marks: row.marks
+                  }))
+                }]
+                : [];
+            const faqList = blog.faqsList?.length ? blog.faqsList : blog.faqs;
+            const customSections = (blog.customSections || []).map((section, index) => ({
+              ...section,
+              sectionId: `custom-${section._key || index}`
+            })).filter((section) => {
+              switch (section._type) {
+                case 'dynamicTable':
+                  return hasRealContent(section.headers) || hasRealContent(section.rows) || hasRealContent(section.notes);
+                case 'richNoteBlock':
+                  return hasRealContent(section.content);
+                case 'stepGuideBlock':
+                  return hasRealContent(section.steps);
+                case 'alertBox':
+                  return hasRealContent(section.title) || hasRealContent(section.description);
+                default:
+                  return false;
+              }
+            });
+            const sectionVisibility = {
+              overview: hasRealContent(blog.overview),
+              comparison: hasRealContent(blog.comparisonPreviousYear),
+              dates: hasRealContent(blog.postDate) || hasRealContent(blog.applicationStartDate) ||
+                hasRealContent(blog.applicationEndDate) || hasRealContent(blog.applicationWindow) ||
+                hasRealContent(blog.examDate) || hasRealContent(blog.importantDates),
+              posts: hasRealContent(blog.vacanciesList) || hasRealContent(blog.totalVacancies),
+              salary: hasRealContent(salaryRows) || hasRealContent(blog.salaryStructure?.notes),
+              vacancies: hasRealContent(blog.vacanciesList),
+              eligibility: hasRealContent(blog.eligibilityCriteria),
+              fee: hasRealContent(blog.applicationFees),
+              selection: hasRealContent(blog.selectionProcess),
+              pattern: hasRealContent(examStages),
+              syllabus: hasRealContent(blog.syllabusDetails),
+              'previous-papers': hasRealContent(blog.previousPapers),
+              apply: hasRealContent(blog.howToApplySteps),
+              documents: hasRealContent(blog.documentSpecs),
+              'important-links': hasRealContent(blog.importantLinks) ||
+                hasRealContent(blog.officialPdfUrl) || hasRealContent(blog.applyOnlineUrl),
+              faqs: hasRealContent(faqList)
+            };
             const sections = [
+              ['overview', 'Overview'],
               ['comparison', '2025 vs 2026'],
               ['dates', 'Dates'],
               ['posts', 'Posts'],
@@ -1676,7 +1745,11 @@ function BookStoreApp() {
               ['documents', 'Documents'],
               ['important-links', 'Important Links'],
               ['faqs', 'FAQs']
-            ];
+            ].filter(([id]) => sectionVisibility[id]).concat(
+              customSections
+                .filter((section) => hasRealContent(section.sectionTitle))
+                .map((section) => [section.sectionId, section.sectionTitle])
+            );
             const renderTable = (rows, columns) => rows?.length ? (
               <div className="mb-2 overflow-x-auto rounded-xl border border-slate-200">
                 <table className="w-full min-w-max border-collapse text-left text-sm">
@@ -1698,25 +1771,7 @@ function BookStoreApp() {
                   </tbody>
                 </table>
               </div>
-            ) : <p className="text-sm text-slate-500">Details will be announced in the official notification.</p>;
-            const salaryRows = Array.isArray(blog.salaryStructure)
-              ? blog.salaryStructure
-              : blog.salaryStructure?.columns || [];
-            const examStages = blog.examStages?.length
-              ? blog.examStages
-              : blog.examPattern?.length
-                ? [{
-                  stageName: 'Exam Pattern',
-                  totalQuestions: blog.examPattern.reduce((total, row) => total + (Number(row.questions) || 0), 0),
-                  totalMarks: blog.examPattern.reduce((total, row) => total + (Number(row.marks) || 0), 0),
-                  sections: blog.examPattern.map((row) => ({
-                    sectionName: row.subject,
-                    questions: row.questions,
-                    marks: row.marks
-                  }))
-                }]
-                : [];
-            const faqList = blog.faqsList?.length ? blog.faqsList : blog.faqs;
+            ) : null;
             const renderActionLink = (url, label, className) => url ? (
               <a
                 href={url}
@@ -1803,6 +1858,16 @@ function BookStoreApp() {
                             {label}
                           </button>
                         ))}
+                        {customSections.filter((section) => hasRealContent(section.sectionTitle)).map((section) => (
+                          <button
+                            type="button"
+                            key={section.sectionId}
+                            onClick={() => document.getElementById(`notification-${section.sectionId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                            className="rounded-full border border-sky-200 bg-sky-50 px-3.5 py-1.5 text-xs sm:text-sm font-medium text-sky-900 transition-colors hover:border-sky-300 hover:bg-sky-100"
+                          >
+                            {section.sectionTitle}
+                          </button>
+                        ))}
                       </div>
                     </nav>
 
@@ -1819,6 +1884,7 @@ function BookStoreApp() {
                       </section>
                     ) : (
                       <>
+                        {sectionVisibility.overview && (
                         <section id="notification-overview" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                           <h2 className="flex items-center gap-2 text-lg font-extrabold text-blue-950">
                             <BookOpen className="h-5 w-5 text-amber-500" /> Overview
@@ -1826,10 +1892,12 @@ function BookStoreApp() {
                           <div className="prose prose-slate mt-4 max-w-none text-sm leading-7">
                             {Array.isArray(blog.overview)
                               ? <PortableText value={blog.overview} />
-                              : <p className="whitespace-pre-line">{blog.overview || 'Notification overview will be updated soon.'}</p>}
+                              : <p className="whitespace-pre-line">{blog.overview}</p>}
                           </div>
                         </section>
+                        )}
 
+                        {sectionVisibility.comparison && (
                         <section id="notification-comparison" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                           <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
                             <CalendarDays className="h-5 w-5 text-amber-500" /> 2025 vs 2026
@@ -1838,7 +1906,9 @@ function BookStoreApp() {
                             ['metric', 'Metric'], ['previousYear', '2025'], ['currentYear', '2026']
                           ])}
                         </section>
+                        )}
 
+                        {sectionVisibility.dates && (
                         <section id="notification-dates" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                           <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
                             <CalendarDays className="h-5 w-5 text-amber-500" /> Important Dates
@@ -1847,17 +1917,21 @@ function BookStoreApp() {
                             {[
                               ['Notification Published', formatNotificationDate(blog.postDate)],
                               ['Application Starts', formatNotificationDate(blog.applicationStartDate)],
-                              ['Application Closes', formatNotificationDate(blog.applicationEndDate)]
-                            ].map(([label, date]) => (
+                              ['Application Closes', formatNotificationDate(blog.applicationEndDate)],
+                              ['Application Window', blog.applicationWindow],
+                              ['Exam Date', formatNotificationDate(blog.examDate)]
+                            ].filter(([, date]) => date).map(([label, date]) => (
                               <div key={label} className="rounded-xl border border-blue-100 bg-blue-50/70 p-3">
                                 <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">{label}</p>
-                                <p className="mt-1 text-sm font-bold text-blue-950">{date || 'To be announced'}</p>
+                                <p className="mt-1 text-sm font-bold text-blue-950">{date}</p>
                               </div>
                             ))}
                           </div>
                           {renderTable(blog.importantDates, [['eventName', 'Event'], ['dateText', 'Date']])}
                         </section>
+                        )}
 
+                        {sectionVisibility.posts && (
                         <section id="notification-posts" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                           <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
                             <ClipboardList className="h-5 w-5 text-amber-500" /> Posts
@@ -1868,7 +1942,7 @@ function BookStoreApp() {
                                 <article key={post._key || index} className="rounded-xl border border-blue-100 bg-blue-50/70 p-4">
                                   <h3 className="font-bold text-blue-950">{post.postName || blog.title}</h3>
                                   <p className="mt-1 text-sm text-slate-600">
-                                    {[post.category, post.vacancies != null ? `${post.vacancies} vacancies` : null].filter(Boolean).join(' · ') || 'Post details'}
+                                    {[post.category, post.vacancies != null ? `${post.vacancies} vacancies` : null, post.notes].filter(Boolean).join(' · ')}
                                   </p>
                                 </article>
                               ))}
@@ -1879,7 +1953,9 @@ function BookStoreApp() {
                             </p>
                           )}
                         </section>
+                        )}
 
+                        {sectionVisibility.salary && (
                         <section id="notification-salary" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                           <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
                             <Award className="h-5 w-5 text-amber-500" /> Salary Structure
@@ -1905,14 +1981,16 @@ function BookStoreApp() {
                                 </tbody>
                               </table>
                             </div>
-                          ) : <p className="text-sm text-slate-500">Salary details will be announced in the official notification.</p>}
+                          ) : null}
                           {blog.salaryStructure?.notes?.length > 0 && (
                             <ul className="mt-4 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-600">
                               {blog.salaryStructure.notes.map((note, index) => <li key={index}>{note}</li>)}
                             </ul>
                           )}
                         </section>
+                        )}
 
+                        {sectionVisibility.vacancies && (
                         <section id="notification-vacancies" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                           <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
                             <ClipboardList className="h-5 w-5 text-amber-500" /> Vacancies
@@ -1921,7 +1999,9 @@ function BookStoreApp() {
                             ['postName', 'Post'], ['category', 'Category / Region'], ['vacancies', 'Vacancies'], ['notes', 'Notes']
                           ])}
                         </section>
+                        )}
 
+                        {sectionVisibility.eligibility && (
                         <section id="notification-eligibility" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                           <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
                             <CheckCircle2 className="h-5 w-5 text-amber-500" /> Eligibility
@@ -1935,9 +2015,11 @@ function BookStoreApp() {
                                 </article>
                               ))}
                             </div>
-                          ) : <p className="text-sm text-slate-500">Eligibility requirements will be announced in the official notification.</p>}
+                          ) : null}
                         </section>
+                        )}
 
+                        {sectionVisibility.fee && (
                         <section id="notification-fee" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                           <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
                             <Award className="h-5 w-5 text-amber-500" /> Application Fee
@@ -1946,7 +2028,9 @@ function BookStoreApp() {
                             ['category', 'Category'], ['amount', 'Fee'], ['notes', 'Notes']
                           ])}
                         </section>
+                        )}
 
+                        {sectionVisibility.selection && (
                         <section id="notification-selection" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                           <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
                             <ClipboardList className="h-5 w-5 text-amber-500" /> Selection Process
@@ -1965,9 +2049,11 @@ function BookStoreApp() {
                                 </article>
                               ))}
                             </div>
-                          ) : <p className="text-sm text-slate-500">Selection process details will be announced in the official notification.</p>}
+                          ) : null}
                         </section>
+                        )}
 
+                        {sectionVisibility.pattern && (
                         <section id="notification-pattern" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                           <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
                             <FileText className="h-5 w-5 text-amber-500" /> Exam Pattern
@@ -2009,9 +2095,11 @@ function BookStoreApp() {
                                 </article>
                               ))}
                             </div>
-                          ) : <p className="text-sm text-slate-500">Exam pattern details will be announced in the official notification.</p>}
+                          ) : null}
                         </section>
+                        )}
 
+                        {sectionVisibility.syllabus && (
                         <section id="notification-syllabus" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                           <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
                             <BookOpen className="h-5 w-5 text-amber-500" /> Syllabus
@@ -2025,20 +2113,24 @@ function BookStoreApp() {
                                 </details>
                               ))}
                             </div>
-                          ) : <p className="text-sm text-slate-500">Syllabus details will be announced in the official notification.</p>}
+                          ) : null}
                         </section>
+                        )}
 
+                        {sectionVisibility.apply && (
                         <section id="notification-apply" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                           <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
                             <FileCheck2 className="h-5 w-5 text-amber-500" /> How to Apply
                           </h2>
                           {blog.howToApplySteps?.length ? (
                             <ol className="list-inside list-decimal space-y-2 text-sm leading-relaxed text-slate-700">
-                              {blog.howToApplySteps.map((step, index) => <li key={step._key || index}>{typeof step === 'string' ? step : step.text}</li>)}
+                              {blog.howToApplySteps.filter(hasRealContent).map((step, index) => <li key={step._key || index}>{typeof step === 'string' ? step : step.text}</li>)}
                             </ol>
-                          ) : <p className="text-sm text-slate-500">Application instructions will be announced in the official notification.</p>}
+                          ) : null}
                         </section>
+                        )}
 
+                        {sectionVisibility['previous-papers'] && (
                         <section id="notification-previous-papers" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                           <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
                             <FileText className="h-5 w-5 text-amber-500" /> Previous Papers
@@ -2055,9 +2147,11 @@ function BookStoreApp() {
                                 </article>
                               ))}
                             </div>
-                          ) : <p className="text-sm text-slate-500">Previous papers will be added soon.</p>}
+                          ) : null}
                         </section>
+                        )}
 
+                        {sectionVisibility.documents && (
                         <section id="notification-documents" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                           <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
                             <FileCheck2 className="h-5 w-5 text-amber-500" /> Document Specifications
@@ -2066,7 +2160,9 @@ function BookStoreApp() {
                             ['item', 'Item'], ['specification', 'CEN Specification']
                           ])}
                         </section>
+                        )}
 
+                        {sectionVisibility['important-links'] && (
                         <section id="notification-important-links" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                           <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
                             <ExternalLink className="h-5 w-5 text-amber-500" /> Important Links
@@ -2074,20 +2170,21 @@ function BookStoreApp() {
                           {blog.importantLinks?.length ? (
                             <div className="grid gap-3 sm:grid-cols-2">
                               {blog.importantLinks.map((link, index) => (
-                                <div key={link._key || index}>
-                                  {renderActionLink(link.url, link.label || 'Open link', 'flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-blue-900 transition hover:border-amber-300 hover:bg-amber-50')}
-                                </div>
+                                link.url
+                                  ? <div key={link._key || index}>{renderActionLink(link.url, link.label || 'Open link', 'flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-blue-900 transition hover:border-amber-300 hover:bg-amber-50')}</div>
+                                  : link.label && <p key={link._key || index} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-blue-900">{link.label}</p>
                               ))}
                             </div>
                           ) : (
                             <div className="flex flex-wrap gap-3">
                               {renderActionLink(blog.officialPdfUrl, 'Official Notification PDF', 'inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-blue-900 transition hover:border-amber-300 hover:bg-amber-50')}
                               {renderActionLink(blog.applyOnlineUrl, 'Apply Online', 'inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-blue-900 transition hover:border-amber-300 hover:bg-amber-50')}
-                              {!blog.officialPdfUrl && !blog.applyOnlineUrl && <p className="text-sm text-slate-500">Important links will be added soon.</p>}
                             </div>
                           )}
                         </section>
+                        )}
 
+                        {sectionVisibility.faqs && (
                         <section id="notification-faqs" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                           <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">Frequently Asked Questions</h2>
                           {faqList?.length ? (
@@ -2099,8 +2196,106 @@ function BookStoreApp() {
                                 </details>
                               ))}
                             </div>
-                          ) : <p className="text-sm text-slate-500">FAQs will be added soon.</p>}
+                          ) : null}
                         </section>
+                        )}
+
+                        {customSections.map((section) => {
+                          const sectionTitle = section.sectionTitle || section.title || (
+                            section._type === 'dynamicTable' ? 'Custom Table' :
+                              section._type === 'richNoteBlock' ? 'Additional Information' :
+                                section._type === 'stepGuideBlock' ? 'Step Guide' : 'Important Notice'
+                          );
+
+                          if (section._type === 'dynamicTable') {
+                            const rows = (section.rows || []).map((row) => Array.isArray(row)
+                              ? row
+                              : row.cells || Object.entries(row)
+                                .filter(([key]) => key !== '_key' && key !== '_type')
+                                .map(([, value]) => value));
+                            const columnCount = Math.max(
+                              section.headers?.length || 0,
+                              ...rows.map((row) => row.length),
+                              0
+                            );
+                            const headers = Array.from({ length: columnCount }, (_, index) =>
+                              section.headers?.[index] || `Column ${index + 1}`
+                            );
+
+                            return (
+                              <section key={section.sectionId} id={`notification-${section.sectionId}`} className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                                <h2 className="mb-4 text-lg font-extrabold text-blue-950">{sectionTitle}</h2>
+                                {headers.length > 0 && rows.length > 0 && (
+                                  <div className="overflow-x-auto rounded-xl border border-slate-200">
+                                    <table className="w-full min-w-max border-collapse text-left text-sm">
+                                      <thead className="bg-blue-950 text-white">
+                                        <tr>{headers.map((heading, index) => (
+                                          <th key={`${heading}-${index}`} className="border-b border-blue-800 px-4 py-3 font-bold">{heading}</th>
+                                        ))}</tr>
+                                      </thead>
+                                      <tbody>
+                                        {rows.map((row, rowIndex) => (
+                                          <tr key={section.rows[rowIndex]?._key || rowIndex} className="odd:bg-white even:bg-slate-50">
+                                            {headers.map((_, columnIndex) => (
+                                              <td key={columnIndex} className="border-b border-slate-100 px-4 py-3 text-slate-700">
+                                                {row[columnIndex] ?? '—'}
+                                              </td>
+                                            ))}
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                                {hasRealContent(section.notes) && (
+                                  <ul className="mt-4 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-600">
+                                    {section.notes.filter(hasRealContent).map((note, index) => <li key={index}>{note}</li>)}
+                                  </ul>
+                                )}
+                              </section>
+                            );
+                          }
+
+                          if (section._type === 'richNoteBlock') {
+                            return (
+                              <section key={section.sectionId} id={`notification-${section.sectionId}`} className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                                <h2 className="mb-4 text-lg font-extrabold text-blue-950">{sectionTitle}</h2>
+                                <div className="prose prose-slate max-w-none text-sm leading-7">
+                                  <PortableText value={section.content} />
+                                </div>
+                              </section>
+                            );
+                          }
+
+                          if (section._type === 'stepGuideBlock') {
+                            return (
+                              <section key={section.sectionId} id={`notification-${section.sectionId}`} className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                                <h2 className="mb-4 text-lg font-extrabold text-blue-950">{sectionTitle}</h2>
+                                <ol className="space-y-3">
+                                  {section.steps.filter(hasRealContent).map((step, index) => (
+                                    <li key={index} className="flex items-start gap-3 text-sm leading-6 text-slate-700">
+                                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-950 text-xs font-bold text-white">{index + 1}</span>
+                                      <span>{step}</span>
+                                    </li>
+                                  ))}
+                                </ol>
+                              </section>
+                            );
+                          }
+
+                          const alertStyles = {
+                            info: 'border-sky-200 bg-sky-50 text-sky-950',
+                            warning: 'border-amber-200 bg-amber-50 text-amber-950',
+                            success: 'border-emerald-200 bg-emerald-50 text-emerald-950'
+                          };
+                          const alertStyle = alertStyles[section.alertType] || alertStyles.info;
+                          return (
+                            <section key={section.sectionId} id={`notification-${section.sectionId}`} className={`scroll-mt-44 rounded-2xl border p-5 shadow-sm sm:p-6 ${alertStyle}`}>
+                              {section.title && <h2 className="text-lg font-extrabold">{section.title}</h2>}
+                              {section.description && <p className={`${section.title ? 'mt-2' : ''} whitespace-pre-line text-sm leading-6`}>{section.description}</p>}
+                            </section>
+                          );
+                        })}
                       </>
                     )}
                   </div>

@@ -97,5 +97,18 @@ export const examNotificationDetailQuery = `*[_type == "examNotification" && _id
   previousPapers[] { _key, title, year, url },
   importantLinks[] { _key, label, url },
   faqsList[] { _key, question, answer },
-  faqs[] { _key, question, answer }
+  faqs[] { _key, question, answer },
+  customSections[] {
+    _key,
+    _type,
+    sectionTitle,
+    headers,
+    rows[] { _key, cells[] },
+    notes,
+    content,
+    steps,
+    alertType,
+    title,
+    description
+  }
 }`;

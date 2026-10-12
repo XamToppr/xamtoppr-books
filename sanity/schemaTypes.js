@@ -240,6 +240,120 @@ const notificationLink = defineType({
   ]
 });
 
+const dynamicTableRow = defineType({
+  name: 'dynamicTableRow',
+  title: 'Table Row',
+  type: 'object',
+  fields: [
+    defineField({
+      name: 'cells',
+      title: 'Cells',
+      type: 'array',
+      of: [defineArrayMember({ type: 'string' })]
+    })
+  ],
+  preview: {
+    select: { title: 'cells' },
+    prepare: ({ title }) => ({ title: title?.filter(Boolean).join(' · ') || 'Table row' })
+  }
+});
+
+const dynamicTable = defineType({
+  name: 'dynamicTable',
+  title: 'Dynamic Table',
+  type: 'object',
+  fields: [
+    defineField({ name: 'sectionTitle', title: 'Section Title', type: 'string' }),
+    defineField({
+      name: 'headers',
+      title: 'Column Headers',
+      type: 'array',
+      of: [defineArrayMember({ type: 'string' })]
+    }),
+    defineField({
+      name: 'rows',
+      title: 'Rows',
+      type: 'array',
+      of: [defineArrayMember({ type: 'dynamicTableRow' })]
+    }),
+    defineField({
+      name: 'notes',
+      title: 'Notes',
+      type: 'array',
+      of: [defineArrayMember({ type: 'string' })]
+    })
+  ],
+  preview: { select: { title: 'sectionTitle' }, prepare: ({ title }) => ({ title: title || 'Dynamic Table' }) }
+});
+
+const richNoteBlock = defineType({
+  name: 'richNoteBlock',
+  title: 'Rich Text Section',
+  type: 'object',
+  fields: [
+    defineField({ name: 'sectionTitle', title: 'Section Title', type: 'string' }),
+    defineField({
+      name: 'content',
+      title: 'Content',
+      type: 'array',
+      of: [defineArrayMember({
+        type: 'block',
+        styles: [
+          { title: 'Normal', value: 'normal' },
+          { title: 'Heading 2', value: 'h2' },
+          { title: 'Heading 3', value: 'h3' },
+          { title: 'Heading 4', value: 'h4' }
+        ],
+        lists: [
+          { title: 'Bullet', value: 'bullet' },
+          { title: 'Numbered', value: 'number' }
+        ],
+        marks: {
+          decorators: [
+            { title: 'Strong', value: 'strong' },
+            { title: 'Emphasis', value: 'em' },
+            { title: 'Underline', value: 'underline' }
+          ]
+        }
+      })]
+    })
+  ],
+  preview: { select: { title: 'sectionTitle' }, prepare: ({ title }) => ({ title: title || 'Rich Text Section' }) }
+});
+
+const stepGuideBlock = defineType({
+  name: 'stepGuideBlock',
+  title: 'Step Guide',
+  type: 'object',
+  fields: [
+    defineField({ name: 'sectionTitle', title: 'Section Title', type: 'string' }),
+    defineField({
+      name: 'steps',
+      title: 'Steps',
+      type: 'array',
+      of: [defineArrayMember({ type: 'string' })]
+    })
+  ],
+  preview: { select: { title: 'sectionTitle' }, prepare: ({ title }) => ({ title: title || 'Step Guide' }) }
+});
+
+const alertBox = defineType({
+  name: 'alertBox',
+  title: 'Alert Box',
+  type: 'object',
+  fields: [
+    defineField({
+      name: 'alertType',
+      title: 'Alert Type',
+      type: 'string',
+      options: { list: ['info', 'warning', 'success'] }
+    }),
+    defineField({ name: 'title', title: 'Title', type: 'string' }),
+    defineField({ name: 'description', title: 'Description', type: 'text', rows: 3 })
+  ],
+  preview: { select: { title: 'title' }, prepare: ({ title }) => ({ title: title || 'Alert Box' }) }
+});
+
 const examNotification = defineType({
   name: 'examNotification',
   title: 'Exam Notification',
@@ -253,6 +367,7 @@ const examNotification = defineType({
     { name: 'selection', title: 'Selection & Pattern' },
     { name: 'syllabus', title: 'Syllabus' },
     { name: 'application', title: 'Application & Documents' },
+    { name: 'custom', title: 'Custom Sections & Tables' },
     { name: 'faqs', title: 'FAQs' }
   ],
   fields: [
@@ -450,6 +565,18 @@ const examNotification = defineType({
       type: 'array',
       group: 'faqs',
       of: [defineArrayMember({ type: 'frequentlyAskedQuestion' })]
+    }),
+    defineField({
+      name: 'customSections',
+      title: 'Custom Sections & Dynamic Tables (Add Section)',
+      type: 'array',
+      group: 'custom',
+      of: [
+        defineArrayMember({ type: 'dynamicTable' }),
+        defineArrayMember({ type: 'richNoteBlock' }),
+        defineArrayMember({ type: 'stepGuideBlock' }),
+        defineArrayMember({ type: 'alertBox' })
+      ]
     }),
     defineField({ name: 'state', title: 'Legacy State / Region', type: 'string', group: 'overview', hidden: true })
   ],
@@ -831,6 +958,11 @@ const siteSettings = defineType({
 
 export const schemaTypes = [
   book,
+  dynamicTableRow,
+  dynamicTable,
+  richNoteBlock,
+  stepGuideBlock,
+  alertBox,
   notificationSalaryRow,
   examStageSection,
   qualifyingMark,
