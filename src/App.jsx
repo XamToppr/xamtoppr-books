@@ -93,11 +93,14 @@ const getHighDefinitionSanityImageUrl = (assetUrl) => {
 
 const DEFAULT_SITE_SETTINGS = {
   supportHelpline: '+91 77177 07121',
-  supportEmail: 'info@xamtoppr.com',
-  aboutUrl: 'https://xamtoppr.com/about-us',
-  termsUrl: 'https://xamtoppr.com/terms-and-condition',
-  privacyUrl: 'https://xamtoppr.com/privacy-and-policy',
-  refundUrl: 'https://xamtoppr.com/refunds-and-cancellations'
+  supportEmail: 'info@xamtoppr.com'
+};
+
+const SITE_CONTENT_PAGES = {
+  '/about-us': { title: 'About Us', field: 'aboutContent' },
+  '/terms-conditions': { title: 'Terms & Conditions', field: 'termsContent' },
+  '/privacy-policy': { title: 'Privacy Policy', field: 'privacyContent' },
+  '/refund-policy': { title: 'Refund Policy', field: 'refundContent' }
 };
 
 const sanityWriteToken = import.meta.env.VITE_SANITY_API_WRITE_TOKEN;
@@ -187,10 +190,10 @@ function BookStoreApp() {
   const flipAudioRef = useRef(null);
   const downloadedBooksRef = useRef(new Set());
   const supportLinks = [
-    { label: 'About Us', href: siteSettings.aboutUrl },
-    { label: 'Terms & Conditions', href: siteSettings.termsUrl },
-    { label: 'Privacy Policy', href: siteSettings.privacyUrl },
-    { label: 'Refunds & Cancellations', href: siteSettings.refundUrl }
+    { label: 'About Us', href: '/about-us' },
+    { label: 'Terms & Conditions', href: '/terms-conditions' },
+    { label: 'Privacy Policy', href: '/privacy-policy' },
+    { label: 'Refund Policy', href: '/refund-policy' }
   ];
 
   useEffect(() => {
@@ -360,11 +363,7 @@ function BookStoreApp() {
         if (isCurrentRequest && settings) {
           setSiteSettings({
             supportHelpline: settings.supportHelpline || DEFAULT_SITE_SETTINGS.supportHelpline,
-            supportEmail: settings.supportEmail || DEFAULT_SITE_SETTINGS.supportEmail,
-            aboutUrl: settings.aboutUrl || DEFAULT_SITE_SETTINGS.aboutUrl,
-            termsUrl: settings.termsUrl || DEFAULT_SITE_SETTINGS.termsUrl,
-            privacyUrl: settings.privacyUrl || DEFAULT_SITE_SETTINGS.privacyUrl,
-            refundUrl: settings.refundUrl || DEFAULT_SITE_SETTINGS.refundUrl
+            supportEmail: settings.supportEmail || DEFAULT_SITE_SETTINGS.supportEmail
           });
         }
       })
@@ -2809,6 +2808,115 @@ function BookStoreApp() {
   );
 }
 
+function SiteContentPage({ page }) {
+  const [settings, setSettings] = useState(null);
+  const [loadError, setLoadError] = useState('');
+
+  useEffect(() => {
+    let isCurrentRequest = true;
+    sanityClient.fetch(siteSettingsQuery)
+      .then((document) => {
+        if (isCurrentRequest) setSettings(document);
+      })
+      .catch((error) => {
+        console.error(`Failed to load ${page.title} content from Sanity:`, error);
+        if (isCurrentRequest) {
+          setLoadError(`The ${page.title.toLowerCase()} page could not be loaded. Please try again later.`);
+        }
+      });
+
+    return () => {
+      isCurrentRequest = false;
+    };
+  }, [page]);
+
+  const content = settings?.[page.field];
+  const portableTextComponents = {
+    block: {
+      normal: ({ children }) => <p className="mb-5 leading-8 text-slate-700 last:mb-0">{children}</p>,
+      h2: ({ children }) => <h2 className="mb-4 mt-10 text-2xl font-extrabold tracking-tight text-blue-950 first:mt-0 sm:text-3xl">{children}</h2>,
+      h3: ({ children }) => <h3 className="mb-3 mt-8 text-xl font-bold text-blue-950 sm:text-2xl">{children}</h3>,
+      h4: ({ children }) => <h4 className="mb-2 mt-6 text-lg font-bold text-slate-900 sm:text-xl">{children}</h4>
+    },
+    list: {
+      bullet: ({ children }) => <ul className="mb-5 ml-6 list-disc space-y-2 text-slate-700 marker:text-amber-500">{children}</ul>,
+      number: ({ children }) => <ol className="mb-5 ml-6 list-decimal space-y-2 text-slate-700 marker:font-bold marker:text-blue-900">{children}</ol>
+    },
+    listItem: {
+      bullet: ({ children }) => <li className="pl-1 leading-7">{children}</li>,
+      number: ({ children }) => <li className="pl-1 leading-7">{children}</li>
+    },
+    marks: {
+      strong: ({ children }) => <strong className="font-bold text-slate-950">{children}</strong>,
+      em: ({ children }) => <em>{children}</em>,
+      underline: ({ children }) => <span className="underline decoration-amber-500 decoration-2 underline-offset-2">{children}</span>,
+      link: ({ children, value }) => {
+        const href = value?.href || '#';
+        const isExternal = /^https?:\/\//i.test(href);
+        return (
+          <a
+            href={href}
+            target={isExternal ? '_blank' : undefined}
+            rel={isExternal ? 'noopener noreferrer' : undefined}
+            className="font-semibold text-blue-800 underline decoration-blue-300 underline-offset-2 transition hover:text-amber-700"
+          >
+            {children}
+          </a>
+        );
+      }
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <header className="border-b border-blue-950/10 bg-[#0c2356] px-4 py-3 text-white sm:px-6">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
+          <a href="/" className="inline-flex shrink-0 rounded-lg bg-white px-1.5 py-1">
+            <img
+              src="/xamtoppr-logo.png"
+              alt="XamToppr - learning for earning"
+              className="h-10 w-auto sm:h-12"
+              width="139"
+              height="75"
+            />
+          </a>
+          <a href="/" className="rounded-lg border border-white/25 px-3 py-2 text-xs font-bold text-white transition hover:bg-white/10 sm:px-4 sm:text-sm">
+            Back to Books
+          </a>
+        </div>
+      </header>
+
+      <main className="px-4 py-8 sm:px-6 sm:py-12">
+        <article className="mx-auto max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:rounded-3xl">
+          <div className="border-b border-slate-200 bg-gradient-to-r from-blue-950 to-blue-900 px-5 py-7 text-white sm:px-10 sm:py-10">
+            <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-amber-300">XamToppr</p>
+            <h1 className="mt-2 text-2xl font-black tracking-tight sm:text-4xl">{page.title}</h1>
+          </div>
+          <div className="min-h-64 px-5 py-7 sm:px-10 sm:py-10">
+            {loadError ? (
+              <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+                {loadError}
+              </p>
+            ) : content?.length ? (
+              <div className="break-words text-sm sm:text-base">
+                <PortableText value={content} components={portableTextComponents} />
+              </div>
+            ) : (
+              <p className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm leading-7 text-slate-600">
+                This content is being prepared. Please check back soon.
+              </p>
+            )}
+          </div>
+        </article>
+      </main>
+
+      <footer className="mt-auto border-t border-blue-950 bg-[#08152e] px-4 py-6 text-center text-xs text-slate-400 sm:px-6">
+        © 2026 XamToppr Edutech Private Limited. All Rights Reserved.
+      </footer>
+    </div>
+  );
+}
+
 export default function App() {
   const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
   if (pathname === '/admin' || pathname.startsWith('/admin/')) {
@@ -2818,6 +2926,10 @@ export default function App() {
       </div>
     );
   }
+
+  const normalizedPathname = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
+  const contentPage = SITE_CONTENT_PAGES[normalizedPathname];
+  if (contentPage) return <SiteContentPage page={contentPage} />;
 
   return <BookStoreApp />;
 }

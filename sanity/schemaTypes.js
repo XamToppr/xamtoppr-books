@@ -543,10 +543,53 @@ const siteSettings = defineType({
   fields: [
     defineField({ name: 'supportHelpline', title: 'Support Helpline', type: 'string' }),
     defineField({ name: 'supportEmail', title: 'Support Email', type: 'string' }),
-    defineField({ name: 'aboutUrl', title: 'About URL', type: 'url' }),
-    defineField({ name: 'termsUrl', title: 'Terms URL', type: 'url' }),
-    defineField({ name: 'privacyUrl', title: 'Privacy URL', type: 'url' }),
-    defineField({ name: 'refundUrl', title: 'Refund URL', type: 'url' })
+    ...[
+      { name: 'aboutContent', title: 'About Us Content' },
+      { name: 'termsContent', title: 'Terms & Conditions Content' },
+      { name: 'privacyContent', title: 'Privacy Policy Content' },
+      { name: 'refundContent', title: 'Refund Policy Content' }
+    ].map(({ name, title }) => defineField({
+      name,
+      title,
+      type: 'array',
+      of: [
+        defineArrayMember({
+          type: 'block',
+          styles: [
+            { title: 'Normal', value: 'normal' },
+            { title: 'Heading 2', value: 'h2' },
+            { title: 'Heading 3', value: 'h3' },
+            { title: 'Heading 4', value: 'h4' }
+          ],
+          lists: [
+            { title: 'Bullet', value: 'bullet' },
+            { title: 'Numbered', value: 'number' }
+          ],
+          marks: {
+            decorators: [
+              { title: 'Strong', value: 'strong' },
+              { title: 'Emphasis', value: 'em' },
+              { title: 'Underline', value: 'underline' }
+            ],
+            annotations: [
+              defineType({
+                name: 'link',
+                title: 'Link',
+                type: 'object',
+                fields: [
+                  defineField({
+                    name: 'href',
+                    title: 'URL',
+                    type: 'url',
+                    validation: (Rule) => Rule.required()
+                  })
+                ]
+              })
+            ]
+          }
+        })
+      ]
+    }))
   ]
 });
 
