@@ -245,7 +245,8 @@ const book = defineType({
     { name: 'details', title: 'Book Details', default: true },
     { name: 'taxonomy', title: 'Exam & Subject' },
     { name: 'media', title: 'Media & Specifications' },
-    { name: 'pricing', title: 'Pricing & Links' }
+    { name: 'pricing', title: 'Pricing & Links' },
+    { name: 'metrics', title: 'Ratings & Activity' }
   ],
   initialValue: () => {
     const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -390,6 +391,33 @@ const book = defineType({
       type: 'boolean',
       group: 'pricing',
       initialValue: false
+    }),
+    defineField({
+      name: 'downloadsCount',
+      title: 'Downloads / Purchases',
+      type: 'number',
+      group: 'metrics',
+      initialValue: 0,
+      description: 'Base or cumulative download/purchase count',
+      validation: (Rule) => Rule.min(0)
+    }),
+    defineField({
+      name: 'rating',
+      title: 'Average Rating',
+      type: 'number',
+      group: 'metrics',
+      initialValue: 4.8,
+      description: 'Calculated average rating, e.g. 4.8',
+      validation: (Rule) => Rule.min(0).max(5)
+    }),
+    defineField({
+      name: 'totalReviews',
+      title: 'Total User Ratings',
+      type: 'number',
+      group: 'metrics',
+      initialValue: 1,
+      description: 'Total number of user ratings submitted',
+      validation: (Rule) => Rule.min(0)
     }),
     defineField({
       name: 'description',

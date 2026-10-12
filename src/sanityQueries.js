@@ -3,6 +3,9 @@ export const ALL_BOOKS_QUERY = '*[_type == "book"] | order(_createdAt desc)';
 export const BOOKS_FOR_STORE_QUERY = `*[_type == "book"] | order(_createdAt desc) {
   _id,
   bookId,
+  downloadsCount,
+  rating,
+  totalReviews,
   title,
   "slug": slug.current,
   badge,

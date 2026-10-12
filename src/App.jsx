@@ -119,6 +119,10 @@ const SORT_OPTIONS = [
   { label: 'Pages: High to Low', value: 'pages-desc' }
 ];
 
+const formatDownloadCount = (count) => (
+  count >= 1000 ? `${(count / 1000).toFixed(1)}K` : count
+);
+
 function BookStoreApp() {
   const [booksList, setBooksList] = useState([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -129,6 +133,8 @@ function BookStoreApp() {
   const [sortBy, setSortBy] = useState('popular');
   const [savedBooks, setSavedBooks] = useState(['xt-bk-001']);
   const [selectedBookForModal, setSelectedBookForModal] = useState(null);
+  const [ratingSelections, setRatingSelections] = useState({});
+  const [ratedBooks, setRatedBooks] = useState(() => new Set());
   const [showFlipbookModal, setShowFlipbookModal] = useState(null);
   const [showRequestBookModal, setShowRequestBookModal] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
@@ -158,6 +164,7 @@ function BookStoreApp() {
 
   const flipBookRef = useRef(null);
   const flipAudioRef = useRef(null);
+  const downloadedBooksRef = useRef(new Set());
 
   useEffect(() => {
     const updateViewportSize = () => {
@@ -254,6 +261,7 @@ function BookStoreApp() {
               : book.language === 'English' ? 'English Medium' : 'Hindi Medium';
 
             return {
+              sanityId: book._id,
               id: book.bookId || book._id,
               slug: book.slug || book.bookId || book._id,
               title: book.title,
@@ -269,9 +277,9 @@ function BookStoreApp() {
               language,
               pages: Number(book.totalPages) || 0,
               fileSize: book.fileSize || '',
-              rating: 4.8,
-              reviewsCount: 100,
-              downloadsCount: '10K',
+              rating: Number(book.rating) || 4.8,
+              totalReviews: Number(book.totalReviews ?? 1),
+              downloadsCount: Number(book.downloadsCount) || 0,
               badge,
               badgeColor: isFree ? 'bg-amber-500' : 'bg-emerald-600',
               coverGradient: 'from-blue-900 via-indigo-950 to-slate-900',
@@ -500,6 +508,86 @@ function BookStoreApp() {
     }
   };
 
+  const updateBookMetrics = (book, metrics) => {
+    setBooksList((currentBooks) => currentBooks.map((currentBook) => (
+      currentBook.sanityId === book.sanityId ? { ...currentBook, ...metrics } : currentBook
+    )));
+    setSelectedBookForModal((currentBook) => (
+      currentBook?.sanityId === book.sanityId ? { ...currentBook, ...metrics } : currentBook
+    ));
+    setShowFlipbookModal((currentBook) => (
+      currentBook?.sanityId === book.sanityId ? { ...currentBook, ...metrics } : currentBook
+    ));
+  };
+
+  const handleBookDownload = (book) => {
+    if (!book.sanityId) return;
+
+    if (downloadedBooksRef.current.has(book.sanityId)) return;
+    const storageKey = `downloaded_${book.sanityId}`;
+    try {
+      if (localStorage.getItem(storageKey)) {
+        downloadedBooksRef.current.add(book.sanityId);
+        return;
+      }
+      localStorage.setItem(storageKey, 'true');
+    } catch (error) {
+      console.error('Unable to save the book download state:', error);
+    }
+
+    downloadedBooksRef.current.add(book.sanityId);
+    updateBookMetrics(book, { downloadsCount: book.downloadsCount + 1 });
+    if (sanityClient.config().token) {
+      sanityClient.patch(book.sanityId)
+        .inc({ downloadsCount: 1 })
+        .commit()
+        .catch((error) => {
+          console.error('Failed to update the book download count in Sanity:', error);
+        });
+    }
+  };
+
+  const handleBookRating = (book, userStar) => {
+    if (!book.sanityId) return false;
+
+    const storageKey = `rated_${book.sanityId}`;
+    try {
+      if (localStorage.getItem(storageKey)) return false;
+      localStorage.setItem(storageKey, String(userStar));
+    } catch (error) {
+      console.error('Unable to save the book rating state:', error);
+      return false;
+    }
+
+    setRatedBooks((currentRatedBooks) => new Set(currentRatedBooks).add(book.sanityId));
+    const totalReviews = book.totalReviews;
+    const newAvg = ((book.rating * totalReviews) + userStar) / (totalReviews + 1);
+    updateBookMetrics(book, {
+      rating: newAvg,
+      totalReviews: totalReviews + 1
+    });
+    if (sanityClient.config().token) {
+      sanityClient.patch(book.sanityId)
+        .set({ rating: newAvg })
+        .inc({ totalReviews: 1 })
+        .commit()
+        .catch((error) => {
+          console.error('Failed to update the book rating in Sanity:', error);
+        });
+    }
+    return true;
+  };
+
+  const hasStoredBookRating = (sanityId) => {
+    if (!sanityId) return false;
+    try {
+      return Boolean(localStorage.getItem(`rated_${sanityId}`));
+    } catch (error) {
+      console.error('Unable to load the saved book rating state:', error);
+      return false;
+    }
+  };
+
   const handleCategoryChange = (exam) => {
     setSelectedExam(exam);
     setIsLoadingSkeleton(true);
@@ -564,13 +652,12 @@ function BookStoreApp() {
 
       return true;
     }).sort((a, b) => {
-      if (sortBy === 'popular') return b.reviewsCount - a.reviewsCount;
+      if (sortBy === 'popular') return b.totalReviews - a.totalReviews;
       if (sortBy === 'rating') return b.rating - a.rating;
       if (sortBy === 'title-asc') return a.title.localeCompare(b.title);
       if (sortBy === 'pages-desc') return b.pages - a.pages;
       if (sortBy === 'downloads') {
-        const parseDL = (str) => parseFloat(String(str).replace('K', '')) * 1000 || 0;
-        return parseDL(b.downloadsCount) - parseDL(a.downloadsCount);
+        return b.downloadsCount - a.downloadsCount;
       }
       return 0;
     });
@@ -901,6 +988,8 @@ function BookStoreApp() {
                               if (!book.pdfUrl) {
                                 event.preventDefault();
                                 showToast('Download link will be updated soon!');
+                              } else {
+                                handleBookDownload(book);
                               }
                             }}
                             className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-4 py-2.5 text-xs font-extrabold text-slate-950 shadow-lg transition hover:bg-amber-300 sm:px-5 sm:py-3 sm:text-sm"
@@ -916,6 +1005,8 @@ function BookStoreApp() {
                               if (!book.pdfUrl) {
                                 event.preventDefault();
                                 showToast('Payment link will be updated soon!');
+                              } else {
+                                handleBookDownload(book);
                               }
                             }}
                             className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-4 py-2.5 text-xs font-extrabold text-slate-950 shadow-lg transition hover:bg-amber-300 sm:px-5 sm:py-3 sm:text-sm"
@@ -1292,7 +1383,7 @@ function BookStoreApp() {
                           {book.language.includes('Hindi') ? 'हिन्दी माध्यम' : 'English Medium'}
                         </span>
                         <span className="flex items-center gap-1 text-amber-300 font-bold bg-black/70 px-1.5 py-0.5 rounded">
-                          <Star className="w-3 h-3 fill-amber-300" /> {book.rating}
+                          <Star className="w-3 h-3 fill-amber-300" /> {book.rating ? book.rating.toFixed(1) : '4.8'}
                         </span>
                       </div>
                     </div>
@@ -1336,7 +1427,7 @@ function BookStoreApp() {
                           </div>
                           <div>
                             <span className="block text-slate-400 text-[9px] uppercase">Downloads</span>
-                            <span className="font-bold text-amber-700">{book.downloadsCount}</span>
+                            <span className="font-bold text-amber-700">{formatDownloadCount(book.downloadsCount)}</span>
                           </div>
                         </div>
                       </div>
@@ -1373,6 +1464,8 @@ function BookStoreApp() {
                               if (!book.pdfUrl) {
                                 e.preventDefault();
                                 showToast('Payment link will be updated soon!');
+                              } else {
+                                handleBookDownload(book);
                               }
                             }}
                             className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2.5 rounded-xl transition font-bold text-xs shadow-sm flex items-center gap-1.5"
@@ -1386,6 +1479,14 @@ function BookStoreApp() {
                             target="_blank"
                             rel="noopener noreferrer"
                             download={book.title}
+                            onClick={(event) => {
+                              if (!book.pdfUrl) {
+                                event.preventDefault();
+                                showToast('Download link will be updated soon!');
+                              } else {
+                                handleBookDownload(book);
+                              }
+                            }}
                             className="bg-amber-500 hover:bg-amber-400 text-slate-950 p-2.5 rounded-xl transition font-bold shadow-sm flex items-center justify-center"
                           >
                             <Download className="w-4 h-4 stroke-[2.5]" />
@@ -1711,6 +1812,7 @@ function BookStoreApp() {
                                     href={book.pdfUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
+                                    onClick={() => handleBookDownload(book)}
                                     className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-500"
                                   >
                                     {book.isFree ? <Download className="h-3.5 w-3.5" /> : <ShoppingCart className="h-3.5 w-3.5" />}
@@ -1984,6 +2086,7 @@ function BookStoreApp() {
                           href={book.pdfUrl}
                           target="_blank"
                           rel="noopener noreferrer"
+                          onClick={() => handleBookDownload(book)}
                           className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 text-white text-xs font-extrabold px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-md"
                         >
                           <ShoppingCart className="w-3.5 h-3.5" />
@@ -1995,6 +2098,7 @@ function BookStoreApp() {
                           href={book.pdfUrl}
                           target="_blank"
                           rel="noopener noreferrer"
+                          onClick={() => handleBookDownload(book)}
                           className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-md"
                         >
                           <Download className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -2080,7 +2184,7 @@ function BookStoreApp() {
     {/* Bottom Indicator (Fixed Height ~35px Anchored at Bottom) */}
     <div className="relative z-10 h-[35px] border-t border-slate-800/90 flex items-center justify-between text-[10px] sm:text-[11px] text-slate-400">
       <span className="text-amber-400 font-bold flex items-center gap-1">
-        ★ {book.rating || '4.9'}
+        ★ {book.rating ? book.rating.toFixed(1) : '4.8'}
       </span>
       <span className="text-indigo-300 font-semibold animate-pulse">
         Turn next for handwritten samples →
@@ -2119,6 +2223,9 @@ function BookStoreApp() {
           href={book.pdfUrl || '#'}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={() => {
+            if (book.pdfUrl) handleBookDownload(book);
+          }}
           className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs py-2.5 rounded-xl shadow-xl flex items-center justify-center gap-2 transition"
         >
           <Download className="w-4 h-4 stroke-[2.5]" />
@@ -2129,6 +2236,9 @@ function BookStoreApp() {
           href={book.pdfUrl || '#'}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={() => {
+            if (book.pdfUrl) handleBookDownload(book);
+          }}
           className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 text-slate-950 font-black text-xs py-2.5 rounded-xl shadow-xl flex items-center justify-center gap-2 transition"
         >
           <ShoppingCart className="w-4 h-4" />
@@ -2224,6 +2334,9 @@ function BookStoreApp() {
               || selectedBookForModal.badge?.includes('₹'));
 
         const sampleUrl = selectedBookForModal.samplePdfUrl || selectedBookForModal.pdfUrl;
+        const ratingSelection = ratingSelections[selectedBookForModal.sanityId] || 0;
+        const hasSubmittedRating = ratedBooks.has(selectedBookForModal.sanityId)
+          || hasStoredBookRating(selectedBookForModal.sanityId);
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-sm animate-fadeIn">
@@ -2271,9 +2384,47 @@ function BookStoreApp() {
                   <div>
                     <span className="text-slate-400 block text-[10px] uppercase">Rating</span>
                     <span className="font-bold text-amber-600 flex items-center justify-center gap-1">
-                      <Star className="w-3.5 h-3.5 fill-amber-500" /> {selectedBookForModal.rating} ({selectedBookForModal.reviewsCount})
+                      <Star className="w-3.5 h-3.5 fill-amber-500" /> {selectedBookForModal.rating ? selectedBookForModal.rating.toFixed(1) : '4.8'} ({selectedBookForModal.totalReviews})
                     </span>
                   </div>
+                </div>
+
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-center">
+                  <h4 className="text-sm font-bold text-slate-900">Rate this book</h4>
+                  <div className="mt-2 flex justify-center gap-1" role="group" aria-label="Choose a rating from 1 to 5 stars">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setRatingSelections((currentSelections) => ({
+                          ...currentSelections,
+                          [selectedBookForModal.sanityId]: star
+                        }))}
+                        disabled={hasSubmittedRating}
+                        aria-label={`${star} ${star === 1 ? 'star' : 'stars'}`}
+                        aria-pressed={ratingSelection === star}
+                        className="rounded-md p-1 text-amber-500 transition hover:scale-110 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <Star className={`h-6 w-6 ${ratingSelection >= star ? 'fill-amber-400' : ''}`} />
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={hasSubmittedRating || ratingSelection === 0}
+                    onClick={() => {
+                      if (handleBookRating(selectedBookForModal, ratingSelection)) {
+                        setRatingSelections((currentSelections) => ({
+                          ...currentSelections,
+                          [selectedBookForModal.sanityId]: 0
+                        }));
+                        showToast('Thanks for rating this book!');
+                      }
+                    }}
+                    className="mt-2 rounded-lg bg-blue-950 px-4 py-2 text-xs font-bold text-white transition hover:bg-blue-900 disabled:cursor-not-allowed disabled:bg-slate-400"
+                  >
+                    {hasSubmittedRating ? 'Rating submitted' : 'Submit rating'}
+                  </button>
                 </div>
 
                 <div>
@@ -2333,6 +2484,9 @@ function BookStoreApp() {
                         href={sampleUrl || '#'}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => {
+                          if (sampleUrl) handleBookDownload(selectedBookForModal);
+                        }}
                         className="bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs sm:text-sm font-bold px-4 py-2.5 rounded-xl transition inline-flex items-center gap-1.5"
                       >
                         <BookOpen className="w-3.5 h-3.5 text-blue-900" />
@@ -2344,6 +2498,9 @@ function BookStoreApp() {
                         href={selectedBookForModal.pdfUrl || '#'}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => {
+                          if (selectedBookForModal.pdfUrl) handleBookDownload(selectedBookForModal);
+                        }}
                         className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white text-xs sm:text-sm font-extrabold px-5 py-2.5 rounded-xl shadow-md transition flex items-center gap-2 transform active:scale-95"
                       >
                         <ShoppingCart className="w-4 h-4 text-white" />
@@ -2356,6 +2513,11 @@ function BookStoreApp() {
                       href={selectedBookForModal.pdfUrl || selectedBookForModal.samplePdfUrl || '#'}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={() => {
+                        if (selectedBookForModal.pdfUrl || selectedBookForModal.samplePdfUrl) {
+                          handleBookDownload(selectedBookForModal);
+                        }
+                      }}
                       className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs sm:text-sm font-extrabold px-6 py-2.5 rounded-xl shadow-md transition flex items-center gap-2 transform active:scale-95"
                     >
                       <Download className="w-4 h-4 stroke-[2.5]" />
