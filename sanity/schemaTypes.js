@@ -1,12 +1,31 @@
-import { defineArrayMember, defineField, defineType } from 'sanity';
+import { createElement } from 'react';
+import { defineArrayMember, defineField, defineType, PatchEvent, set } from 'sanity';
+
+const examCategorySuggestions = ['SSC', 'Railway', 'Banking', 'Teaching', 'Defence', 'State Exams', 'UPSC'];
+
+const ExamCategoryInput = ({ value, onChange, elementProps }) => createElement(
+  'div',
+  null,
+  createElement('input', {
+    ...elementProps,
+    list: 'exam-category-suggestions',
+    value: value || '',
+    onChange: (event) => onChange(PatchEvent.from(set(event.currentTarget.value)))
+  }),
+  createElement(
+    'datalist',
+    { id: 'exam-category-suggestions' },
+    examCategorySuggestions.map((category) => createElement('option', { key: category, value: category }))
+  )
+);
 
 const importantDate = defineType({
   name: 'importantDate',
   title: 'Important Date',
   type: 'object',
   fields: [
-    defineField({ name: 'eventName', title: 'Event', type: 'string', validation: (Rule) => Rule.required() }),
-    defineField({ name: 'dateText', title: 'Date', type: 'string', validation: (Rule) => Rule.required() })
+    defineField({ name: 'eventName', title: 'Event', type: 'string' }),
+    defineField({ name: 'dateText', title: 'Date', type: 'string' })
   ],
   preview: {
     select: { title: 'eventName', subtitle: 'dateText' }
@@ -34,7 +53,7 @@ const selectionStage = defineType({
   type: 'object',
   fields: [
     defineField({ name: 'stageNumber', title: 'Stage Number', type: 'number' }),
-    defineField({ name: 'title', title: 'Stage Title', type: 'string', validation: (Rule) => Rule.required() }),
+    defineField({ name: 'title', title: 'Stage Title', type: 'string' }),
     defineField({ name: 'description', title: 'Description', type: 'text', rows: 3 })
   ],
   preview: {
@@ -70,7 +89,7 @@ const syllabusSection = defineType({
   title: 'Syllabus Section',
   type: 'object',
   fields: [
-    defineField({ name: 'sectionTitle', title: 'Section Title', type: 'string', validation: (Rule) => Rule.required() }),
+    defineField({ name: 'sectionTitle', title: 'Section Title', type: 'string' }),
     defineField({ name: 'topics', title: 'Topics', type: 'text', rows: 4 })
   ],
   preview: {
@@ -83,7 +102,7 @@ const documentSpec = defineType({
   title: 'Document Specification',
   type: 'object',
   fields: [
-    defineField({ name: 'docName', title: 'Document', type: 'string', validation: (Rule) => Rule.required() }),
+    defineField({ name: 'docName', title: 'Document', type: 'string' }),
     defineField({ name: 'dimension', title: 'Dimensions', type: 'string' }),
     defineField({ name: 'fileSize', title: 'File Size', type: 'string' }),
     defineField({ name: 'format', title: 'Format', type: 'string' })
@@ -98,12 +117,127 @@ const frequentlyAskedQuestion = defineType({
   title: 'Frequently Asked Question',
   type: 'object',
   fields: [
-    defineField({ name: 'question', title: 'Question', type: 'string', validation: (Rule) => Rule.required() }),
-    defineField({ name: 'answer', title: 'Answer', type: 'text', rows: 3, validation: (Rule) => Rule.required() })
+    defineField({ name: 'question', title: 'Question', type: 'string' }),
+    defineField({ name: 'answer', title: 'Answer', type: 'text', rows: 3 })
   ],
   preview: {
     select: { title: 'question', subtitle: 'answer' }
   }
+});
+
+const notificationSalaryRow = defineType({
+  name: 'notificationSalaryRow',
+  title: 'Salary Table Row',
+  type: 'object',
+  fields: [
+    defineField({ name: 'component', title: 'Salary Component', type: 'string' }),
+    defineField({ name: 'col1', title: 'Column 1', type: 'string' }),
+    defineField({ name: 'col2', title: 'Column 2', type: 'string' }),
+    defineField({ name: 'col3', title: 'Column 3', type: 'string' }),
+    defineField({ name: 'col4', title: 'Column 4', type: 'string' })
+  ]
+});
+
+const examStageSection = defineType({
+  name: 'examStageSection',
+  title: 'Exam Section',
+  type: 'object',
+  fields: [
+    defineField({ name: 'sectionName', title: 'Section Name', type: 'string' }),
+    defineField({ name: 'questions', title: 'Questions', type: 'number' }),
+    defineField({ name: 'marks', title: 'Marks', type: 'number' })
+  ]
+});
+
+const qualifyingMark = defineType({
+  name: 'qualifyingMark',
+  title: 'Qualifying Mark',
+  type: 'object',
+  fields: [
+    defineField({ name: 'category', title: 'Category', type: 'string' }),
+    defineField({ name: 'percentage', title: 'Percentage', type: 'number' })
+  ]
+});
+
+const examStage = defineType({
+  name: 'examStage',
+  title: 'Exam Stage',
+  type: 'object',
+  fields: [
+    defineField({ name: 'stageName', title: 'Stage Name', type: 'string' }),
+    defineField({ name: 'totalQuestions', title: 'Total Questions', type: 'number' }),
+    defineField({ name: 'totalMarks', title: 'Total Marks', type: 'number' }),
+    defineField({ name: 'durationMinutes', title: 'Duration (Minutes)', type: 'number' }),
+    defineField({ name: 'negativeMarking', title: 'Negative Marking', type: 'string' }),
+    defineField({
+      name: 'sections',
+      title: 'Sections',
+      type: 'array',
+      of: [defineArrayMember({ type: 'examStageSection' })]
+    }),
+    defineField({
+      name: 'qualifyingMarks',
+      title: 'Qualifying Marks',
+      type: 'array',
+      of: [defineArrayMember({ type: 'qualifyingMark' })]
+    }),
+    defineField({ name: 'additionalNotes', title: 'Additional Notes', type: 'text', rows: 3 })
+  ],
+  preview: { select: { title: 'stageName', subtitle: 'totalQuestions' } }
+});
+
+const notificationVacancy = defineType({
+  name: 'notificationVacancy',
+  title: 'Vacancy',
+  type: 'object',
+  fields: [
+    defineField({ name: 'postName', title: 'Post Name', type: 'string' }),
+    defineField({ name: 'category', title: 'Category / Region', type: 'string' }),
+    defineField({ name: 'vacancies', title: 'Vacancies', type: 'number' }),
+    defineField({ name: 'notes', title: 'Notes', type: 'string' })
+  ]
+});
+
+const notificationEligibility = defineType({
+  name: 'notificationEligibility',
+  title: 'Eligibility Criterion',
+  type: 'object',
+  fields: [
+    defineField({ name: 'criterion', title: 'Criterion', type: 'string' }),
+    defineField({ name: 'details', title: 'Details', type: 'text', rows: 3 })
+  ]
+});
+
+const notificationFee = defineType({
+  name: 'notificationFee',
+  title: 'Application Fee',
+  type: 'object',
+  fields: [
+    defineField({ name: 'category', title: 'Category', type: 'string' }),
+    defineField({ name: 'amount', title: 'Fee Amount', type: 'string' }),
+    defineField({ name: 'notes', title: 'Notes', type: 'string' })
+  ]
+});
+
+const notificationPaper = defineType({
+  name: 'notificationPaper',
+  title: 'Previous Paper',
+  type: 'object',
+  fields: [
+    defineField({ name: 'title', title: 'Paper Title', type: 'string' }),
+    defineField({ name: 'year', title: 'Year', type: 'string' }),
+    defineField({ name: 'url', title: 'Paper URL', type: 'url' })
+  ]
+});
+
+const notificationLink = defineType({
+  name: 'notificationLink',
+  title: 'Important Link',
+  type: 'object',
+  fields: [
+    defineField({ name: 'label', title: 'Link Label', type: 'string' }),
+    defineField({ name: 'url', title: 'URL', type: 'url' })
+  ]
 });
 
 const examNotification = defineType({
@@ -113,6 +247,8 @@ const examNotification = defineType({
   groups: [
     { name: 'overview', title: 'Overview', default: true },
     { name: 'dates', title: 'Dates & Links' },
+    { name: 'posts', title: 'Posts & Vacancies' },
+    { name: 'eligibility', title: 'Eligibility & Fee' },
     { name: 'salary', title: 'Salary' },
     { name: 'selection', title: 'Selection & Pattern' },
     { name: 'syllabus', title: 'Syllabus' },
@@ -140,18 +276,50 @@ const examNotification = defineType({
       title: 'Exam Category',
       type: 'string',
       group: 'overview',
+      description: 'Choose a suggested category or enter a custom category.',
+      components: { input: ExamCategoryInput }
+    }),
+    defineField({
+      name: 'stateRegion',
+      title: 'State / Region',
+      type: 'string',
+      group: 'overview',
       options: {
-        list: ['SSC', 'Railway', 'Banking', 'Police', 'Teaching', 'Defense', 'State Exams', 'Other']
+        list: [
+          'All India / Central', 'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar',
+          'Chhattisgarh', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand',
+          'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya',
+          'Mizoram', 'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
+          'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+          'Andaman and Nicobar Islands', 'Chandigarh', 'Dadra and Nagar Haveli and Daman and Diu',
+          'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry'
+        ]
       }
     }),
-    defineField({ name: 'state', title: 'State / Region', type: 'string', group: 'overview' }),
     defineField({ name: 'totalVacancies', title: 'Total Vacancies', type: 'string', group: 'overview' }),
-    defineField({ name: 'postDate', title: 'Post Date', type: 'string', group: 'overview' }),
+    defineField({ name: 'cardImage', title: 'Notification Card Image', type: 'image', group: 'overview', options: { hotspot: true } }),
+    defineField({ name: 'postDate', title: 'Post Date', type: 'date', group: 'overview' }),
+    defineField({
+      name: 'comparisonPreviousYear',
+      title: 'Previous Year Comparison',
+      type: 'array',
+      group: 'overview',
+      of: [defineArrayMember({
+        type: 'object',
+        fields: [
+          defineField({ name: 'metric', title: 'Metric', type: 'string' }),
+          defineField({ name: 'previousYear', title: '2025', type: 'string' }),
+          defineField({ name: 'currentYear', title: '2026', type: 'string' })
+        ]
+      })]
+    }),
     defineField({ name: 'overview', title: 'Overview', type: 'text', rows: 6, group: 'overview' }),
     defineField({ name: 'officialPdfUrl', title: 'Official Notification PDF URL', type: 'url', group: 'dates' }),
     defineField({ name: 'applyOnlineUrl', title: 'Apply Online URL', type: 'url', group: 'dates' }),
     defineField({ name: 'applicationWindow', title: 'Application Window', type: 'string', group: 'dates' }),
-    defineField({ name: 'examDate', title: 'Exam Date', type: 'string', group: 'dates' }),
+    defineField({ name: 'applicationStartDate', title: 'Application Start Date', type: 'date', group: 'dates' }),
+    defineField({ name: 'applicationEndDate', title: 'Application End Date', type: 'date', group: 'dates' }),
+    defineField({ name: 'examDate', title: 'Exam Date (use text if tentative)', type: 'string', group: 'dates' }),
     defineField({
       name: 'importantDates',
       title: 'Important Dates',
@@ -169,9 +337,43 @@ const examNotification = defineType({
     defineField({
       name: 'salaryStructure',
       title: 'Salary Structure',
-      type: 'array',
+      type: 'object',
       group: 'salary',
-      of: [defineArrayMember({ type: 'salaryEntry' })]
+      fields: [
+        defineField({
+          name: 'columns',
+          title: 'Salary Table Rows',
+          type: 'array',
+          of: [defineArrayMember({ type: 'notificationSalaryRow' })]
+        }),
+        defineField({
+          name: 'notes',
+          title: 'Salary Notes',
+          type: 'array',
+          of: [defineArrayMember({ type: 'string' })]
+        })
+      ]
+    }),
+    defineField({
+      name: 'vacanciesList',
+      title: 'Vacancy Breakdown',
+      type: 'array',
+      group: 'posts',
+      of: [defineArrayMember({ type: 'notificationVacancy' })]
+    }),
+    defineField({
+      name: 'eligibilityCriteria',
+      title: 'Eligibility Criteria',
+      type: 'array',
+      group: 'eligibility',
+      of: [defineArrayMember({ type: 'notificationEligibility' })]
+    }),
+    defineField({
+      name: 'applicationFees',
+      title: 'Application Fees',
+      type: 'array',
+      group: 'eligibility',
+      of: [defineArrayMember({ type: 'notificationFee' })]
     }),
     defineField({
       name: 'selectionProcess',
@@ -186,6 +388,13 @@ const examNotification = defineType({
       type: 'array',
       group: 'selection',
       of: [defineArrayMember({ type: 'examPatternRow' })]
+    }),
+    defineField({
+      name: 'examStages',
+      title: 'Exam Stages & CBT Pattern',
+      type: 'array',
+      group: 'selection',
+      of: [defineArrayMember({ type: 'examStage' })]
     }),
     defineField({
       name: 'syllabusDetails',
@@ -206,15 +415,36 @@ const examNotification = defineType({
       title: 'Document Specifications',
       type: 'array',
       group: 'application',
-      of: [defineArrayMember({ type: 'documentSpec' })]
+      of: [defineArrayMember({
+        type: 'object',
+        fields: [
+          defineField({ name: 'item', title: 'Item', type: 'string' }),
+          defineField({ name: 'specification', title: 'CEN Specification', type: 'text', rows: 3 })
+        ]
+      })]
     }),
     defineField({
-      name: 'faqs',
+      name: 'previousPapers',
+      title: 'Previous Papers',
+      type: 'array',
+      group: 'application',
+      of: [defineArrayMember({ type: 'notificationPaper' })]
+    }),
+    defineField({
+      name: 'importantLinks',
+      title: 'Important Links',
+      type: 'array',
+      group: 'dates',
+      of: [defineArrayMember({ type: 'notificationLink' })]
+    }),
+    defineField({
+      name: 'faqsList',
       title: 'FAQs',
       type: 'array',
       group: 'faqs',
       of: [defineArrayMember({ type: 'frequentlyAskedQuestion' })]
-    })
+    }),
+    defineField({ name: 'state', title: 'Legacy State / Region', type: 'string', group: 'overview', hidden: true })
   ],
   preview: {
     select: { title: 'title', subtitle: 'examCategory', vacancies: 'totalVacancies' },
@@ -580,8 +810,7 @@ const siteSettings = defineType({
                   defineField({
                     name: 'href',
                     title: 'URL',
-                    type: 'url',
-                    validation: (Rule) => Rule.required()
+                    type: 'url'
                   })
                 ]
               })
@@ -595,6 +824,15 @@ const siteSettings = defineType({
 
 export const schemaTypes = [
   book,
+  notificationSalaryRow,
+  examStageSection,
+  qualifyingMark,
+  examStage,
+  notificationVacancy,
+  notificationEligibility,
+  notificationFee,
+  notificationPaper,
+  notificationLink,
   bookRequest,
   siteSettings,
   examNotification,

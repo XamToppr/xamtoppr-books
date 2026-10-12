@@ -91,6 +91,26 @@ const getHighDefinitionSanityImageUrl = (assetUrl) => {
   }
 };
 
+const formatNotificationDate = (value) => {
+  if (!value) return '';
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime())
+    ? value
+    : new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
+};
+
+const getNotificationGradient = (category = '') => {
+  const palettes = [
+    'from-indigo-950 via-blue-800 to-cyan-600',
+    'from-fuchsia-950 via-purple-800 to-indigo-600',
+    'from-emerald-950 via-teal-800 to-cyan-600',
+    'from-rose-950 via-red-800 to-orange-500',
+    'from-slate-950 via-blue-900 to-violet-700'
+  ];
+  const paletteIndex = [...category].reduce((sum, character) => sum + character.charCodeAt(0), 0) % palettes.length;
+  return palettes[paletteIndex];
+};
+
 const DEFAULT_SITE_SETTINGS = {
   supportHelpline: '+91 77177 07121',
   supportEmail: 'info@xamtoppr.com'
@@ -796,9 +816,10 @@ function BookStoreApp() {
       'SSC',
       'Railway',
       'Banking',
-      'Police',
       'Teaching',
+      'Defence',
       'State Exams',
+      'UPSC',
       ...blogPosts.map((post) => post.examCategory)
     ].filter(Boolean))],
     [blogPosts]
@@ -811,9 +832,40 @@ function BookStoreApp() {
       'Central',
       'Bihar',
       'Uttar Pradesh',
+      'Andhra Pradesh',
+      'Arunachal Pradesh',
+      'Assam',
+      'Chhattisgarh',
+      'Goa',
+      'Gujarat',
+      'Haryana',
+      'Himachal Pradesh',
+      'Jharkhand',
+      'Karnataka',
+      'Kerala',
+      'Maharashtra',
+      'Manipur',
+      'Meghalaya',
+      'Mizoram',
+      'Nagaland',
+      'Odisha',
+      'Punjab',
       'Rajasthan',
-      'MP',
       'Madhya Pradesh',
+      'Sikkim',
+      'Tamil Nadu',
+      'Telangana',
+      'Tripura',
+      'Uttarakhand',
+      'West Bengal',
+      'Andaman and Nicobar Islands',
+      'Chandigarh',
+      'Dadra and Nagar Haveli and Daman and Diu',
+      'Delhi',
+      'Jammu and Kashmir',
+      'Ladakh',
+      'Lakshadweep',
+      'Puducherry',
       ...blogPosts.map((post) => post.state)
     ].filter(Boolean))],
     [blogPosts]
@@ -1609,14 +1661,20 @@ function BookStoreApp() {
               .filter(Boolean);
             const matchedBooks = booksList.filter((book) => targetIds.includes(book.id));
             const sections = [
-              ['overview', 'Overview'],
+              ['comparison', '2025 vs 2026'],
               ['dates', 'Dates'],
+              ['posts', 'Posts'],
               ['salary', 'Salary'],
+              ['vacancies', 'Vacancies'],
+              ['eligibility', 'Eligibility'],
+              ['fee', 'Fee'],
               ['selection', 'Selection'],
-              ['pattern', 'Pattern'],
+              ['pattern', 'Exam Pattern'],
               ['syllabus', 'Syllabus'],
-              ['apply', 'Apply'],
+              ['previous-papers', 'Previous Papers'],
+              ['apply', 'How to Apply'],
               ['documents', 'Documents'],
+              ['important-links', 'Important Links'],
               ['faqs', 'FAQs']
             ];
             const renderTable = (rows, columns) => rows?.length ? (
@@ -1641,6 +1699,24 @@ function BookStoreApp() {
                 </table>
               </div>
             ) : <p className="text-sm text-slate-500">Details will be announced in the official notification.</p>;
+            const salaryRows = Array.isArray(blog.salaryStructure)
+              ? blog.salaryStructure
+              : blog.salaryStructure?.columns || [];
+            const examStages = blog.examStages?.length
+              ? blog.examStages
+              : blog.examPattern?.length
+                ? [{
+                  stageName: 'Exam Pattern',
+                  totalQuestions: blog.examPattern.reduce((total, row) => total + (Number(row.questions) || 0), 0),
+                  totalMarks: blog.examPattern.reduce((total, row) => total + (Number(row.marks) || 0), 0),
+                  sections: blog.examPattern.map((row) => ({
+                    sectionName: row.subject,
+                    questions: row.questions,
+                    marks: row.marks
+                  }))
+                }]
+                : [];
+            const faqList = blog.faqsList?.length ? blog.faqsList : blog.faqs;
             const renderActionLink = (url, label, className) => url ? (
               <a
                 href={url}
@@ -1678,20 +1754,20 @@ function BookStoreApp() {
                   </div>
                   <h1 className="mt-4 text-2xl sm:text-4xl font-black leading-tight">{blog.title}</h1>
                   <p className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-blue-100">
-                    {blog.postDate && <span>Posted {blog.postDate}</span>}
+                    {blog.postDate && <span>Posted {formatNotificationDate(blog.postDate)}</span>}
                   </p>
-                  {(blog.applicationWindow || blog.examDate) && (
+                  {(blog.applicationWindow || blog.applicationStartDate || blog.applicationEndDate || blog.examDate) && (
                     <div className="mt-4 flex flex-wrap gap-2">
-                      {blog.applicationWindow && (
+                      {(blog.applicationWindow || blog.applicationStartDate || blog.applicationEndDate) && (
                         <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-blue-50">
                           <CalendarDays className="h-4 w-4" />
-                          Applications: {blog.applicationWindow}
+                          Applications: {blog.applicationWindow || [blog.applicationStartDate, blog.applicationEndDate].filter(Boolean).map(formatNotificationDate).join(' – ')}
                         </span>
                       )}
                       {blog.examDate && (
                         <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-blue-50">
                           <CalendarDays className="h-4 w-4" />
-                          Exam: {blog.examDate}
+                          Exam: {formatNotificationDate(blog.examDate)}
                         </span>
                       )}
                     </div>
@@ -1714,7 +1790,7 @@ function BookStoreApp() {
                   <div className="min-w-0 space-y-6">
                     <nav
                       aria-label="Notification sections"
-                      className="sticky top-16 z-30 -mx-4 overflow-x-auto border-b border-slate-200 bg-white/95 px-4 py-2.5 shadow-sm backdrop-blur sm:top-20"
+                      className="sticky top-40 z-30 -mx-4 overflow-x-auto border-b border-slate-200 bg-white/95 px-4 py-2.5 shadow-sm backdrop-blur"
                     >
                       <div className="flex min-w-max gap-2">
                         {sections.map(([id, label]) => (
@@ -1754,19 +1830,120 @@ function BookStoreApp() {
                           </div>
                         </section>
 
+                        <section id="notification-comparison" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                          <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
+                            <CalendarDays className="h-5 w-5 text-amber-500" /> 2025 vs 2026
+                          </h2>
+                          {renderTable(blog.comparisonPreviousYear, [
+                            ['metric', 'Metric'], ['previousYear', '2025'], ['currentYear', '2026']
+                          ])}
+                        </section>
+
                         <section id="notification-dates" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                           <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
                             <CalendarDays className="h-5 w-5 text-amber-500" /> Important Dates
                           </h2>
+                          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                            {[
+                              ['Notification Published', formatNotificationDate(blog.postDate)],
+                              ['Application Starts', formatNotificationDate(blog.applicationStartDate)],
+                              ['Application Closes', formatNotificationDate(blog.applicationEndDate)]
+                            ].map(([label, date]) => (
+                              <div key={label} className="rounded-xl border border-blue-100 bg-blue-50/70 p-3">
+                                <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">{label}</p>
+                                <p className="mt-1 text-sm font-bold text-blue-950">{date || 'To be announced'}</p>
+                              </div>
+                            ))}
+                          </div>
                           {renderTable(blog.importantDates, [['eventName', 'Event'], ['dateText', 'Date']])}
+                        </section>
+
+                        <section id="notification-posts" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                          <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
+                            <ClipboardList className="h-5 w-5 text-amber-500" /> Posts
+                          </h2>
+                          {blog.vacanciesList?.length ? (
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              {blog.vacanciesList.map((post, index) => (
+                                <article key={post._key || index} className="rounded-xl border border-blue-100 bg-blue-50/70 p-4">
+                                  <h3 className="font-bold text-blue-950">{post.postName || blog.title}</h3>
+                                  <p className="mt-1 text-sm text-slate-600">
+                                    {[post.category, post.vacancies != null ? `${post.vacancies} vacancies` : null].filter(Boolean).join(' · ') || 'Post details'}
+                                  </p>
+                                </article>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="rounded-xl bg-blue-50 p-4 text-sm font-semibold leading-6 text-blue-950">
+                              {blog.title}{blog.totalVacancies ? ` — ${blog.totalVacancies} vacancies` : ''}
+                            </p>
+                          )}
                         </section>
 
                         <section id="notification-salary" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                           <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
                             <Award className="h-5 w-5 text-amber-500" /> Salary Structure
                           </h2>
-                          {renderTable(blog.salaryStructure, [
-                            ['postName', 'Post'], ['payLevel', 'Pay Level'], ['basicPay', 'Basic Pay'], ['inHandSalary', 'In-hand Salary']
+                          {salaryRows.length ? (
+                            <div className="overflow-x-auto rounded-xl border border-slate-200">
+                              <table className="w-full min-w-[680px] border-collapse text-left text-sm">
+                                <thead className="bg-blue-950 text-white">
+                                  <tr>
+                                    {['Component', 'Column 1', 'Column 2', 'Column 3', 'Column 4'].map((heading) => (
+                                      <th key={heading} className="border-b border-blue-800 px-4 py-3 font-bold">{heading}</th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {salaryRows.map((row, index) => (
+                                    <tr key={row._key || index} className="odd:bg-white even:bg-slate-50">
+                                      {[row.component || row.postName, row.col1 || row.payLevel, row.col2 || row.basicPay, row.col3 || row.inHandSalary, row.col4].map((value, columnIndex) => (
+                                        <td key={columnIndex} className="border-b border-slate-100 px-4 py-3 text-slate-700">{value || '—'}</td>
+                                      ))}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          ) : <p className="text-sm text-slate-500">Salary details will be announced in the official notification.</p>}
+                          {blog.salaryStructure?.notes?.length > 0 && (
+                            <ul className="mt-4 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-600">
+                              {blog.salaryStructure.notes.map((note, index) => <li key={index}>{note}</li>)}
+                            </ul>
+                          )}
+                        </section>
+
+                        <section id="notification-vacancies" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                          <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
+                            <ClipboardList className="h-5 w-5 text-amber-500" /> Vacancies
+                          </h2>
+                          {renderTable(blog.vacanciesList, [
+                            ['postName', 'Post'], ['category', 'Category / Region'], ['vacancies', 'Vacancies'], ['notes', 'Notes']
+                          ])}
+                        </section>
+
+                        <section id="notification-eligibility" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                          <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
+                            <CheckCircle2 className="h-5 w-5 text-amber-500" /> Eligibility
+                          </h2>
+                          {blog.eligibilityCriteria?.length ? (
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              {blog.eligibilityCriteria.map((item, index) => (
+                                <article key={item._key || index} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                  <h3 className="font-bold text-slate-900">{item.criterion || 'Eligibility'}</h3>
+                                  <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{item.details}</p>
+                                </article>
+                              ))}
+                            </div>
+                          ) : <p className="text-sm text-slate-500">Eligibility requirements will be announced in the official notification.</p>}
+                        </section>
+
+                        <section id="notification-fee" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                          <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
+                            <Award className="h-5 w-5 text-amber-500" /> Application Fee
+                          </h2>
+                          {renderTable(blog.applicationFees, [
+                            ['category', 'Category'], ['amount', 'Fee'], ['notes', 'Notes']
                           ])}
                         </section>
 
@@ -1795,9 +1972,44 @@ function BookStoreApp() {
                           <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
                             <FileText className="h-5 w-5 text-amber-500" /> Exam Pattern
                           </h2>
-                          {renderTable(blog.examPattern, [
-                            ['subject', 'Subject'], ['questions', 'Questions'], ['marks', 'Marks'], ['duration', 'Duration']
-                          ])}
+                          {examStages.length ? (
+                            <div className="space-y-5">
+                              {examStages.map((stage, stageIndex) => (
+                                <article key={stage._key || stageIndex} className="rounded-2xl border border-slate-200 p-4 sm:p-5">
+                                  <h3 className="mb-4 text-base font-extrabold text-blue-950">{stage.stageName || `Stage ${stageIndex + 1}`}</h3>
+                                  <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                                    {[
+                                      ['Questions', stage.totalQuestions],
+                                      ['Marks', stage.totalMarks],
+                                      ['Duration', stage.durationMinutes ? `${stage.durationMinutes} min` : '—'],
+                                      ['Negative Marking', stage.negativeMarking || '—']
+                                    ].map(([label, value]) => (
+                                      <div key={label} className="rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 p-3">
+                                        <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">{label}</p>
+                                        <p className="mt-1 text-sm font-black text-blue-950">{value ?? '—'}</p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  {renderTable(stage.sections, [
+                                    ['sectionName', 'Section'], ['questions', 'Questions'], ['marks', 'Marks']
+                                  ])}
+                                  {stage.qualifyingMarks?.length > 0 && (
+                                    <div className="mt-4">
+                                      <h4 className="mb-2 text-sm font-bold text-slate-800">Qualifying Marks</h4>
+                                      {renderTable(stage.qualifyingMarks, [
+                                        ['category', 'Category'], ['percentage', 'Percentage']
+                                      ])}
+                                    </div>
+                                  )}
+                                  {stage.additionalNotes && (
+                                    <p className="mt-3 whitespace-pre-line rounded-lg bg-amber-50 p-3 text-sm leading-6 text-slate-700">
+                                      {stage.additionalNotes}
+                                    </p>
+                                  )}
+                                </article>
+                              ))}
+                            </div>
+                          ) : <p className="text-sm text-slate-500">Exam pattern details will be announced in the official notification.</p>}
                         </section>
 
                         <section id="notification-syllabus" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -1827,20 +2039,60 @@ function BookStoreApp() {
                           ) : <p className="text-sm text-slate-500">Application instructions will be announced in the official notification.</p>}
                         </section>
 
+                        <section id="notification-previous-papers" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                          <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
+                            <FileText className="h-5 w-5 text-amber-500" /> Previous Papers
+                          </h2>
+                          {blog.previousPapers?.length ? (
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              {blog.previousPapers.map((paper, index) => (
+                                <article key={paper._key || index} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                  <div>
+                                    <h3 className="font-bold text-slate-900">{paper.title || 'Previous year paper'}</h3>
+                                    {paper.year && <p className="mt-1 text-xs text-slate-500">{paper.year}</p>}
+                                  </div>
+                                  {renderActionLink(paper.url, 'View paper', 'inline-flex items-center gap-1.5 rounded-lg bg-blue-950 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-900')}
+                                </article>
+                              ))}
+                            </div>
+                          ) : <p className="text-sm text-slate-500">Previous papers will be added soon.</p>}
+                        </section>
+
                         <section id="notification-documents" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                           <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
                             <FileCheck2 className="h-5 w-5 text-amber-500" /> Document Specifications
                           </h2>
                           {renderTable(blog.documentSpecs, [
-                            ['docName', 'Document'], ['dimension', 'Dimensions'], ['fileSize', 'File Size'], ['format', 'Format']
+                            ['item', 'Item'], ['specification', 'CEN Specification']
                           ])}
+                        </section>
+
+                        <section id="notification-important-links" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                          <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">
+                            <ExternalLink className="h-5 w-5 text-amber-500" /> Important Links
+                          </h2>
+                          {blog.importantLinks?.length ? (
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              {blog.importantLinks.map((link, index) => (
+                                <div key={link._key || index}>
+                                  {renderActionLink(link.url, link.label || 'Open link', 'flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-blue-900 transition hover:border-amber-300 hover:bg-amber-50')}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap gap-3">
+                              {renderActionLink(blog.officialPdfUrl, 'Official Notification PDF', 'inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-blue-900 transition hover:border-amber-300 hover:bg-amber-50')}
+                              {renderActionLink(blog.applyOnlineUrl, 'Apply Online', 'inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-blue-900 transition hover:border-amber-300 hover:bg-amber-50')}
+                              {!blog.officialPdfUrl && !blog.applyOnlineUrl && <p className="text-sm text-slate-500">Important links will be added soon.</p>}
+                            </div>
+                          )}
                         </section>
 
                         <section id="notification-faqs" className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                           <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-blue-950">Frequently Asked Questions</h2>
-                          {blog.faqs?.length ? (
+                          {faqList?.length ? (
                             <div className="space-y-3">
-                              {blog.faqs.map((faq, index) => (
+                              {faqList.map((faq, index) => (
                                 <details key={faq._key || index} className="group rounded-xl border border-slate-200 p-4">
                                   <summary className="cursor-pointer font-bold text-slate-800">{faq.question}</summary>
                                   <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-slate-600">{faq.answer}</p>
@@ -2037,38 +2289,58 @@ function BookStoreApp() {
             ) : (
               <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {filteredBlogPosts.map((post) => (
-                  <article key={post._id} className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-amber-300 hover:shadow-lg">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-blue-100 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide text-blue-900">
-                        {post.examCategory || 'Exam'}
-                      </span>
-                      <span className="rounded-full bg-fuchsia-50 px-3 py-1 text-[10px] font-bold text-fuchsia-800">
-                        {post.state || 'All India / Central'}
-                      </span>
-                    </div>
-                    <h3 className="mt-4 flex-1 text-lg font-black leading-snug text-slate-900">{post.title}</h3>
-                    <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3">
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Total Vacancies</p>
-                        <p className="mt-1 text-sm font-extrabold text-blue-950">{post.totalVacancies || 'Not announced'}</p>
-                      </div>
-                      <div>
-                        <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                          <CalendarDays className="h-3 w-3" /> Application Dates
-                        </p>
-                        <p className="mt-1 text-xs font-semibold text-slate-700">
-                          {post.applicationWindow || 'TBA'}
-                        </p>
+                  <article key={post._id} className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:border-amber-300 hover:shadow-lg">
+                    <div className={`relative flex h-48 items-end overflow-hidden bg-gradient-to-br ${getNotificationGradient(post.examCategory)}`}>
+                      {post.cardImageUrl ? (
+                        <img src={post.cardImageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+                      ) : (
+                        <>
+                          <div className="absolute -right-8 -top-10 h-44 w-44 rounded-full border-[24px] border-white/10" />
+                          <div className="absolute -right-2 top-9 h-24 w-24 rounded-full bg-amber-300/20 blur-2xl" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/10 to-transparent" />
+                        </>
+                      )}
+                      <div className="relative z-10 w-full p-5">
+                        <span className="inline-flex rounded-full border border-white/30 bg-slate-950/30 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-white backdrop-blur">
+                          {post.examCategory || 'Exam Notification'}
+                        </span>
+                        <h3 className="mt-3 line-clamp-2 text-xl font-black leading-tight text-white drop-shadow sm:text-2xl">{post.title}</h3>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedBlog(post)}
-                      className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-950 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-900"
-                    >
-                      View Notification Details
-                      <ArrowRight className="h-4 w-4" />
-                    </button>
+                    <div className="flex flex-1 flex-col p-5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-fuchsia-50 px-3 py-1 text-[10px] font-bold text-fuchsia-800">
+                          {post.state || 'All India / Central'}
+                        </span>
+                        {post.postDate && (
+                          <span className="text-[11px] font-semibold text-slate-500">
+                            Posted {formatNotificationDate(post.postDate)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3">
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Total Vacancies</p>
+                          <p className="mt-1 text-sm font-extrabold text-blue-950">{post.totalVacancies || 'Not announced'}</p>
+                        </div>
+                        <div>
+                          <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                            <CalendarDays className="h-3 w-3" /> Application Dates
+                          </p>
+                          <p className="mt-1 text-xs font-semibold text-slate-700">
+                            {post.applicationWindow || [post.applicationStartDate, post.applicationEndDate].filter(Boolean).map(formatNotificationDate).join(' – ') || 'TBA'}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBlog(post)}
+                        className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-950 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-900"
+                      >
+                        View Notification Details
+                        <ArrowRight className="h-4 w-4" />
+                      </button>
+                    </div>
                   </article>
                 ))}
               </div>
