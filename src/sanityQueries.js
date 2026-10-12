@@ -33,6 +33,8 @@ export const BOOKS_FOR_STORE_QUERY = `*[_type == "book"] | order(_createdAt desc
 
 export const BOOK_BY_SLUG_QUERY = '*[_type == "book" && slug.current == $slug][0]';
 
+export const siteSettingsQuery = '*[_type == "siteSettings" && _id == "siteSettings"][0] { supportHelpline, supportEmail, aboutUrl, termsUrl, privacyUrl, refundUrl }';
+
 export const examNotificationsQuery = `*[_type == "examNotification"] | order(_createdAt desc) {
   _id,
   title,

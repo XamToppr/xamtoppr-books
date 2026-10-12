@@ -4,7 +4,12 @@ import { PortableText } from '@portabletext/react';
 import { Studio } from 'sanity';
 import sanityConfig from '../sanity.config.js';
 import sanityClient from './sanityClient';
-import { BOOKS_FOR_STORE_QUERY, examNotificationDetailQuery, examNotificationsQuery } from './sanityQueries';
+import {
+  BOOKS_FOR_STORE_QUERY,
+  examNotificationDetailQuery,
+  examNotificationsQuery,
+  siteSettingsQuery
+} from './sanityQueries';
 import {
   Search,
   BookOpen,
@@ -28,7 +33,6 @@ import {
   RotateCcw,
   Languages,
   Layers,
-  GraduationCap,
   Award,
   Clock,
   ExternalLink,
@@ -86,12 +90,14 @@ const getHighDefinitionSanityImageUrl = (assetUrl) => {
   }
 };
 
-const SUPPORT_LINKS = [
-  { label: 'About Us', href: 'https://xamtoppr.com/about-us' },
-  { label: 'Terms & Conditions', href: 'https://xamtoppr.com/terms-and-condition' },
-  { label: 'Privacy Policy', href: 'https://xamtoppr.com/privacy-and-policy' },
-  { label: 'Refunds & Cancellations', href: 'https://xamtoppr.com/refunds-and-cancellations' }
-];
+const DEFAULT_SITE_SETTINGS = {
+  supportHelpline: '+91 77177 07121',
+  supportEmail: 'info@xamtoppr.com',
+  aboutUrl: 'https://xamtoppr.com/about-us',
+  termsUrl: 'https://xamtoppr.com/terms-and-condition',
+  privacyUrl: 'https://xamtoppr.com/privacy-and-policy',
+  refundUrl: 'https://xamtoppr.com/refunds-and-cancellations'
+};
 
 const MEDIUM_OPTIONS = ['All Mediums', 'Bilingual (Hindi + English)', 'Hindi Medium', 'English Medium'];
 
@@ -137,6 +143,18 @@ function BookStoreApp() {
   const [ratedBooks, setRatedBooks] = useState(() => new Set());
   const [showFlipbookModal, setShowFlipbookModal] = useState(null);
   const [showRequestBookModal, setShowRequestBookModal] = useState(false);
+  const [isSubmittingBookRequest, setIsSubmittingBookRequest] = useState(false);
+  const [bookRequestError, setBookRequestError] = useState('');
+  const [localBookRequests, setLocalBookRequests] = useState(() => {
+    try {
+      const savedRequests = JSON.parse(localStorage.getItem('bookRequests') || '[]');
+      return Array.isArray(savedRequests) ? savedRequests : [];
+    } catch (error) {
+      console.error('Unable to load saved local book requests:', error);
+      return [];
+    }
+  });
+  const [siteSettings, setSiteSettings] = useState(DEFAULT_SITE_SETTINGS);
   const [toastMessage, setToastMessage] = useState(null);
   const [isLoadingSkeleton, setIsLoadingSkeleton] = useState(true);
   const [bookLoadError, setBookLoadError] = useState('');
@@ -165,6 +183,12 @@ function BookStoreApp() {
   const flipBookRef = useRef(null);
   const flipAudioRef = useRef(null);
   const downloadedBooksRef = useRef(new Set());
+  const supportLinks = [
+    { label: 'About Us', href: siteSettings.aboutUrl },
+    { label: 'Terms & Conditions', href: siteSettings.termsUrl },
+    { label: 'Privacy Policy', href: siteSettings.privacyUrl },
+    { label: 'Refunds & Cancellations', href: siteSettings.refundUrl }
+  ];
 
   useEffect(() => {
     const updateViewportSize = () => {
@@ -319,6 +343,30 @@ function BookStoreApp() {
       })
       .finally(() => {
         if (isCurrentRequest) setIsLoadingSkeleton(false);
+      });
+
+    return () => {
+      isCurrentRequest = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isCurrentRequest = true;
+    sanityClient.fetch(siteSettingsQuery)
+      .then((settings) => {
+        if (isCurrentRequest && settings) {
+          setSiteSettings({
+            supportHelpline: settings.supportHelpline || DEFAULT_SITE_SETTINGS.supportHelpline,
+            supportEmail: settings.supportEmail || DEFAULT_SITE_SETTINGS.supportEmail,
+            aboutUrl: settings.aboutUrl || DEFAULT_SITE_SETTINGS.aboutUrl,
+            termsUrl: settings.termsUrl || DEFAULT_SITE_SETTINGS.termsUrl,
+            privacyUrl: settings.privacyUrl || DEFAULT_SITE_SETTINGS.privacyUrl,
+            refundUrl: settings.refundUrl || DEFAULT_SITE_SETTINGS.refundUrl
+          });
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to load site settings from Sanity:', error);
       });
 
     return () => {
@@ -578,6 +626,48 @@ function BookStoreApp() {
     return true;
   };
 
+  const handleBookRequestSubmit = async (event) => {
+    event.preventDefault();
+    setIsSubmittingBookRequest(true);
+    setBookRequestError('');
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const request = {
+      _type: 'bookRequest',
+      studentName: String(formData.get('studentName') || '').trim(),
+      contactNumber: String(formData.get('contactNumber') || '').trim(),
+      email: String(formData.get('email') || '').trim(),
+      requestedBookTitle: String(formData.get('requestedBookTitle') || '').trim(),
+      examCategory: String(formData.get('examCategory') || '').trim(),
+      additionalDetails: String(formData.get('additionalDetails') || '').trim(),
+      status: 'Pending',
+      requestedAt: new Date().toISOString()
+    };
+
+    try {
+      if (sanityClient.config().token) {
+        await sanityClient.create(request);
+      } else {
+        const nextRequests = [request, ...localBookRequests];
+        setLocalBookRequests(nextRequests);
+        try {
+          localStorage.setItem('bookRequests', JSON.stringify(nextRequests));
+        } catch (storageError) {
+          console.error('Unable to persist the local book request:', storageError);
+        }
+      }
+      form.reset();
+      setShowRequestBookModal(false);
+      showToast('Request submitted successfully!');
+    } catch (error) {
+      console.error('Failed to submit the book request:', error);
+      setBookRequestError('Your request could not be submitted. Please try again.');
+    } finally {
+      setIsSubmittingBookRequest(false);
+    }
+  };
+
   const hasStoredBookRating = (sanityId) => {
     if (!sanityId) return false;
     try {
@@ -769,87 +859,77 @@ function BookStoreApp() {
       {/* Header */}
       <header className="sticky top-0 z-40 bg-[#0c2356] text-white shadow-lg border-b border-blue-900/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16 sm:h-20">
-            <div className="flex items-center gap-3">
-              <a href="https://www.xamtoppr.com/" className="cursor-pointer flex items-center gap-2.5 group">
-                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-orange-600 flex items-center justify-center shadow-md group-hover:scale-105 transition">
-                  <GraduationCap className="w-6 h-6 text-slate-950 stroke-[2.5]" />
-                </div>
-                <div className="flex flex-col">
-                  <div className="flex items-baseline">
-                    <span className="text-xl sm:text-2xl font-black tracking-tight text-white">Xam</span>
-                    <span className="text-xl sm:text-2xl font-black tracking-tight text-amber-400">Toppr</span>
-                  </div>
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-blue-200">
-                    Learn • Practice • Excel
-                  </span>
-                </div>
+          <div className="flex min-h-16 items-center justify-between gap-3 py-2 sm:min-h-20 sm:gap-4">
+            <div className="flex min-w-0 items-center">
+              <a href="https://www.xamtoppr.com/" className="flex shrink-0 items-center rounded-lg bg-white px-1.5 py-1 transition hover:opacity-90">
+                <img
+                  src="/xamtoppr-logo.png"
+                  alt="XamToppr - learning for earning"
+                  className="h-10 w-auto sm:h-12"
+                  width="139"
+                  height="75"
+                  fetchPriority="high"
+                />
               </a>
             </div>
 
-            <nav className="hidden lg:flex items-center gap-1 xl:gap-2 text-sm font-medium">
-              <a href="https://www.xamtoppr.com/" className="px-3.5 py-2 rounded-lg text-slate-200 hover:text-white hover:bg-white/5 transition">
+            <nav className="hidden xl:flex items-center gap-0.5 text-xs font-medium">
+              <a href="https://www.xamtoppr.com/" className="whitespace-nowrap rounded-lg px-2 py-2 text-slate-200 transition hover:bg-white/5 hover:text-white">
                 Home
               </a>
-              <a href="https://xamtoppr.com/video" className="px-3.5 py-2 rounded-lg text-slate-200 hover:text-white hover:bg-white/5 transition">
+              <a href="https://xamtoppr.com/video" className="whitespace-nowrap rounded-lg px-2 py-2 text-slate-200 transition hover:bg-white/5 hover:text-white">
                 Courses
               </a>
-              <a href="https://xamtoppr.com/package/combo" className="px-3.5 py-2 rounded-lg text-slate-200 hover:text-white hover:bg-white/5 transition">
+              <a href="https://xamtoppr.com/package/combo" className="whitespace-nowrap rounded-lg px-2 py-2 text-slate-200 transition hover:bg-white/5 hover:text-white">
                 Test Series
               </a>
-              <a href="/" className="px-3.5 py-2 rounded-lg relative flex items-center gap-1.5 text-amber-400 font-bold bg-white/15 shadow-inner">
-                <BookOpen className="w-4 h-4 text-amber-400" />
+              <a href="/" className="relative flex items-center gap-1 rounded-lg bg-white/15 px-2 py-2 font-bold text-amber-400 shadow-inner">
+                <BookOpen className="h-4 w-4 shrink-0 text-amber-400" />
                 <span>Books & Notes</span>
-                <span className="bg-amber-500 text-slate-950 font-extrabold text-[10px] px-1.5 py-0.2 rounded-full uppercase">
+                <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] font-extrabold uppercase text-slate-950">
                   Free
                 </span>
               </a>
-              <a href="https://xamtoppr.com/weekly-quiz" className="px-3.5 py-2 rounded-lg text-slate-200 hover:text-white hover:bg-white/5 transition">
+              <a href="https://xamtoppr.com/weekly-quiz" className="whitespace-nowrap rounded-lg px-2 py-2 text-slate-200 transition hover:bg-white/5 hover:text-white">
                 Current Affairs
               </a>
-              <a href="https://xamtoppr.com/blog" className="px-3.5 py-2 rounded-lg text-slate-200 hover:text-white hover:bg-white/5 transition">
+              <a href="https://xamtoppr.com/blog" className="whitespace-nowrap rounded-lg px-2 py-2 text-slate-200 transition hover:bg-white/5 hover:text-white">
                 PYQ Papers
               </a>
-              <details className="group relative">
-                <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-lg px-3.5 py-2 text-slate-200 transition hover:bg-white/5 hover:text-white">
-                  Support / About
-                  <ChevronRight className="h-3.5 w-3.5 rotate-90 transition-transform group-open:-rotate-90" />
-                </summary>
-                <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 text-sm text-slate-800 shadow-xl">
-                  {SUPPORT_LINKS.map(({ label, href }) => (
-                    <a key={href} href={href} className="block rounded-lg px-3 py-2.5 font-medium transition hover:bg-blue-50 hover:text-blue-900">
-                      {label}
-                    </a>
-                  ))}
-                </div>
-              </details>
             </nav>
 
-            <div className="hidden sm:flex items-center gap-3">
+            <div className="hidden xl:flex shrink-0 items-center gap-2">
               <button
-                onClick={() => setShowRequestBookModal(true)}
-                className="text-xs font-semibold text-amber-300 hover:text-white bg-blue-900/60 hover:bg-blue-900 border border-blue-700/60 px-3 py-2 rounded-lg transition flex items-center gap-1.5"
+                onClick={() => {
+                  setBookRequestError('');
+                  setShowRequestBookModal(true);
+                }}
+                className="flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-blue-700/60 bg-blue-900/60 px-2.5 py-2 text-xs font-semibold text-amber-300 transition hover:bg-blue-900 hover:text-white"
               >
                 <FileText className="w-3.5 h-3.5 text-amber-400" /> Request Book
               </button>
-              <a href="https://xamtoppr.com/signin" className="text-sm font-medium text-white hover:text-amber-400 px-3 py-2 transition">
+              <a href="https://xamtoppr.com/login" className="whitespace-nowrap px-2.5 py-2 text-sm font-medium text-white transition hover:text-amber-400">
                 Log In
               </a>
-              <a href="https://xamtoppr.com/signup" className="text-sm font-semibold bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 px-4 py-2 rounded-lg shadow-md transition transform active:scale-95">
+              <a href="https://xamtoppr.com/register" className="whitespace-nowrap rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 px-3 py-2 text-sm font-semibold text-slate-950 shadow-md transition hover:from-amber-400 hover:to-orange-400 active:scale-95">
                 Sign Up Free
               </a>
             </div>
 
-            <div className="lg:hidden flex items-center gap-2">
+            <div className="xl:hidden flex shrink-0 items-center gap-2">
               <button
-                onClick={() => setShowRequestBookModal(true)}
-                className="text-xs text-amber-300 bg-blue-900/60 border border-blue-700 px-2.5 py-1.5 rounded-md"
+                onClick={() => {
+                  setBookRequestError('');
+                  setShowRequestBookModal(true);
+                }}
+                className="rounded-md border border-blue-700 bg-blue-900/60 px-2.5 py-1.5 text-xs text-amber-300"
               >
-                Request
+                Request Book
               </button>
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="p-2 rounded-lg text-slate-200 hover:text-white hover:bg-blue-900/80 focus:outline-none"
+                aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
               >
                 {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
               </button>
@@ -898,7 +978,7 @@ function BookStoreApp() {
         </div>
 
         {mobileMenuOpen && (
-          <div className="lg:hidden bg-[#0a1b3d] border-b border-blue-900 px-4 pt-3 pb-5 space-y-2">
+          <div className="xl:hidden bg-[#0a1b3d] border-b border-blue-900 px-4 pt-3 pb-5 space-y-2">
             <a href="https://www.xamtoppr.com/" className="block w-full text-left px-3 py-2.5 rounded-lg text-slate-200 hover:bg-blue-900/50">
               Home
             </a>
@@ -920,13 +1000,13 @@ function BookStoreApp() {
             <a href="https://xamtoppr.com/blog" className="block w-full text-left px-3 py-2.5 rounded-lg text-slate-200 hover:bg-blue-900/50">
               PYQ Papers
             </a>
-            <div className="border-t border-blue-800/70 pt-3">
-              <p className="px-3 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-amber-300">Support / About</p>
-              {SUPPORT_LINKS.map(({ label, href }) => (
-                <a key={href} href={href} className="block w-full rounded-lg px-3 py-2.5 text-slate-200 transition hover:bg-blue-900/50 hover:text-white">
-                  {label}
-                </a>
-              ))}
+            <div className="grid grid-cols-2 gap-2 border-t border-blue-800/70 pt-3">
+              <a href="https://xamtoppr.com/login" className="rounded-lg border border-blue-700 px-3 py-2.5 text-center text-sm font-semibold text-slate-100 transition hover:bg-blue-900/60">
+                Log In
+              </a>
+              <a href="https://xamtoppr.com/register" className="rounded-lg bg-amber-500 px-3 py-2.5 text-center text-sm font-bold text-slate-950 transition hover:bg-amber-400">
+                Sign Up Free
+              </a>
             </div>
           </div>
         )}
@@ -2532,14 +2612,143 @@ function BookStoreApp() {
         );
       })()}
 
+      {showRequestBookModal && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-black/70 p-3 backdrop-blur-sm sm:p-6"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !isSubmittingBookRequest) {
+              setShowRequestBookModal(false);
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="book-request-title"
+            className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-xl overflow-y-auto rounded-2xl bg-white shadow-2xl sm:max-h-[calc(100dvh-3rem)] sm:rounded-3xl"
+          >
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-4 py-4 sm:px-6 sm:py-5">
+              <div>
+                <h2 id="book-request-title" className="text-lg font-extrabold text-slate-900 sm:text-xl">Request a Book</h2>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500 sm:text-sm">
+                  Tell us what you need and our team will review your request.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRequestBookModal(false)}
+                disabled={isSubmittingBookRequest}
+                aria-label="Close book request form"
+                className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:opacity-50"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleBookRequestSubmit} className="space-y-4 p-4 sm:space-y-5 sm:p-6">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <label className="block text-sm font-semibold text-slate-700">
+                  Student Name
+                  <input
+                    name="studentName"
+                    type="text"
+                    autoComplete="name"
+                    className="mt-1.5 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-normal text-slate-900 outline-none transition focus:border-blue-700 focus:ring-2 focus:ring-blue-100"
+                    placeholder="Your name"
+                  />
+                </label>
+                <label className="block text-sm font-semibold text-slate-700">
+                  Contact Number
+                  <input
+                    name="contactNumber"
+                    type="tel"
+                    autoComplete="tel"
+                    className="mt-1.5 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-normal text-slate-900 outline-none transition focus:border-blue-700 focus:ring-2 focus:ring-blue-100"
+                    placeholder="Your phone number"
+                  />
+                </label>
+              </div>
+              <label className="block text-sm font-semibold text-slate-700">
+                Email <span className="font-normal text-slate-400">(optional)</span>
+                <input
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  className="mt-1.5 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-normal text-slate-900 outline-none transition focus:border-blue-700 focus:ring-2 focus:ring-blue-100"
+                  placeholder="you@example.com"
+                />
+              </label>
+              <label className="block text-sm font-semibold text-slate-700">
+                Requested Book Title <span className="text-rose-600">*</span>
+                <input
+                  name="requestedBookTitle"
+                  type="text"
+                  required
+                  maxLength={200}
+                  className="mt-1.5 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-normal text-slate-900 outline-none transition focus:border-blue-700 focus:ring-2 focus:ring-blue-100"
+                  placeholder="Enter the book title or topic"
+                />
+              </label>
+              <label className="block text-sm font-semibold text-slate-700">
+                Exam Category
+                <input
+                  name="examCategory"
+                  type="text"
+                  className="mt-1.5 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-normal text-slate-900 outline-none transition focus:border-blue-700 focus:ring-2 focus:ring-blue-100"
+                  placeholder="e.g. SSC, Banking, Railway"
+                />
+              </label>
+              <label className="block text-sm font-semibold text-slate-700">
+                Additional Details
+                <textarea
+                  name="additionalDetails"
+                  rows={3}
+                  maxLength={2000}
+                  className="mt-1.5 w-full resize-y rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-normal text-slate-900 outline-none transition focus:border-blue-700 focus:ring-2 focus:ring-blue-100"
+                  placeholder="Share anything else that will help us find the right book."
+                />
+              </label>
+              {bookRequestError && (
+                <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                  {bookRequestError}
+                </p>
+              )}
+              <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowRequestBookModal(false)}
+                  disabled={isSubmittingBookRequest}
+                  className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingBookRequest}
+                  className="rounded-xl bg-blue-950 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-blue-900 disabled:cursor-wait disabled:opacity-60"
+                >
+                  {isSubmittingBookRequest ? 'Submitting…' : 'Submit Request'}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
+
       {/* Footer */}
       <footer className="border-t border-blue-950 bg-[#08152e] px-4 py-10 text-slate-300 sm:px-6 lg:px-8">
         <div className="mx-auto grid max-w-7xl grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-[1.2fr_1fr_1fr]">
           <div>
-            <div className="flex items-center gap-2">
-              <GraduationCap className="h-6 w-6 text-amber-400" />
-              <span className="text-lg font-black text-white">Xam<span className="text-amber-400">Toppr</span></span>
-            </div>
+            <a href="https://www.xamtoppr.com/" className="inline-flex rounded-lg bg-white px-1.5 py-1">
+              <img
+                src="/xamtoppr-logo.png"
+                alt="XamToppr - learning for earning"
+                className="h-12 w-auto"
+                width="139"
+                height="75"
+                loading="lazy"
+              />
+            </a>
             <p className="mt-3 max-w-sm text-sm leading-relaxed text-slate-400">
               Exam preparation books, study notes, and notification updates to help students learn, practice, and excel.
             </p>
@@ -2548,7 +2757,7 @@ function BookStoreApp() {
           <div>
             <h2 className="text-sm font-extrabold uppercase tracking-wider text-white">Support & Legal</h2>
             <ul className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-1">
-              {SUPPORT_LINKS.map(({ label, href }) => (
+              {supportLinks.map(({ label, href }) => (
                 <li key={href}>
                   <a href={href} className="inline-flex min-h-8 items-center text-slate-400 transition hover:text-amber-300">
                     {label}
@@ -2561,13 +2770,13 @@ function BookStoreApp() {
           <div>
             <h2 className="text-sm font-extrabold uppercase tracking-wider text-white">Contact Student Support</h2>
             <div className="mt-3 flex flex-col items-start gap-3 text-sm">
-              <a href="tel:+917717707121" className="inline-flex min-h-8 items-center gap-2 text-slate-300 transition hover:text-amber-300">
+              <a href={`tel:${siteSettings.supportHelpline.replace(/[^\d+]/g, '')}`} className="inline-flex min-h-8 items-center gap-2 text-slate-300 transition hover:text-amber-300">
                 <Phone className="h-4 w-4 shrink-0 text-amber-400" />
-                +91 77177 07121
+                {siteSettings.supportHelpline}
               </a>
-              <a href="mailto:info@xamtoppr.com" className="inline-flex min-h-8 items-center gap-2 break-all text-slate-300 transition hover:text-amber-300">
+              <a href={`mailto:${siteSettings.supportEmail}`} className="inline-flex min-h-8 items-center gap-2 break-all text-slate-300 transition hover:text-amber-300">
                 <Mail className="h-4 w-4 shrink-0 text-amber-400" />
-                info@xamtoppr.com
+                {siteSettings.supportEmail}
               </a>
             </div>
           </div>

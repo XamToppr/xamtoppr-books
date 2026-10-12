@@ -490,8 +490,66 @@ const book = defineType({
   ]
 });
 
+const bookRequest = defineType({
+  name: 'bookRequest',
+  title: 'Book Request',
+  type: 'document',
+  fields: [
+    defineField({ name: 'studentName', title: 'Student Name', type: 'string' }),
+    defineField({ name: 'contactNumber', title: 'Contact Number', type: 'string' }),
+    defineField({ name: 'email', title: 'Email', type: 'string' }),
+    defineField({
+      name: 'requestedBookTitle',
+      title: 'Requested Book Title',
+      type: 'string',
+      validation: (Rule) => Rule.required()
+    }),
+    defineField({ name: 'examCategory', title: 'Exam Category', type: 'string' }),
+    defineField({ name: 'additionalDetails', title: 'Additional Details', type: 'text', rows: 4 }),
+    defineField({
+      name: 'status',
+      title: 'Status',
+      type: 'string',
+      options: { list: ['Pending', 'Reviewed', 'Added to Library'] },
+      initialValue: 'Pending'
+    }),
+    defineField({
+      name: 'requestedAt',
+      title: 'Requested At',
+      type: 'datetime',
+      initialValue: () => new Date().toISOString()
+    })
+  ],
+  preview: {
+    select: { title: 'requestedBookTitle', subtitle: 'studentName' },
+    prepare: ({ title, subtitle }) => ({
+      title: title || 'Untitled book request',
+      subtitle: subtitle || 'Student name not provided'
+    })
+  },
+  orderings: [
+    { title: 'Newest first', name: 'requestedAtDesc', by: [{ field: 'requestedAt', direction: 'desc' }] }
+  ]
+});
+
+const siteSettings = defineType({
+  name: 'siteSettings',
+  title: 'Site Settings',
+  type: 'document',
+  fields: [
+    defineField({ name: 'supportHelpline', title: 'Support Helpline', type: 'string' }),
+    defineField({ name: 'supportEmail', title: 'Support Email', type: 'string' }),
+    defineField({ name: 'aboutUrl', title: 'About URL', type: 'url' }),
+    defineField({ name: 'termsUrl', title: 'Terms URL', type: 'url' }),
+    defineField({ name: 'privacyUrl', title: 'Privacy URL', type: 'url' }),
+    defineField({ name: 'refundUrl', title: 'Refund URL', type: 'url' })
+  ]
+});
+
 export const schemaTypes = [
   book,
+  bookRequest,
+  siteSettings,
   examNotification,
   importantDate,
   salaryEntry,
