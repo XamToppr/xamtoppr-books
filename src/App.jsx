@@ -1790,15 +1790,15 @@ function BookStoreApp() {
                   <div className="min-w-0 space-y-6">
                     <nav
                       aria-label="Notification sections"
-                      className="sticky top-40 z-30 -mx-4 overflow-x-auto border-b border-slate-200 bg-white/95 px-4 py-2.5 shadow-sm backdrop-blur"
+                      className="sticky top-40 z-30 w-full border-b border-slate-200 bg-white/95 px-3 py-3 shadow-sm backdrop-blur"
                     >
-                      <div className="flex min-w-max gap-2">
+                      <div className="flex flex-wrap gap-2 sm:gap-2.5 items-center">
                         {sections.map(([id, label]) => (
                           <button
                             type="button"
                             key={id}
                             onClick={() => document.getElementById(`notification-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                            className="rounded-full border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-900 transition hover:border-sky-300 hover:bg-sky-100"
+                            className="rounded-full border border-sky-200 bg-sky-50 px-3.5 py-1.5 text-xs sm:text-sm font-medium text-sky-900 transition-colors hover:border-sky-300 hover:bg-sky-100"
                           >
                             {label}
                           </button>
