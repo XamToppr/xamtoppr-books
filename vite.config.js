@@ -99,7 +99,7 @@ const localStudentProfileApi = (env) => {
     ? createClient({
       projectId: env.SANITY_PROJECT_ID || 'rkev3aui',
       dataset: env.SANITY_DATASET || 'production',
-      apiVersion: '2024-01-01',
+      apiVersion: '2023-01-01',
       token: writeToken,
       useCdn: false
     })
@@ -153,9 +153,11 @@ const localStudentProfileApi = (env) => {
           }
 
           const firebaseUser = await verifyFirebaseIdToken(idToken, firebaseApiKey)
-          await syncStudentDocument(client, firebaseUser, phone)
+          const document = await syncStudentDocument(client, firebaseUser, phone)
+          const result = { success: true, documentId: document._id }
+          console.log('Student profile synced to Sanity:', result)
           response.statusCode = 200
-          response.end(JSON.stringify({ success: true }))
+          response.end(JSON.stringify(result))
         } catch (error) {
           if (error instanceof SyntaxError) {
             response.statusCode = 400
@@ -170,7 +172,11 @@ const localStudentProfileApi = (env) => {
 
           console.error('Failed to sync a local student profile to Sanity:', error)
           response.statusCode = 500
-          response.end(JSON.stringify({ success: false, error: 'Unable to sync the student profile.' }))
+          response.end(JSON.stringify({
+            success: false,
+            error: 'Unable to sync the student profile.',
+            details: error.message
+          }))
         }
       })
     }

@@ -10,7 +10,7 @@ export default function UserButton() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Check karein agar user logged in hai par phone missing hai to popup force open rahe
-  const needsPhone = currentUser && (!userProfile?.phone || userProfile.phone.trim() === "");
+  const needsPhone = currentUser && !/^[6-9]\d{9}$/.test(userProfile?.phone?.trim() || "");
 
   return (
     <>

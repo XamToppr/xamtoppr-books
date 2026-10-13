@@ -57,16 +57,22 @@ export default async function handler(request, response) {
   const sanityClient = createClient({
     projectId: process.env.SANITY_PROJECT_ID || 'rkev3aui',
     dataset: process.env.SANITY_DATASET || 'production',
-    apiVersion: '2024-01-01',
+    apiVersion: '2023-01-01',
     token: sanityWriteToken,
     useCdn: false
   });
 
   try {
-    await syncStudentDocument(sanityClient, firebaseUser, phone);
-    return response.status(200).json({ success: true });
+    const document = await syncStudentDocument(sanityClient, firebaseUser, phone);
+    const result = { success: true, documentId: document._id };
+    console.log('Student profile synced to Sanity:', result);
+    return response.status(200).json(result);
   } catch (error) {
     console.error('Failed to sync a student profile to Sanity:', error);
-    return response.status(500).json({ success: false, error: 'Unable to sync the student profile.' });
+    return response.status(500).json({
+      success: false,
+      error: 'Unable to sync the student profile.',
+      details: error.message
+    });
   }
 }

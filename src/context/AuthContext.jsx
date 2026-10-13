@@ -5,10 +5,14 @@ import {
   onAuthStateChanged 
 } from "firebase/auth";
 import { 
+  collection,
   doc, 
   getDoc, 
+  getDocs,
+  query,
   setDoc, 
-  serverTimestamp 
+  serverTimestamp,
+  where
 } from "firebase/firestore";
 import { auth, googleProvider, db } from "../services/firebase";
 
@@ -40,8 +44,9 @@ const syncStudentProfile = async (user, phone = "") => {
     });
 
     const result = await response.json();
+    console.log("Sanity sync response:", result);
     if (!response.ok) {
-      throw new Error(result.error || `Student profile sync failed with status ${response.status}.`);
+      throw new Error(result.details || result.error || `Student profile sync failed with status ${response.status}.`);
     }
   } catch (err) {
     console.error("Sanity sync error:", err);
@@ -110,6 +115,20 @@ export const AuthProvider = ({ children }) => {
   const updatePhoneNumber = async (phoneNumber) => {
     if (!currentUser) return;
     try {
+      const phoneQuery = query(
+        collection(db, "users"),
+        where("phone", "==", phoneNumber)
+      );
+      const matchingUsers = await getDocs(phoneQuery);
+      const phoneIsRegistered = matchingUsers.docs.some(
+        (userDocument) => userDocument.id !== currentUser.uid
+      );
+      if (phoneIsRegistered) {
+        const error = new Error("This mobile number is already registered with another account.");
+        error.code = "PHONE_ALREADY_REGISTERED";
+        throw error;
+      }
+
       const userRef = doc(db, "users", currentUser.uid);
       await setDoc(userRef, { phone: phoneNumber }, { merge: true });
       setUserProfile((prev) => ({ ...prev, phone: phoneNumber }));

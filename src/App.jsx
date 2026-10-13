@@ -635,7 +635,7 @@ function BookStoreApp() {
   };
 
   const handlePaidBookPurchase = (event, book) => {
-    const hasPhone = typeof userProfile?.phone === 'string' && userProfile.phone.trim().length > 0;
+    const hasPhone = /^[6-9]\d{9}$/.test(userProfile?.phone?.trim() || '');
     if (!currentUser || !hasPhone) {
       event.preventDefault();
       if (!currentUser || viewportSize.width < 1280) {

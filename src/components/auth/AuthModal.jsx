@@ -7,10 +7,9 @@ export default function AuthModal({ isOpen, onClose }) {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  if (!isOpen) return null;
-
   // Check karein ki user login hai lekin phone number missing hai ya nahi
-  const needsPhone = currentUser && (!userProfile?.phone || userProfile.phone.trim() === "");
+  const needsPhone = currentUser && !/^[6-9]\d{9}$/.test(userProfile?.phone?.trim() || "");
+  if (!isOpen || (currentUser && !needsPhone)) return null;
 
   const handleGoogleLogin = async () => {
     try {
@@ -37,7 +36,9 @@ export default function AuthModal({ isOpen, onClose }) {
       await updatePhoneNumber(cleanPhone);
       onClose();
     } catch (err) {
-      setError("Failed to save mobile number. Please try again.");
+      setError(err.code === "PHONE_ALREADY_REGISTERED"
+        ? "This mobile number is already registered with another account."
+        : "Failed to save mobile number. Please try again.");
     } finally {
       setSubmitting(false);
     }
