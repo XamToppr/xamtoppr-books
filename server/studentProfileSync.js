@@ -32,7 +32,7 @@ export function syncStudentDocument(client, firebaseUser, phone) {
     : new Date().toISOString();
 
   return client.createOrReplace({
-    _id: `studentUser-${firebaseUser.localId}`,
+    _id: `student_${firebaseUser.localId}`,
     _type: 'studentUser',
     fullName: firebaseUser.displayName || 'Student',
     email: firebaseUser.email || '',

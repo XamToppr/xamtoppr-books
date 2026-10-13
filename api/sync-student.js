@@ -9,7 +9,10 @@ export default async function handler(request, response) {
     return response.status(405).json({ success: false, error: 'Method not allowed.' });
   }
 
-  const sanityWriteToken = process.env.SANITY_API_WRITE_TOKEN;
+  const sanityWriteToken = process.env.SANITY_WRITE_TOKEN
+    || process.env.SANITY_API_WRITE_TOKEN
+    || process.env.VITE_SANITY_WRITE_TOKEN
+    || process.env.VITE_SANITY_API_WRITE_TOKEN;
   const firebaseApiKey = process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_WEB_API_KEY;
   if (!sanityWriteToken || !firebaseApiKey) {
     console.error('Student profile sync requires Sanity and Firebase server configuration.');

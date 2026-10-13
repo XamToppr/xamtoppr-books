@@ -90,7 +90,10 @@ const localBookRequestApi = (env) => {
 }
 
 const localStudentProfileApi = (env) => {
-  const writeToken = env.SANITY_API_WRITE_TOKEN
+  const writeToken = env.SANITY_WRITE_TOKEN
+    || env.SANITY_API_WRITE_TOKEN
+    || env.VITE_SANITY_WRITE_TOKEN
+    || env.VITE_SANITY_API_WRITE_TOKEN
   const firebaseApiKey = env.VITE_FIREBASE_API_KEY || env.FIREBASE_WEB_API_KEY
   const client = writeToken
     ? createClient({

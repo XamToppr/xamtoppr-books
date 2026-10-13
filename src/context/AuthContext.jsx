@@ -15,18 +15,37 @@ import { auth, googleProvider, db } from "../services/firebase";
 const AuthContext = createContext(null);
 
 const syncStudentProfile = async (user, phone = "") => {
-  const idToken = await user.getIdToken();
-  const response = await fetch("/api/sync-student", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${idToken}`,
-    },
-    body: JSON.stringify({ phone }),
-  });
+  const userData = {
+    _id: `student_${user.uid}`,
+    _type: "studentUser",
+    fullName: user.displayName || "Student",
+    email: user.email || "",
+    phone,
+    firebaseUid: user.uid,
+    createdAt: user.metadata.creationTime
+      ? new Date(user.metadata.creationTime).toISOString()
+      : new Date().toISOString(),
+  };
 
-  if (!response.ok) {
-    throw new Error(`Student profile sync failed with status ${response.status}.`);
+  console.log("Syncing user to Sanity:", userData);
+  try {
+    const idToken = await user.getIdToken();
+    const response = await fetch("/api/sync-student", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({ phone }),
+    });
+
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.error || `Student profile sync failed with status ${response.status}.`);
+    }
+  } catch (err) {
+    console.error("Sanity sync error:", err);
+    throw err;
   }
 };
 
