@@ -90,6 +90,8 @@ const hasRealContent = (value) => {
   return false;
 };
 
+const isAbortError = (error) => error?.name === 'AbortError';
+
 const getHighDefinitionSanityImageUrl = (assetUrl) => {
   if (!assetUrl) return '';
   try {
@@ -379,6 +381,7 @@ function BookStoreApp() {
         setBookLoadError('');
       })
       .catch((error) => {
+        if (isAbortError(error)) return;
         console.error('Failed to load books from Sanity:', error);
         if (isCurrentRequest) {
           setBookLoadError('Books could not be loaded from Sanity. Please try again later.');
@@ -405,6 +408,7 @@ function BookStoreApp() {
         }
       })
       .catch((error) => {
+        if (isAbortError(error)) return;
         console.error('Failed to load site settings from Sanity:', error);
       });
 
@@ -425,6 +429,7 @@ function BookStoreApp() {
         setBlogLoadError('');
       })
       .catch((error) => {
+        if (isAbortError(error)) return;
         console.error('Failed to load exam notifications from Sanity:', error);
         if (isCurrentRequest) {
           setBlogLoadError('Exam notifications could not be loaded. Please try again later.');
@@ -564,6 +569,7 @@ function BookStoreApp() {
         setSelectedBlogDetail(notification);
       })
       .catch((error) => {
+        if (isAbortError(error)) return;
         console.error('Failed to load exam notification details from Sanity:', error);
         if (isCurrentRequest) {
           setBlogDetailError('Notification details could not be loaded. Please try again.');
@@ -629,6 +635,7 @@ function BookStoreApp() {
         .inc({ downloadsCount: 1 })
         .commit()
         .catch((error) => {
+          if (isAbortError(error)) return;
           console.error('Failed to update the book download count in Sanity:', error);
         });
     }
@@ -678,6 +685,7 @@ function BookStoreApp() {
         .inc({ totalReviews: 1 })
         .commit()
         .catch((error) => {
+          if (isAbortError(error)) return;
           console.error('Failed to update the book rating in Sanity:', error);
         });
     }
@@ -734,6 +742,7 @@ function BookStoreApp() {
       setShowRequestBookModal(false);
       showToast('Your book request has been submitted successfully!');
     } catch (error) {
+      if (isAbortError(error)) return;
       console.error('Failed to submit the book request:', error);
       setBookRequestError(error instanceof Error && error.message
         ? error.message
@@ -3256,6 +3265,7 @@ function SiteContentPage({ page }) {
         if (isCurrentRequest) setSettings(document);
       })
       .catch((error) => {
+        if (isAbortError(error)) return;
         console.error(`Failed to load ${page.title} content from Sanity:`, error);
         if (isCurrentRequest) {
           setLoadError(`The ${page.title.toLowerCase()} page could not be loaded. Please try again later.`);

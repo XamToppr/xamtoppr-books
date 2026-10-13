@@ -46,9 +46,14 @@ export default async function handler(request, response) {
     return response.status(400).json({ success: false, error: 'A valid request body is required.' });
   }
 
+  const requestedUid = getString(body.uid);
   const phone = getString(body.phone);
-  if (phone.length > 32) {
-    return response.status(400).json({ success: false, error: 'Phone number is too long.' });
+  const profile = {
+    fullName: getString(body.name),
+    email: getString(body.email)
+  };
+  if (!requestedUid || phone.length > 32 || profile.fullName.length > 200 || profile.email.length > 320) {
+    return response.status(400).json({ success: false, error: 'Student profile fields are invalid.' });
   }
 
   let firebaseUser;
@@ -62,6 +67,10 @@ export default async function handler(request, response) {
     return response.status(502).json({ success: false, error: 'Unable to verify the account right now.' });
   }
 
+  if (requestedUid !== firebaseUser.localId) {
+    return response.status(403).json({ success: false, error: 'The requested user does not match the authenticated account.' });
+  }
+
   const sanityClient = createClient({
     projectId: process.env.SANITY_PROJECT_ID || 'rkev3aui',
     dataset: process.env.SANITY_DATASET || 'production',
@@ -71,7 +80,7 @@ export default async function handler(request, response) {
   });
 
   try {
-    const document = await syncStudentDocument(sanityClient, firebaseUser, phone);
+    const document = await syncStudentDocument(sanityClient, firebaseUser, phone, profile);
     const result = { success: true, documentId: document._id };
     console.log('Student profile synced to Sanity:', result);
     return response.status(200).json(result);

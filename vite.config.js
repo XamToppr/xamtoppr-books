@@ -145,15 +145,26 @@ const localStudentProfileApi = (env) => {
             return
           }
 
+          const requestedUid = typeof body.uid === 'string' ? body.uid.trim() : ''
           const phone = typeof body.phone === 'string' ? body.phone.trim() : ''
-          if (phone.length > 32) {
+          const profile = {
+            fullName: typeof body.name === 'string' ? body.name.trim() : '',
+            email: typeof body.email === 'string' ? body.email.trim() : ''
+          }
+          if (!requestedUid || phone.length > 32 || profile.fullName.length > 200 || profile.email.length > 320) {
             response.statusCode = 400
-            response.end(JSON.stringify({ success: false, error: 'Phone number is too long.' }))
+            response.end(JSON.stringify({ success: false, error: 'Student profile fields are invalid.' }))
             return
           }
 
           const firebaseUser = await verifyFirebaseIdToken(idToken, firebaseApiKey)
-          const document = await syncStudentDocument(client, firebaseUser, phone)
+          if (requestedUid !== firebaseUser.localId) {
+            response.statusCode = 403
+            response.end(JSON.stringify({ success: false, error: 'The requested user does not match the authenticated account.' }))
+            return
+          }
+
+          const document = await syncStudentDocument(client, firebaseUser, phone, profile)
           const result = { success: true, documentId: document._id }
           console.log('Student profile synced to Sanity:', result)
           response.statusCode = 200

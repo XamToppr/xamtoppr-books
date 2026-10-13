@@ -14,7 +14,12 @@ import {
   serverTimestamp,
   where
 } from "firebase/firestore";
-import { auth, googleProvider, db } from "../services/firebase";
+import {
+  auth,
+  googleProvider,
+  db,
+  ensureBrowserLocalPersistence
+} from "../services/firebase";
 
 const AuthContext = createContext(null);
 
@@ -40,7 +45,12 @@ const syncStudentProfile = async (user, phone = "") => {
         "Content-Type": "application/json",
         Authorization: `Bearer ${idToken}`,
       },
-      body: JSON.stringify({ phone }),
+      body: JSON.stringify({
+        uid: user.uid,
+        email: userData.email,
+        phone: userData.phone,
+        name: userData.fullName,
+      }),
     });
 
     const result = await response.json();
@@ -48,9 +58,11 @@ const syncStudentProfile = async (user, phone = "") => {
     if (!response.ok) {
       throw new Error(result.details || result.error || `Student profile sync failed with status ${response.status}.`);
     }
+    return true;
   } catch (err) {
+    if (err?.name === "AbortError") return false;
     console.error("Sanity sync error:", err);
-    throw err;
+    return false;
   }
 };
 
@@ -59,28 +71,10 @@ export const AuthProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Firestore se profile fetch karna
-  const fetchUserProfile = async (uid) => {
-    try {
-      const userRef = doc(db, "users", uid);
-      const snap = await getDoc(userRef);
-      if (snap.exists()) {
-        const profile = snap.data();
-        setUserProfile(profile);
-        return profile;
-      } else {
-        setUserProfile(null);
-        return null;
-      }
-    } catch (err) {
-      console.error("Error fetching user profile:", err);
-      throw err;
-    }
-  };
-
   // Google Sign-In
   const signInWithGoogle = async () => {
     try {
+      await ensureBrowserLocalPersistence();
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
       
@@ -103,11 +97,6 @@ export const AuthProvider = ({ children }) => {
         profile = snap.data();
       }
       setUserProfile(profile);
-      try {
-        await syncStudentProfile(user, profile.phone || "");
-      } catch (error) {
-        console.error("Unable to sync the signed-in student profile to Sanity:", error);
-      }
       return user;
     } catch (error) {
       console.error("Google sign-in error:", error);
@@ -136,11 +125,7 @@ export const AuthProvider = ({ children }) => {
       const userRef = doc(db, "users", currentUser.uid);
       await setDoc(userRef, { phone: phoneNumber }, { merge: true });
       setUserProfile((prev) => ({ ...prev, phone: phoneNumber }));
-      try {
-        await syncStudentProfile(currentUser, phoneNumber);
-      } catch (error) {
-        console.error("Unable to sync the updated student phone number to Sanity:", error);
-      }
+      void syncStudentProfile(currentUser, phoneNumber);
     } catch (error) {
       console.error("Error updating phone:", error);
       throw error;
@@ -159,22 +144,48 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        try {
-          await fetchUserProfile(user.uid);
-        } catch {
-          setUserProfile(null);
-        }
-        setCurrentUser(user);
-      } else {
-        setUserProfile(null);
-        setCurrentUser(null);
-      }
-      setLoading(false);
-    });
+    let isActive = true;
+    let unsubscribe;
 
-    return () => unsubscribe();
+    ensureBrowserLocalPersistence()
+      .then(() => {
+        if (!isActive) return;
+        unsubscribe = onAuthStateChanged(auth, async (user) => {
+          try {
+            if (user) {
+              const userRef = doc(db, "users", user.uid);
+              const profileSnapshot = await getDoc(userRef);
+              if (!isActive) return;
+              const profile = profileSnapshot.exists() ? profileSnapshot.data() : null;
+              setUserProfile(profile);
+              setCurrentUser(user);
+              void syncStudentProfile(user, profile?.phone || "");
+            } else {
+              setUserProfile(null);
+              setCurrentUser(null);
+            }
+          } catch (error) {
+            if (error?.name !== "AbortError") {
+              console.error("Failed to restore the Firebase authentication session:", error);
+            }
+            if (isActive) {
+              setUserProfile(null);
+              setCurrentUser(user);
+            }
+          } finally {
+            if (isActive) setLoading(false);
+          }
+        });
+      })
+      .catch((error) => {
+        console.error("Failed to enable Firebase browser-local persistence:", error);
+        if (isActive) setLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+      unsubscribe?.();
+    };
   }, []);
 
   return (

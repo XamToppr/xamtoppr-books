@@ -25,19 +25,14 @@ export async function verifyFirebaseIdToken(idToken, apiKey) {
   return user;
 }
 
-export function syncStudentDocument(client, firebaseUser, phone) {
-  const createdAtTimestamp = Number(firebaseUser.createdAt);
-  const createdAt = Number.isFinite(createdAtTimestamp)
-    ? new Date(createdAtTimestamp).toISOString()
-    : new Date().toISOString();
-
+export function syncStudentDocument(client, firebaseUser, phone, profile = {}) {
   return client.createOrReplace({
     _id: `student_${firebaseUser.localId}`,
     _type: 'studentUser',
-    fullName: firebaseUser.displayName || 'Student',
-    email: firebaseUser.email || '',
+    fullName: profile.fullName || firebaseUser.displayName || 'Student',
+    email: profile.email || firebaseUser.email || '',
     phone,
     firebaseUid: firebaseUser.localId,
-    createdAt
+    createdAt: new Date().toISOString()
   });
 }
