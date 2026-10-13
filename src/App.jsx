@@ -1125,7 +1125,7 @@ function BookStoreApp() {
           className="relative overflow-hidden bg-gradient-to-br from-[#0c2356] via-[#102d6b] to-[#153a8a] text-white shadow-inner"
         >
           <div className="pointer-events-none absolute inset-0 opacity-10 bg-[radial-gradient(#f59e0b_1px,transparent_1px)] [background-size:16px_16px]" />
-          <div className="relative mx-auto h-[720px] max-w-7xl px-4 py-6 sm:h-[470px] sm:px-6 sm:py-12 lg:h-[500px] lg:px-8">
+          <div className="relative mx-auto h-[560px] max-w-7xl px-4 py-6 sm:h-[470px] sm:px-6 sm:py-12 lg:h-[500px] lg:px-8">
             {featuredBooks.length > 0 ? (
               <>
                 {featuredBooks.map((book, index) => (
@@ -1144,63 +1144,16 @@ function BookStoreApp() {
                       <h1 className="mt-2 line-clamp-2 max-w-3xl text-2xl font-black leading-tight tracking-tight text-white sm:mt-4 sm:text-4xl lg:text-5xl">
                         {book.title}
                       </h1>
-                      <div className="mt-2 flex max-w-full flex-wrap gap-1.5 overflow-hidden text-[10px] font-bold sm:mt-4 sm:gap-2 sm:text-xs">
-                        {[book.subject, book.exam].filter(Boolean).slice(0, 2).map((tag) => (
-                          <span key={tag} className="max-w-full truncate rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-blue-50">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
                       <p className="mt-2 line-clamp-2 max-w-2xl text-xs leading-relaxed text-blue-100 sm:mt-4 sm:text-base">
                         {book.descriptionText || `Prepare smarter with ${book.subject} resources curated for ${book.exam} aspirants.`}
                       </p>
-                      <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-5 sm:gap-3">
-                        <span className="rounded-xl bg-amber-300 px-3 py-1.5 text-base font-black text-slate-950 shadow-lg sm:px-4 sm:py-2 sm:text-lg">
-                          {book.isFree ? 'FREE' : book.price}
-                        </span>
-                        {!book.isFree && book.mrp > book.offerPrice && (
-                          <span className="text-sm font-semibold text-blue-200 line-through">MRP ₹{book.mrp}</span>
-                        )}
-                      </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-6 sm:gap-3">
-                        {book.isFree ? (
-                          <a
-                            href={book.pdfUrl || '#'}
-                            onClick={(event) => {
-                              if (!book.pdfUrl) {
-                                event.preventDefault();
-                                showToast('Download link will be updated soon!');
-                              } else {
-                                handleBookDownload(book);
-                              }
-                            }}
-                            className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-4 py-2.5 text-xs font-extrabold text-slate-950 shadow-lg transition hover:bg-amber-300 sm:px-5 sm:py-3 sm:text-sm"
-                          >
-                            <Download className="h-4 w-4" /> Download Free
-                          </a>
-                        ) : (
-                          <a
-                            href={book.pdfUrl || '#'}
-                            target={book.pdfUrl ? '_blank' : undefined}
-                            rel={book.pdfUrl ? 'noopener noreferrer' : undefined}
-                            onClick={(event) => handlePaidBookPurchase(event, book)}
-                            className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-4 py-2.5 text-xs font-extrabold text-slate-950 shadow-lg transition hover:bg-amber-300 sm:px-5 sm:py-3 sm:text-sm"
-                          >
-                            <ShoppingCart className="h-4 w-4" /> Buy Now
-                          </a>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowFlipbookModal(book);
-                            setFlipPageNumber(0);
-                            setActiveSlideIndex(0);
-                          }}
-                          className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/10 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-white/20 sm:px-5 sm:py-3 sm:text-sm"
-                        >
-                          <BookOpen className="h-4 w-4" /> 3D Flipbook Sample
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBookForModal(book)}
+                        className="mt-4 inline-flex items-center gap-2 rounded-full bg-amber-400 px-4 py-2.5 text-xs font-extrabold text-slate-950 shadow-lg transition hover:bg-amber-300 sm:mt-6 sm:px-5 sm:py-3 sm:text-sm"
+                      >
+                        View Details <ArrowRight className="h-4 w-4" />
+                      </button>
                     </div>
 
                     <div className="relative z-10 order-1 mx-auto flex h-[190px] w-[142px] items-center justify-center sm:order-2 sm:h-[300px] sm:w-[225px] lg:h-[380px] lg:w-[285px]">
