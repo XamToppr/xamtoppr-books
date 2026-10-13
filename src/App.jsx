@@ -1651,31 +1651,16 @@ function BookStoreApp() {
                         )}
                         
                         {isPaid ? (
-                          <>
-                            <a
-                              href={book.pdfUrl || '#'}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(event) => handlePaidBookPurchase(event, book)}
-                              className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2.5 rounded-xl transition font-bold text-xs shadow-sm flex items-center gap-1.5"
-                            >
-                              <ShoppingCart className="w-3.5 h-3.5" />
-                              <span>{book.price ? `Buy • ${book.price}` : 'Buy'}</span>
-                            </a>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (cartItems.some((item) => item.id === book.sanityId)) {
-                                  setShowCartDrawer(true);
-                                } else {
-                                  handleAddToCart(book);
-                                }
-                              }}
-                              className="rounded-xl border border-blue-200 bg-blue-50 px-2.5 py-2.5 text-[10px] font-bold text-blue-950 transition hover:bg-blue-100"
-                            >
-                              {cartItems.some((item) => item.id === book.sanityId) ? 'Go to Cart' : 'Add to Cart'}
-                            </button>
-                          </>
+                          <a
+                            href={book.pdfUrl || '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(event) => handlePaidBookPurchase(event, book)}
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2.5 rounded-xl transition font-bold text-xs shadow-sm flex items-center gap-1.5"
+                          >
+                            <ShoppingCart className="w-3.5 h-3.5" />
+                            <span>{book.price ? `Buy • ${book.price}` : 'Buy'}</span>
+                          </a>
                         ) : (
                           <a
                             href={book.pdfUrl || '#'}
