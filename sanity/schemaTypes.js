@@ -909,7 +909,35 @@ const studentUser = defineType({
     defineField({ name: 'email', title: 'Email', type: 'string' }),
     defineField({ name: 'phone', title: 'Phone', type: 'string' }),
     defineField({ name: 'firebaseUid', title: 'Firebase UID', type: 'string' }),
-    defineField({ name: 'createdAt', title: 'Created At', type: 'datetime' })
+    defineField({ name: 'createdAt', title: 'Created At', type: 'datetime' }),
+    defineField({
+      name: 'purchasedBooks',
+      title: 'Purchased Books / Orders',
+      type: 'array',
+      of: [
+        defineArrayMember({
+          type: 'object',
+          fields: [
+            defineField({
+              name: 'book',
+              title: 'Book',
+              type: 'reference',
+              to: [{ type: 'book' }]
+            }),
+            defineField({ name: 'bookTitle', title: 'Book Title', type: 'string' }),
+            defineField({ name: 'amount', title: 'Amount Paid', type: 'number' }),
+            defineField({ name: 'orderId', title: 'Order / Payment ID', type: 'string' }),
+            defineField({ name: 'purchasedAt', title: 'Purchase Date', type: 'datetime' })
+          ],
+          preview: {
+            select: {
+              title: 'bookTitle',
+              subtitle: 'orderId'
+            }
+          }
+        })
+      ]
+    })
   ],
   preview: {
     select: { title: 'fullName', subtitle: 'email' },

@@ -1,5 +1,6 @@
+import { randomUUID } from 'node:crypto'
 import { createClient } from '@sanity/client'
-import { syncStudentDocument, verifyFirebaseIdToken } from './server/studentProfileSync.js'
+import { appendStudentPurchase, syncStudentDocument, verifyFirebaseIdToken } from './server/studentProfileSync.js'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -201,6 +202,130 @@ const localStudentProfileApi = (env) => {
   }
 }
 
+const localStudentPurchaseApi = (env) => {
+  const writeToken = env.SANITY_API_WRITE_TOKEN
+    || env.VITE_SANITY_WRITE_TOKEN
+    || env.VITE_SANITY_API_WRITE_TOKEN
+  const client = writeToken
+    ? createClient({
+      projectId: env.SANITY_PROJECT_ID || env.VITE_SANITY_PROJECT_ID || 'rkev3aui',
+      dataset: env.SANITY_DATASET || env.VITE_SANITY_DATASET || 'production',
+      apiVersion: '2023-01-01',
+      token: writeToken,
+      useCdn: false
+    })
+    : null
+
+  return {
+    name: 'local-student-purchase-api',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use('/api/track-purchase', async (request, response) => {
+        response.setHeader('Content-Type', 'application/json')
+
+        if (request.method !== 'POST') {
+          response.setHeader('Allow', 'POST')
+          response.statusCode = 405
+          response.end(JSON.stringify({ success: false, error: 'Method not allowed.' }))
+          return
+        }
+
+        if (!client) {
+          response.statusCode = 503
+          response.end(JSON.stringify({
+            success: false,
+            error: 'Purchase tracking is missing a server-side Sanity write token.'
+          }))
+          return
+        }
+
+        const idToken = request.headers.authorization?.match(/^Bearer\s+(.+)$/i)?.[1]
+        if (!idToken) {
+          response.statusCode = 401
+          response.end(JSON.stringify({ success: false, error: 'Authentication is required.' }))
+          return
+        }
+
+        try {
+          let rawBody = ''
+          for await (const chunk of request) {
+            rawBody += chunk
+          }
+
+          const body = JSON.parse(rawBody)
+          if (!body || typeof body !== 'object' || Array.isArray(body)) {
+            response.statusCode = 400
+            response.end(JSON.stringify({ success: false, error: 'A valid request body is required.' }))
+            return
+          }
+
+          const uid = typeof body.uid === 'string' ? body.uid.trim() : ''
+          const bookId = typeof body.bookId === 'string' ? body.bookId.trim() : ''
+          const phone = typeof body.phone === 'string' ? body.phone.trim() : ''
+          const firebaseApiKey = typeof body.firebaseApiKey === 'string'
+            ? body.firebaseApiKey.trim()
+            : env.VITE_FIREBASE_API_KEY || env.FIREBASE_WEB_API_KEY
+          if (!uid || !bookId || bookId.length > 200 || phone.length > 32) {
+            response.statusCode = 400
+            response.end(JSON.stringify({ success: false, error: 'Purchase details are invalid.' }))
+            return
+          }
+          if (!firebaseApiKey) {
+            response.statusCode = 503
+            response.end(JSON.stringify({
+              success: false,
+              error: 'Purchase tracking is missing the Firebase public API key required to verify the signed-in user.'
+            }))
+            return
+          }
+
+          const firebaseUser = await verifyFirebaseIdToken(idToken, firebaseApiKey)
+          if (uid !== firebaseUser.localId) {
+            response.statusCode = 403
+            response.end(JSON.stringify({ success: false, error: 'The requested user does not match the authenticated account.' }))
+            return
+          }
+
+          const orderId = `checkout_${randomUUID()}`
+          const result = await appendStudentPurchase(client, firebaseUser, {
+            bookId,
+            phone,
+            orderId
+          })
+          console.log('Student purchase event synced to Sanity:', result)
+          response.statusCode = 200
+          response.end(JSON.stringify({ success: true, ...result }))
+        } catch (error) {
+          if (error instanceof SyntaxError) {
+            response.statusCode = 400
+            response.end(JSON.stringify({ success: false, error: 'Request body must be valid JSON.' }))
+            return
+          }
+          if (error.code === 'INVALID_FIREBASE_TOKEN') {
+            response.statusCode = 401
+            response.end(JSON.stringify({ success: false, error: 'Authentication is invalid or expired.' }))
+            return
+          }
+          if (error.code === 'BOOK_NOT_FOUND') {
+            response.statusCode = 404
+            response.end(JSON.stringify({ success: false, error: error.message }))
+            return
+          }
+          if (error.code === 'BOOK_NOT_PURCHASABLE') {
+            response.statusCode = 400
+            response.end(JSON.stringify({ success: false, error: error.message }))
+            return
+          }
+
+          console.error('Failed to sync a local student purchase event to Sanity:', error)
+          response.statusCode = 500
+          response.end(JSON.stringify({ success: false, error: 'Unable to sync the purchase event.' }))
+        }
+      })
+    }
+  }
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
@@ -211,6 +336,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       localBookRequestApi(env),
       localStudentProfileApi(env),
+      localStudentPurchaseApi(env),
       react(),
       tailwindcss(),
     ],

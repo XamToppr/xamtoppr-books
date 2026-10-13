@@ -22,6 +22,7 @@ The XamToppr Books web portal provides competitive-exam books, study notes, PDF 
 | `sanity/schemaTypes.js` | Sanity document and object schemas |
 | `sanity.config.js` | Embedded Studio configuration at `/admin` |
 | `api/sync-student.js` | Authenticated server-side student profile upsert |
+| `api/track-purchase.js` | Authenticated checkout/purchase event tracking |
 | `api/request-book.js` | Server-side book request creation |
 | `server/studentProfileSync.js` | Firebase ID-token verification and student document mapping |
 | `vite.config.js` | Vite development server and local API middleware |
@@ -48,7 +49,13 @@ Sanity Studio is available at `/admin`. Schemas in `sanity/schemaTypes.js` inclu
 - `examNotification`
 - Supporting objects for dates, salary entries, selection stages, exam patterns, syllabus, document specifications, tables, rich notes, and guide blocks.
 
-The `studentUser` document uses a stable ID (`student_<Firebase UID>`) and fields `fullName`, `email`, `phone`, `firebaseUid`, and `createdAt`. Each login/profile update replaces the corresponding document so the latest name, email, and phone are visible in Studio. `bookRequest` documents are also written through a server endpoint.
+The `studentUser` document uses a stable ID (`student_<Firebase UID>`) and fields `fullName`, `email`, `phone`, `firebaseUid`, `createdAt`, and `purchasedBooks`. Each login/profile sync updates profile fields without replacing existing orders. `purchasedBooks` contains a book reference, title snapshot, amount, order/payment ID, and purchase timestamp. `bookRequest` documents are also written through a server endpoint.
+
+### Purchase tracking
+
+When a signed-in user with a saved phone clicks a paid book's **Buy Now** action, the app adds the Sanity book ID to `users/{uid}.purchasedBookIds` in Firestore and sends an authenticated request to `/api/track-purchase`. The server verifies the Firebase ID token, looks up the book in Sanity (using the catalog title and current offer price rather than trusting client-supplied values), then appends a purchase entry to `student_<uid>.purchasedBooks`. The entry is visible under the student's document in Sanity Studio.
+
+The current application opens the configured book link and does not receive a payment-provider confirmation or webhook. Therefore, this entry represents a **checkout/test-purchase trigger**, and its generated `checkout_<UUID>` value is a tracking ID rather than a confirmed gateway payment ID. The amount is the catalog offer price at click time. To record only settled payments, connect the provider's verified payment webhook before treating these entries as completed purchases.
 
 The public Sanity client is read-only. Book requests and student records are written by the server endpoints using a Sanity token with dataset write permission. **Do not configure a write token in browser code or commit real credentials.** Although compatibility fallbacks accept `VITE_SANITY_WRITE_TOKEN` and `VITE_SANITY_API_WRITE_TOKEN` on the server, prefer the non-prefixed, server-only `SANITY_API_WRITE_TOKEN`.
 

@@ -170,7 +170,7 @@ const formatDownloadCount = (count) => (
 );
 
 function BookStoreApp() {
-  const { currentUser, userProfile } = useAuth();
+  const { currentUser, userProfile, trackBookPurchase } = useAuth();
   const [booksList, setBooksList] = useState([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -645,6 +645,10 @@ function BookStoreApp() {
       return;
     }
 
+    void trackBookPurchase(book).catch((error) => {
+      console.error('Failed to track the book checkout:', error);
+      showToast(error.message || 'Checkout tracking could not be saved.');
+    });
     handleBookDownload(book);
   };
 

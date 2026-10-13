@@ -26,13 +26,70 @@ export async function verifyFirebaseIdToken(idToken, apiKey) {
 }
 
 export function syncStudentDocument(client, firebaseUser, phone, profile = {}) {
-  return client.createOrReplace({
-    _id: `student_${firebaseUser.localId}`,
+  const documentId = `student_${firebaseUser.localId}`;
+  const createdAt = new Date().toISOString();
+  return client.createIfNotExists({
+    _id: documentId,
     _type: 'studentUser',
     fullName: profile.fullName || firebaseUser.displayName || 'Student',
     email: profile.email || firebaseUser.email || '',
     phone,
     firebaseUid: firebaseUser.localId,
-    createdAt: new Date().toISOString()
+    createdAt,
+    purchasedBooks: []
+  }).then(() => client.patch(documentId)
+    .set({
+      fullName: profile.fullName || firebaseUser.displayName || 'Student',
+      email: profile.email || firebaseUser.email || '',
+      phone,
+      firebaseUid: firebaseUser.localId
+    })
+    .setIfMissing({ createdAt, purchasedBooks: [] })
+    .commit());
+}
+
+export async function appendStudentPurchase(client, firebaseUser, { bookId, phone, orderId }) {
+  const book = await client.getDocument(bookId);
+  if (!book || book._type !== 'book') {
+    const error = new Error('The selected book could not be found.');
+    error.code = 'BOOK_NOT_FOUND';
+    throw error;
+  }
+
+  const amount = Number(book.offerPrice);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    const error = new Error('The selected book is not available for purchase.');
+    error.code = 'BOOK_NOT_PURCHASABLE';
+    throw error;
+  }
+
+  const studentId = `student_${firebaseUser.localId}`;
+  const purchasedAt = new Date().toISOString();
+  await client.createIfNotExists({
+    _id: studentId,
+    _type: 'studentUser',
+    fullName: firebaseUser.displayName || 'Student',
+    email: firebaseUser.email || '',
+    phone,
+    firebaseUid: firebaseUser.localId,
+    createdAt: purchasedAt,
+    purchasedBooks: []
   });
+
+  const purchase = {
+    _key: orderId,
+    _type: 'object',
+    book: { _type: 'reference', _ref: book._id },
+    bookTitle: book.title,
+    amount,
+    orderId,
+    purchasedAt
+  };
+
+  await client.patch(studentId)
+    .setIfMissing({ purchasedBooks: [] })
+    .append('purchasedBooks', [purchase])
+    .commit();
+
+  return { documentId: studentId, orderId };
 }
