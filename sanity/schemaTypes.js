@@ -900,6 +900,29 @@ const bookRequest = defineType({
   ]
 });
 
+const studentUser = defineType({
+  name: 'studentUser',
+  title: 'Student User',
+  type: 'document',
+  fields: [
+    defineField({ name: 'fullName', title: 'Full Name', type: 'string' }),
+    defineField({ name: 'email', title: 'Email', type: 'string' }),
+    defineField({ name: 'phone', title: 'Phone', type: 'string' }),
+    defineField({ name: 'firebaseUid', title: 'Firebase UID', type: 'string' }),
+    defineField({ name: 'createdAt', title: 'Created At', type: 'datetime' })
+  ],
+  preview: {
+    select: { title: 'fullName', subtitle: 'email' },
+    prepare: ({ title, subtitle }) => ({
+      title: title || 'Student',
+      subtitle: subtitle || 'No email'
+    })
+  },
+  orderings: [
+    { title: 'Newest first', name: 'createdAtDesc', by: [{ field: 'createdAt', direction: 'desc' }] }
+  ]
+});
+
 const siteSettings = defineType({
   name: 'siteSettings',
   title: 'Site Settings',
@@ -973,6 +996,7 @@ export const schemaTypes = [
   notificationPaper,
   notificationLink,
   bookRequest,
+  studentUser,
   siteSettings,
   examNotification,
   importantDate,

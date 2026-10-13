@@ -1,3 +1,6 @@
+import UserButton from './components/auth/UserButton';
+import AuthModal from './components/auth/AuthModal';
+import { useAuth } from './context/AuthContext';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import HTMLFlipBook from 'react-pageflip';
 import { PortableText } from '@portabletext/react';
@@ -177,6 +180,7 @@ const formatDownloadCount = (count) => (
 );
 
 function BookStoreApp() {
+  const { currentUser, userProfile } = useAuth();
   const [booksList, setBooksList] = useState([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -190,6 +194,7 @@ function BookStoreApp() {
   const [ratedBooks, setRatedBooks] = useState(() => new Set());
   const [showFlipbookModal, setShowFlipbookModal] = useState(null);
   const [showRequestBookModal, setShowRequestBookModal] = useState(false);
+  const [showCheckoutAuthModal, setShowCheckoutAuthModal] = useState(false);
   const [isSubmittingBookRequest, setIsSubmittingBookRequest] = useState(false);
   const [bookRequestError, setBookRequestError] = useState('');
   const [siteSettings, setSiteSettings] = useState(DEFAULT_SITE_SETTINGS);
@@ -629,6 +634,25 @@ function BookStoreApp() {
     }
   };
 
+  const handlePaidBookPurchase = (event, book) => {
+    const hasPhone = typeof userProfile?.phone === 'string' && userProfile.phone.trim().length > 0;
+    if (!currentUser || !hasPhone) {
+      event.preventDefault();
+      if (!currentUser || viewportSize.width < 1280) {
+        setShowCheckoutAuthModal(true);
+      }
+      return;
+    }
+
+    if (!book.pdfUrl) {
+      event.preventDefault();
+      showToast('Payment link will be updated soon!');
+      return;
+    }
+
+    handleBookDownload(book);
+  };
+
   const handleBookRating = (book, userStar) => {
     if (!book.sanityId) return false;
 
@@ -982,6 +1006,7 @@ function BookStoreApp() {
             </nav>
 
             <div className="hidden xl:flex shrink-0 items-center gap-2">
+              <UserButton />
               <button
                 onClick={() => {
                   setBookRequestError('');
@@ -991,12 +1016,6 @@ function BookStoreApp() {
               >
                 <FileText className="w-3.5 h-3.5 text-amber-400" /> Request Book
               </button>
-              <a href="https://xamtoppr.com/login" className="whitespace-nowrap px-2.5 py-2 text-sm font-medium text-white transition hover:text-amber-400">
-                Log In
-              </a>
-              <a href="https://xamtoppr.com/register" className="whitespace-nowrap rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 px-3 py-2 text-sm font-semibold text-slate-950 shadow-md transition hover:from-amber-400 hover:to-orange-400 active:scale-95">
-                Sign Up Free
-              </a>
             </div>
 
             <div className="xl:hidden flex shrink-0 items-center gap-2">
@@ -1164,14 +1183,7 @@ function BookStoreApp() {
                             href={book.pdfUrl || '#'}
                             target={book.pdfUrl ? '_blank' : undefined}
                             rel={book.pdfUrl ? 'noopener noreferrer' : undefined}
-                            onClick={(event) => {
-                              if (!book.pdfUrl) {
-                                event.preventDefault();
-                                showToast('Payment link will be updated soon!');
-                              } else {
-                                handleBookDownload(book);
-                              }
-                            }}
+                            onClick={(event) => handlePaidBookPurchase(event, book)}
                             className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-4 py-2.5 text-xs font-extrabold text-slate-950 shadow-lg transition hover:bg-amber-300 sm:px-5 sm:py-3 sm:text-sm"
                           >
                             <ShoppingCart className="h-4 w-4" /> Buy Now
@@ -1623,14 +1635,7 @@ function BookStoreApp() {
                             href={book.pdfUrl || '#'}
                             target="_blank"
                             rel="noopener noreferrer"
-                            onClick={(e) => {
-                              if (!book.pdfUrl) {
-                                e.preventDefault();
-                                showToast('Payment link will be updated soon!');
-                              } else {
-                                handleBookDownload(book);
-                              }
-                            }}
+                            onClick={(event) => handlePaidBookPurchase(event, book)}
                             className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2.5 rounded-xl transition font-bold text-xs shadow-sm flex items-center gap-1.5"
                           >
                             <ShoppingCart className="w-3.5 h-3.5" />
@@ -2358,7 +2363,13 @@ function BookStoreApp() {
                                     href={book.pdfUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    onClick={() => handleBookDownload(book)}
+                                    onClick={(event) => {
+                                      if (book.isFree) {
+                                        handleBookDownload(book);
+                                      } else {
+                                        handlePaidBookPurchase(event, book);
+                                      }
+                                    }}
                                     className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-500"
                                   >
                                     {book.isFree ? <Download className="h-3.5 w-3.5" /> : <ShoppingCart className="h-3.5 w-3.5" />}
@@ -2367,7 +2378,13 @@ function BookStoreApp() {
                                 ) : (
                                   <button
                                     type="button"
-                                    onClick={() => showToast(book.isFree ? 'Download link will be updated soon!' : 'Payment link will be updated soon!')}
+                                    onClick={(event) => {
+                                      if (book.isFree) {
+                                        showToast('Download link will be updated soon!');
+                                      } else {
+                                        handlePaidBookPurchase(event, book);
+                                      }
+                                    }}
                                     className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-500"
                                   >
                                     {book.isFree ? <Download className="h-3.5 w-3.5" /> : <ShoppingCart className="h-3.5 w-3.5" />}
@@ -2652,7 +2669,7 @@ function BookStoreApp() {
                           href={book.pdfUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          onClick={() => handleBookDownload(book)}
+                          onClick={(event) => handlePaidBookPurchase(event, book)}
                           className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 text-white text-xs font-extrabold px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-md"
                         >
                           <ShoppingCart className="w-3.5 h-3.5" />
@@ -2802,9 +2819,7 @@ function BookStoreApp() {
           href={book.pdfUrl || '#'}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={() => {
-            if (book.pdfUrl) handleBookDownload(book);
-          }}
+          onClick={(event) => handlePaidBookPurchase(event, book)}
           className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 text-slate-950 font-black text-xs py-2.5 rounded-xl shadow-xl flex items-center justify-center gap-2 transition"
         >
           <ShoppingCart className="w-4 h-4" />
@@ -3064,9 +3079,7 @@ function BookStoreApp() {
                         href={selectedBookForModal.pdfUrl || '#'}
                         target="_blank"
                         rel="noopener noreferrer"
-                        onClick={() => {
-                          if (selectedBookForModal.pdfUrl) handleBookDownload(selectedBookForModal);
-                        }}
+                        onClick={(event) => handlePaidBookPurchase(event, selectedBookForModal)}
                         className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white text-xs sm:text-sm font-extrabold px-5 py-2.5 rounded-xl shadow-md transition flex items-center gap-2 transform active:scale-95"
                       >
                         <ShoppingCart className="w-4 h-4 text-white" />
@@ -3271,6 +3284,10 @@ function BookStoreApp() {
           © 2026 XamToppr Edutech Private Limited. All Rights Reserved.
         </div>
       </footer>
+      <AuthModal
+        isOpen={showCheckoutAuthModal}
+        onClose={() => setShowCheckoutAuthModal(false)}
+      />
     </div>
   );
 }
