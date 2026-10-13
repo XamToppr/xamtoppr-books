@@ -15,8 +15,16 @@ export default async function handler(request, response) {
     || process.env.VITE_SANITY_API_WRITE_TOKEN;
   const firebaseApiKey = process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_WEB_API_KEY;
   if (!sanityWriteToken || !firebaseApiKey) {
-    console.error('Student profile sync requires Sanity and Firebase server configuration.');
-    return response.status(503).json({ success: false, error: 'Profile sync is unavailable right now.' });
+    const missingConfiguration = [
+      !sanityWriteToken && 'SANITY_API_WRITE_TOKEN or VITE_SANITY_WRITE_TOKEN',
+      !firebaseApiKey && 'VITE_FIREBASE_API_KEY or FIREBASE_WEB_API_KEY'
+    ].filter(Boolean);
+    console.error('Student profile sync is missing server configuration:', missingConfiguration);
+    return response.status(503).json({
+      success: false,
+      error: 'Profile sync is unavailable because server configuration is missing.',
+      missingConfiguration
+    });
   }
 
   const idToken = request.headers.authorization?.match(/^Bearer\s+(.+)$/i)?.[1];

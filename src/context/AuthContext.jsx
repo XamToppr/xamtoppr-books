@@ -65,12 +65,16 @@ export const AuthProvider = ({ children }) => {
       const userRef = doc(db, "users", uid);
       const snap = await getDoc(userRef);
       if (snap.exists()) {
-        setUserProfile(snap.data());
+        const profile = snap.data();
+        setUserProfile(profile);
+        return profile;
       } else {
         setUserProfile(null);
+        return null;
       }
     } catch (err) {
       console.error("Error fetching user profile:", err);
+      throw err;
     }
   };
 
@@ -83,9 +87,10 @@ export const AuthProvider = ({ children }) => {
       // User collection check aur initial document create/sync
       const userRef = doc(db, "users", user.uid);
       const snap = await getDoc(userRef);
+      let profile;
       
       if (!snap.exists()) {
-        const newProfile = {
+        profile = {
           uid: user.uid,
           name: user.displayName || "Student",
           email: user.email || "",
@@ -93,12 +98,11 @@ export const AuthProvider = ({ children }) => {
           phone: "",
           createdAt: serverTimestamp(),
         };
-        await setDoc(userRef, newProfile);
-        setUserProfile(newProfile);
+        await setDoc(userRef, profile);
       } else {
-        setUserProfile(snap.data());
+        profile = snap.data();
       }
-      const profile = snap.exists() ? snap.data() : { phone: "" };
+      setUserProfile(profile);
       try {
         await syncStudentProfile(user, profile.phone || "");
       } catch (error) {
@@ -124,7 +128,7 @@ export const AuthProvider = ({ children }) => {
         (userDocument) => userDocument.id !== currentUser.uid
       );
       if (phoneIsRegistered) {
-        const error = new Error("This mobile number is already registered with another account.");
+        const error = new Error("This mobile number is already linked to another account.");
         error.code = "PHONE_ALREADY_REGISTERED";
         throw error;
       }
@@ -156,11 +160,16 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setCurrentUser(user);
       if (user) {
-        await fetchUserProfile(user.uid);
+        try {
+          await fetchUserProfile(user.uid);
+        } catch {
+          setUserProfile(null);
+        }
+        setCurrentUser(user);
       } else {
         setUserProfile(null);
+        setCurrentUser(null);
       }
       setLoading(false);
     });

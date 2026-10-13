@@ -37,7 +37,7 @@ export default function AuthModal({ isOpen, onClose }) {
       onClose();
     } catch (err) {
       setError(err.code === "PHONE_ALREADY_REGISTERED"
-        ? "This mobile number is already registered with another account."
+        ? "This mobile number is already linked to another account."
         : "Failed to save mobile number. Please try again.");
     } finally {
       setSubmitting(false);
