@@ -5,7 +5,6 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import HTMLFlipBook from 'react-pageflip';
 import { PortableText } from '@portabletext/react';
 import { Studio } from 'sanity';
-import { createClient } from '@sanity/client';
 import sanityConfig from '../sanity.config.js';
 import sanityClient from './sanityClient';
 import {
@@ -139,17 +138,6 @@ const SITE_CONTENT_PAGES = {
   '/privacy-policy': { title: 'Privacy Policy', field: 'privacyContent' },
   '/refund-policy': { title: 'Refund Policy', field: 'refundContent' }
 };
-
-const sanityWriteToken = import.meta.env.VITE_SANITY_API_WRITE_TOKEN;
-const sanityWriteClient = sanityWriteToken
-  ? createClient({
-    projectId: import.meta.env.VITE_SANITY_PROJECT_ID || 'rkev3aui',
-    dataset: import.meta.env.VITE_SANITY_DATASET || 'production',
-    useCdn: false,
-    apiVersion: '2024-01-01',
-    token: sanityWriteToken
-  })
-  : null;
 
 const MEDIUM_OPTIONS = ['All Mediums', 'Bilingual (Hindi + English)', 'Hindi Medium', 'English Medium'];
 
@@ -709,33 +697,24 @@ function BookStoreApp() {
     };
 
     try {
-      if (sanityWriteClient) {
-        await sanityWriteClient.create({
-          _type: 'bookRequest',
-          ...request,
-          status: 'Pending',
-          requestedAt: new Date().toISOString()
-        });
-      } else {
-        const response = await fetch('/api/request-book', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(request)
-        });
-        const responseText = await response.text();
-        let result;
-        try {
-          result = responseText ? JSON.parse(responseText) : null;
-        } catch {
-          throw new Error(
-            response.ok
-              ? 'The book request service is unavailable. Use the configured Sanity client or run the Vercel development server.'
-              : `The request service returned an invalid response (HTTP ${response.status}).`
-          );
-        }
-        if (!response.ok || !result?.success) {
-          throw new Error(result?.error || `The request could not be submitted (HTTP ${response.status}).`);
-        }
+      const response = await fetch('/api/request-book', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request)
+      });
+      const responseText = await response.text();
+      let result;
+      try {
+        result = responseText ? JSON.parse(responseText) : null;
+      } catch {
+        throw new Error(
+          response.ok
+            ? 'The book request service is unavailable. Run the configured Vite or Vercel server.'
+            : `The request service returned an invalid response (HTTP ${response.status}).`
+        );
+      }
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || `The request could not be submitted (HTTP ${response.status}).`);
       }
 
       form.reset();

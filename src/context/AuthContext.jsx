@@ -50,6 +50,7 @@ const syncStudentProfile = async (user, phone = "") => {
         email: userData.email,
         phone: userData.phone,
         name: userData.fullName,
+        firebaseApiKey: auth.app.options.apiKey,
       }),
     });
 

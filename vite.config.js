@@ -6,10 +6,12 @@ import tailwindcss from '@tailwindcss/vite'
 
 const localBookRequestApi = (env) => {
   const writeToken = env.SANITY_API_WRITE_TOKEN
+    || env.VITE_SANITY_WRITE_TOKEN
+    || env.VITE_SANITY_API_WRITE_TOKEN
   const client = writeToken
     ? createClient({
-      projectId: env.SANITY_PROJECT_ID || 'rkev3aui',
-      dataset: env.SANITY_DATASET || 'production',
+      projectId: env.SANITY_PROJECT_ID || env.VITE_SANITY_PROJECT_ID || 'rkev3aui',
+      dataset: env.SANITY_DATASET || env.VITE_SANITY_DATASET || 'production',
       apiVersion: '2024-01-01',
       token: writeToken,
       useCdn: false
@@ -90,15 +92,13 @@ const localBookRequestApi = (env) => {
 }
 
 const localStudentProfileApi = (env) => {
-  const writeToken = env.SANITY_WRITE_TOKEN
-    || env.SANITY_API_WRITE_TOKEN
+  const writeToken = env.SANITY_API_WRITE_TOKEN
     || env.VITE_SANITY_WRITE_TOKEN
     || env.VITE_SANITY_API_WRITE_TOKEN
-  const firebaseApiKey = env.VITE_FIREBASE_API_KEY || env.FIREBASE_WEB_API_KEY
   const client = writeToken
     ? createClient({
-      projectId: env.SANITY_PROJECT_ID || 'rkev3aui',
-      dataset: env.SANITY_DATASET || 'production',
+      projectId: env.SANITY_PROJECT_ID || env.VITE_SANITY_PROJECT_ID || 'rkev3aui',
+      dataset: env.SANITY_DATASET || env.VITE_SANITY_DATASET || 'production',
       apiVersion: '2023-01-01',
       token: writeToken,
       useCdn: false
@@ -119,9 +119,13 @@ const localStudentProfileApi = (env) => {
           return
         }
 
-        if (!client || !firebaseApiKey) {
+        if (!client) {
           response.statusCode = 503
-          response.end(JSON.stringify({ success: false, error: 'Student profile sync is not configured for local development.' }))
+          response.end(JSON.stringify({
+            success: false,
+            error: 'Student profile sync is missing a server-side Sanity write token.',
+            missingConfiguration: ['SANITY_API_WRITE_TOKEN or a VITE_SANITY_* compatibility variable']
+          }))
           return
         }
 
@@ -151,7 +155,10 @@ const localStudentProfileApi = (env) => {
             fullName: typeof body.name === 'string' ? body.name.trim() : '',
             email: typeof body.email === 'string' ? body.email.trim() : ''
           }
-          if (!requestedUid || phone.length > 32 || profile.fullName.length > 200 || profile.email.length > 320) {
+          const firebaseApiKey = typeof body.firebaseApiKey === 'string'
+            ? body.firebaseApiKey.trim()
+            : env.VITE_FIREBASE_API_KEY || env.FIREBASE_WEB_API_KEY
+          if (!requestedUid || !firebaseApiKey || phone.length > 32 || profile.fullName.length > 200 || profile.email.length > 320) {
             response.statusCode = 400
             response.end(JSON.stringify({ success: false, error: 'Student profile fields are invalid.' }))
             return

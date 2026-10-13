@@ -1,13 +1,5 @@
 import { createClient } from '@sanity/client';
 
-const sanityClient = createClient({
-  projectId: 'rkev3aui',
-  dataset: 'production',
-  apiVersion: '2024-01-01',
-  token: process.env.SANITY_API_WRITE_TOKEN,
-  useCdn: false
-});
-
 const getString = (value) => (typeof value === 'string' ? value.trim() : '');
 
 export default async function handler(request, response) {
@@ -16,9 +8,15 @@ export default async function handler(request, response) {
     return response.status(405).json({ success: false, error: 'Method not allowed.' });
   }
 
-  if (!process.env.SANITY_API_WRITE_TOKEN) {
-    console.error('SANITY_API_WRITE_TOKEN is not configured for the request-book endpoint.');
-    return response.status(500).json({ success: false, error: 'Book requests are unavailable right now.' });
+  const sanityWriteToken = process.env.SANITY_API_WRITE_TOKEN
+    || process.env.VITE_SANITY_WRITE_TOKEN
+    || process.env.VITE_SANITY_API_WRITE_TOKEN;
+  if (!sanityWriteToken) {
+    console.error('Book request endpoint is missing a server-side Sanity write token.');
+    return response.status(503).json({
+      success: false,
+      error: 'Book requests are unavailable because the server-side Sanity write token is missing.'
+    });
   }
 
   const body = typeof request.body === 'string'
@@ -53,6 +51,13 @@ export default async function handler(request, response) {
   };
 
   try {
+    const sanityClient = createClient({
+      projectId: process.env.SANITY_PROJECT_ID || process.env.VITE_SANITY_PROJECT_ID || 'rkev3aui',
+      dataset: process.env.SANITY_DATASET || process.env.VITE_SANITY_DATASET || 'production',
+      apiVersion: '2024-01-01',
+      token: sanityWriteToken,
+      useCdn: false
+    });
     await sanityClient.create(document);
     return response.status(200).json({ success: true });
   } catch (error) {

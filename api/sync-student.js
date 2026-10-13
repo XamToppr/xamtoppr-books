@@ -9,15 +9,18 @@ export default async function handler(request, response) {
     return response.status(405).json({ success: false, error: 'Method not allowed.' });
   }
 
-  const sanityWriteToken = process.env.SANITY_WRITE_TOKEN
-    || process.env.SANITY_API_WRITE_TOKEN
+  const sanityWriteToken = process.env.SANITY_API_WRITE_TOKEN
     || process.env.VITE_SANITY_WRITE_TOKEN
     || process.env.VITE_SANITY_API_WRITE_TOKEN;
-  const firebaseApiKey = process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_WEB_API_KEY;
-  if (!sanityWriteToken || !firebaseApiKey) {
+  const projectId = process.env.SANITY_PROJECT_ID
+    || process.env.VITE_SANITY_PROJECT_ID
+    || 'rkev3aui';
+  const dataset = process.env.SANITY_DATASET
+    || process.env.VITE_SANITY_DATASET
+    || 'production';
+  if (!sanityWriteToken) {
     const missingConfiguration = [
-      !sanityWriteToken && 'SANITY_API_WRITE_TOKEN or VITE_SANITY_WRITE_TOKEN',
-      !firebaseApiKey && 'VITE_FIREBASE_API_KEY or FIREBASE_WEB_API_KEY'
+      'SANITY_API_WRITE_TOKEN, VITE_SANITY_WRITE_TOKEN, or VITE_SANITY_API_WRITE_TOKEN'
     ].filter(Boolean);
     console.error('Student profile sync is missing server configuration:', missingConfiguration);
     return response.status(503).json({
@@ -52,8 +55,17 @@ export default async function handler(request, response) {
     fullName: getString(body.name),
     email: getString(body.email)
   };
+  const firebaseApiKey = getString(body.firebaseApiKey)
+    || process.env.VITE_FIREBASE_API_KEY
+    || process.env.FIREBASE_WEB_API_KEY;
   if (!requestedUid || phone.length > 32 || profile.fullName.length > 200 || profile.email.length > 320) {
     return response.status(400).json({ success: false, error: 'Student profile fields are invalid.' });
+  }
+  if (!firebaseApiKey) {
+    return response.status(503).json({
+      success: false,
+      error: 'Profile sync is missing the Firebase public API key required to verify the signed-in user.'
+    });
   }
 
   let firebaseUser;
@@ -72,8 +84,8 @@ export default async function handler(request, response) {
   }
 
   const sanityClient = createClient({
-    projectId: process.env.SANITY_PROJECT_ID || 'rkev3aui',
-    dataset: process.env.SANITY_DATASET || 'production',
+    projectId,
+    dataset,
     apiVersion: '2023-01-01',
     token: sanityWriteToken,
     useCdn: false

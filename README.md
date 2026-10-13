@@ -1,113 +1,134 @@
-# XamToppr Books Store — Web Portal Documentation
+# XamToppr Books
 
-Production-grade educational web portal for competitive examination preparation notes, solved papers, and handwritten visual materials (SSC, Railways, etc.).
+The XamToppr Books web portal provides competitive-exam books, study notes, PDF previews, interactive flipbooks, exam notifications, and a Sanity-powered admin studio.
 
-* **Live URL:** [https://xamtoppr-books.vercel.app](https://xamtoppr-books.vercel.app)
-* **Frontend:** React 19 + Vite + Tailwind CSS + Lucide React Icons
-* **Deployment:** Vercel (CI/CD via GitHub `main` branch)
-* **Backend / CMS:** Google Sheets (Published CSV endpoint parsed client-side with PapaParse)
+## Architecture
 
----
+- **Frontend:** React 19, Vite, Tailwind CSS, and Lucide icons.
+- **Authentication:** Firebase Authentication with Google sign-in and browser-local persistence.
+- **User profiles:** Firestore `users/{uid}` documents store the account profile and phone number.
+- **CMS:** Sanity manages books, notifications, site content, book requests, and student profile records.
+- **Server endpoints:** Vercel Functions under `api/` write to Sanity with a server-side token. Vite middleware in `vite.config.js` supplies the matching endpoints during local development.
+- **Interactive reading:** `react-pageflip` powers the sample flipbook. Paid checkout links and existing book-viewer behavior remain in the frontend.
 
-## 1. Project Architecture & Directory Layout
+### Main source locations
 
-```text
-xamtoppr-books/
-├── src/
-│   ├── App.jsx          # Main application containing all components, state & modals
-│   ├── App.css          # Core animations & styling overrides
-│   ├── main.jsx         # Application root mount
-│   └── index.css        # Tailwind base, components, and utilities
-├── public/
-│   ├── page-flip.mp3    # Audio asset for realistic 3D page flip effect
-│   └── ...
-├── package.json
-└── README.md
+| Path | Responsibility |
+| --- | --- |
+| `src/App.jsx` | Store UI, book viewer and flipbook, book-request form, checkout links, and Sanity content reads |
+| `src/context/AuthContext.jsx` | Firebase auth state, Firestore user profile, duplicate-phone check, and student sync request |
+| `src/services/firebase.js` | Firebase app, Auth, Firestore, and local persistence initialization |
+| `src/sanityClient.js` | Public, read-only Sanity client |
+| `sanity/schemaTypes.js` | Sanity document and object schemas |
+| `sanity.config.js` | Embedded Studio configuration at `/admin` |
+| `api/sync-student.js` | Authenticated server-side student profile upsert |
+| `api/request-book.js` | Server-side book request creation |
+| `server/studentProfileSync.js` | Firebase ID-token verification and student document mapping |
+| `vite.config.js` | Vite development server and local API middleware |
+
+## Authentication and profile flow
+
+1. Firebase Auth is configured with `browserLocalPersistence`, so a signed-in session survives a page refresh.
+2. After Auth restores or establishes a user, `AuthContext` reads `users/{uid}` from Firestore before publishing the loaded profile to the app.
+3. Google sign-in checks that same Firestore document. A returning account with a saved phone bypasses phone onboarding; a missing/empty phone requires onboarding.
+4. Phone submission validates the number and queries Firestore for matching `phone` values. A match owned by another UID is rejected before the current user's profile is updated.
+5. Student profile sync is sent to `/api/sync-student` after a user is restored/signed in and after a phone is saved. Login and phone onboarding do not wait for Sanity to respond.
+6. The endpoint verifies the Firebase ID token, checks that the requested UID matches the authenticated account, and upserts `student_<uid>` into Sanity.
+
+The Auth provider catches and reports synchronization errors without creating unhandled promise rejections. The Sanity write token stays on the server; do not write directly from the browser with a privileged token.
+
+## Sanity schemas and sync
+
+Sanity Studio is available at `/admin`. Schemas in `sanity/schemaTypes.js` include:
+
+- `book`
+- `bookRequest`
+- `studentUser`
+- `siteSettings`
+- `examNotification`
+- Supporting objects for dates, salary entries, selection stages, exam patterns, syllabus, document specifications, tables, rich notes, and guide blocks.
+
+The `studentUser` document uses a stable ID (`student_<Firebase UID>`) and fields `fullName`, `email`, `phone`, `firebaseUid`, and `createdAt`. Each login/profile update replaces the corresponding document so the latest name, email, and phone are visible in Studio. `bookRequest` documents are also written through a server endpoint.
+
+The public Sanity client is read-only. Book requests and student records are written by the server endpoints using a Sanity token with dataset write permission. **Do not configure a write token in browser code or commit real credentials.** Although compatibility fallbacks accept `VITE_SANITY_WRITE_TOKEN` and `VITE_SANITY_API_WRITE_TOKEN` on the server, prefer the non-prefixed, server-only `SANITY_API_WRITE_TOKEN`.
+
+## Environment variables
+
+Set these values in a local `.env` file for development and as Vercel environment variables for the Production deployment. Do not include quotes around values unless required by the value itself.
+
+### Firebase web configuration
+
+These Firebase web app values are public client configuration (not service-account credentials):
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `VITE_FIREBASE_API_KEY` | Yes | Firebase Auth ID-token verification and web app initialization |
+| `VITE_FIREBASE_AUTH_DOMAIN` | Yes | Firebase Google authentication |
+| `VITE_FIREBASE_PROJECT_ID` | Yes | Firebase project and Firestore |
+| `VITE_FIREBASE_STORAGE_BUCKET` | Yes | Firebase app configuration |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | Yes | Firebase app configuration |
+| `VITE_FIREBASE_APP_ID` | Yes | Firebase app configuration |
+
+### Sanity configuration
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `SANITY_API_WRITE_TOKEN` | Yes for writes | **Server-only** token with write access for student sync and book requests |
+| `SANITY_PROJECT_ID` | No | Server project ID; defaults to `rkev3aui` |
+| `SANITY_DATASET` | No | Server dataset; defaults to `production` |
+| `VITE_SANITY_PROJECT_ID` | No | Public Sanity project ID override; also accepted as a server-side compatibility fallback |
+| `VITE_SANITY_DATASET` | No | Public Sanity dataset override; also accepted as a server-side compatibility fallback |
+| `VITE_SANITY_WRITE_TOKEN` | Compatibility only | Accepted by server endpoints if the preferred token name is unavailable; **never reference it in frontend code** |
+| `VITE_SANITY_API_WRITE_TOKEN` | Compatibility only | Legacy server-side token fallback; **never reference it in frontend code** |
+
+For a typical local `.env`, provide all six Firebase variables and `SANITY_API_WRITE_TOKEN`. Project ID and dataset can be omitted to use the defaults. Do not paste real values into this README or commit the `.env` file.
+
+### Local `.env` template
+
+```dotenv
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
+VITE_FIREBASE_APP_ID=
+
+SANITY_API_WRITE_TOKEN=
+# Optional overrides:
+# SANITY_PROJECT_ID=rkev3aui
+# SANITY_DATASET=production
+# VITE_SANITY_PROJECT_ID=rkev3aui
+# VITE_SANITY_DATASET=production
 ```
 
----
+`/api/sync-student` accepts the Firebase API key in the authenticated request body because it is public Firebase web configuration. The Firebase ID token is independently verified before a Sanity write. A valid Sanity write token is still required server-side; the service cannot safely write if this credential is absent.
 
-## 2. Core Functional Logic & Features
+## Local development
 
-### A. Dynamic Google Sheets Backend
-Data is fetched live from a published Google Sheets CSV URL via PapaParse.
+Requirements: Node.js supported by the installed Vite version and npm.
 
-* **Delimiters in Table of Contents:**
-  * Uses regex `b.tableOfContents.split(/[,|\n]/)` to parse chapters whether entered using commas (`,`), pipes (`|`), or new lines (`\n`).
-  * Rendered as numbered chapter chips (1, 2, 3...) in the details modal.
-* **Separation of Free vs. Paid Notes:**
-  * `isFree`: When a note is free, `samplePdfUrl` is left empty. The UI suppresses "Sample PDF" buttons and shows a single **"Download Full Free PDF"** action.
-  * `isPaid`: Shows a **"Read Sample PDF"** button (pointing to `samplePdfUrl`) and a direct **"Buy Now"** button (pointing to `pdfUrl` with the Razorpay link).
-
----
-
-### B. Dedicated Markdown Parsers (Dual Themes)
-To prevent styling conflicts between light-mode modals and dark-mode 3D flipbook pages, two independent markdown-to-bold renderers are maintained:
-
-1. **`renderPdfModalDescription(text)`:**
-   * Used in the standard PDF Information Modal (Light slate background).
-   * Parses `**bold text**` into high-contrast dark text (`text-slate-950 font-extrabold`).
-
-2. **`renderFlipbookDescription(text)`:**
-   * Used on Page 1 of the 3D Flipbook (Dark gradient background).
-   * Parses `**bold text**` into bright glowing amber (`text-amber-300 font-black drop-shadow-sm`) to ensure readability against dark blue/indigo backgrounds.
-
----
-
-### C. 3D Interactive Flipbook (`react-pageflip`)
-Handwritten notes feature an interactive 3D reading experience:
-
-* **Audio Feedback:** Plays `page-flip.mp3` on page turns with proper user-gesture audio handling.
-* **Page 1 (Interactive Overview Sheet):**
-  * Serves as the first page of the flipbook.
-  * Features subtle animated glow effects (`from-slate-950 via-indigo-950 to-purple-950`).
-  * Displays book title, exam category, badge, and rating.
-  * Scrollable inner container (`style={{ height: 'calc(100% - 135px)' }}` with `overflow-y-auto`) ensuring overflowing descriptions never breach container boundaries.
-  * Fixed bottom indicators pinned neatly above the margin.
-* **Sample Content Pages:**
-  * Renders high-resolution handwritten image pages fetched via `pagesList`.
-* **Final Action Page:**
-  * Sample Preview Ended card with full note download/unlock CTA.
-  * Social sharing buttons for **WhatsApp**, **Telegram**, and a 1-click **Copy Link** clipboard trigger with toast alerts.
-
----
-
-## 3. Google Sheets Schema Guide
-
-| Column Name | Type | Example / Format | Purpose |
-| :--- | :--- | :--- | :--- |
-| `id` | String | `xt-bk-102` | Unique document ID |
-| `title` | String | `Biology Complete Notes (SSC / Railway)` | Title of study notes |
-| `author` | String | `Dhiraj Kumar` | Author attribution |
-| `publisher` | String | `XamToppr` | Publishing brand |
-| `exam` | String | `SSC, Railway` | Target examinations |
-| `examCategory`| String | `SSC / Railway` | Filter category badge |
-| `subject` | String | `Science` | Primary subject classification |
-| `language` | String | `Hindi` / `English` | Content language |
-| `pages` | Number | `217` | Total page count |
-| `fileSize` | String | `42.8 MB` | Storage footprint |
-| `rating` | Number | `4.9` | User satisfaction score |
-| `badge` | String | `FREE PDF` / `₹49` | Pricing / category tag |
-| `pdfUrl` | String | Direct Google Drive `/preview` link or Razorpay checkout | Full PDF or payment link |
-| `samplePdfUrl`| String | Direct Google Drive preview link | Sample preview link (Blank for free books) |
-| `samplePages` | String | Image URLs separated by comma/pipe | Sample page images for 3D flipbook |
-| `tableOfContents` | String | Chapter 1, Chapter 2 \| Chapter 3 | Multi-delimiter chapter list |
-| `description` | String | Markdown text (use `**text**` for bold) | Detailed book description |
-
----
-
-## 4. Local Development
-
-```bash
-# Clone the repository
-git clone https://github.com/xamtoppr/xamtoppr-books.git
-
-# Install dependencies
+```sh
 npm install
-
-# Run development server
 npm run dev
-
-# Verify production build before committing
-npm run build
 ```
+
+The Vite middleware implements `/api/request-book` and `/api/sync-student` for local use. Configure the environment variables above, then visit the URL printed by Vite. Sanity Studio is served by the application at `/admin`.
+
+Useful checks:
+
+```sh
+npm run lint
+npm run build
+npm run preview
+```
+
+## Vercel deployment
+
+1. Import the Git repository into Vercel and set the project root to the repository root.
+2. Use `npm install` for install and `npm run build` for the build command. Vite outputs to `dist`.
+3. Add the six `VITE_FIREBASE_*` values and the server-only `SANITY_API_WRITE_TOKEN` in **Project Settings → Environment Variables** for Production (and Preview/Development as appropriate).
+4. Optionally configure `SANITY_PROJECT_ID` and `SANITY_DATASET` if not using the defaults.
+5. Redeploy after adding or changing environment variables. Vercel serves `api/*.js` as serverless functions; `vercel.json` rewrites frontend paths to the SPA while `/api/*` routes are handled by their functions.
+6. Test Google login, refresh persistence, phone onboarding, student record creation in Sanity Studio, and book requests after deployment.
+
+If `/api/sync-student` returns an error, inspect the response JSON and Vercel Function logs. A missing write token cannot be repaired by a browser fallback; configure the token as a server-side Vercel environment variable. Never solve this by exposing a Sanity write token through `VITE_` client code.
