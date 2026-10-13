@@ -7,6 +7,7 @@ The XamToppr Books web portal provides competitive-exam books, study notes, PDF 
 - **Frontend:** React 19, Vite, Tailwind CSS, and Lucide icons.
 - **Authentication:** Firebase Authentication with Google sign-in and browser-local persistence.
 - **User profiles:** Firestore `users/{uid}` documents store the account profile and phone number.
+- **Shopping cart:** A global React `CartContext` persists selected catalog books in browser `localStorage`.
 - **CMS:** Sanity manages books, notifications, site content, book requests, and student profile records.
 - **Server endpoints:** Vercel Functions under `api/` write to Sanity with a server-side token. Vite middleware in `vite.config.js` supplies the matching endpoints during local development.
 - **Interactive reading:** `react-pageflip` powers the sample flipbook. Paid checkout links and existing book-viewer behavior remain in the frontend.
@@ -17,6 +18,9 @@ The XamToppr Books web portal provides competitive-exam books, study notes, PDF 
 | --- | --- |
 | `src/App.jsx` | Store UI, book viewer and flipbook, book-request form, checkout links, and Sanity content reads |
 | `src/context/AuthContext.jsx` | Firebase auth state, Firestore user profile, duplicate-phone check, and student sync request |
+| `src/context/CartContext.jsx` | Persistent cart state and cart actions |
+| `src/components/profile/MyLibrary.jsx` | `/my-library` page backed by the signed-in user's Firestore purchase fields and Sanity catalog |
+| `src/components/cart/CartDrawer.jsx` | Cart item list, removal, total, and checkout action |
 | `src/services/firebase.js` | Firebase app, Auth, Firestore, and local persistence initialization |
 | `src/sanityClient.js` | Public, read-only Sanity client |
 | `sanity/schemaTypes.js` | Sanity document and object schemas |
@@ -56,6 +60,12 @@ The `studentUser` document uses a stable ID (`student_<Firebase UID>`) and field
 When a signed-in user with a saved phone clicks a paid book's **Buy Now** action, the app adds the Sanity book ID to `users/{uid}.purchasedBookIds` in Firestore and sends an authenticated request to `/api/track-purchase`. The server verifies the Firebase ID token, looks up the book in Sanity (using the catalog title and current offer price rather than trusting client-supplied values), then appends a purchase entry to `student_<uid>.purchasedBooks`. The entry is visible under the student's document in Sanity Studio.
 
 The current application opens the configured book link and does not receive a payment-provider confirmation or webhook. Therefore, this entry represents a **checkout/test-purchase trigger**, and its generated `checkout_<UUID>` value is a tracking ID rather than a confirmed gateway payment ID. The amount is the catalog offer price at click time. To record only settled payments, connect the provider's verified payment webhook before treating these entries as completed purchases.
+
+### My Library and cart
+
+The `/my-library` route reads `users/{uid}.purchasedBooks` and `users/{uid}.purchasedBookIds` from Firestore, then resolves matching book documents from the public Sanity catalog for titles, covers, and sample reading links. Checkout tracking appends an ID and purchase summary to the profile arrays. The page provides a Read Now action when the book has a sample PDF; unavailable reading links are shown as disabled rather than redirecting to a payment link.
+
+`CartProvider` wraps the app and persists its `cartItems` in `localStorage` under `xamtoppr-books-cart`. Its `addToCart`, `removeFromCart`, and `clearCart` actions maintain a derived `cartTotal`. Paid book cards and detail views expose Add to Cart/Go to Cart actions, and the header cart drawer shows selected books, removes items, and calculates the total. Since there is no cart-level payment integration, Proceed to Checkout opens the first item's existing payment link and leaves the remaining items in the cart.
 
 The public Sanity client is read-only. Book requests and student records are written by the server endpoints using a Sanity token with dataset write permission. **Do not configure a write token in browser code or commit real credentials.** Although compatibility fallbacks accept `VITE_SANITY_WRITE_TOKEN` and `VITE_SANITY_API_WRITE_TOKEN` on the server, prefer the non-prefixed, server-only `SANITY_API_WRITE_TOKEN`.
 

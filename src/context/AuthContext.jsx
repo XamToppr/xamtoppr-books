@@ -145,7 +145,16 @@ export const AuthProvider = ({ children }) => {
     const idToken = await currentUser.getIdToken();
     const firestoreWrite = setDoc(
       doc(db, "users", currentUser.uid),
-      { purchasedBookIds: arrayUnion(book.sanityId) },
+      {
+        purchasedBookIds: arrayUnion(book.sanityId),
+        purchasedBooks: arrayUnion({
+          bookId: book.sanityId,
+          title: book.title,
+          coverImage: book.coverImage || "",
+          readUrl: book.samplePdfUrl || "",
+          purchasedAt: new Date().toISOString(),
+        }),
+      },
       { merge: true }
     );
     const sanityWrite = fetch("/api/track-purchase", {

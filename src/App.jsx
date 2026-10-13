@@ -1,6 +1,9 @@
 import UserButton from './components/auth/UserButton';
 import AuthModal from './components/auth/AuthModal';
+import CartDrawer from './components/cart/CartDrawer';
+import MyLibrary from './components/profile/MyLibrary';
 import { useAuth } from './context/AuthContext';
+import { useCart } from './context/CartContext';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import HTMLFlipBook from 'react-pageflip';
 import { PortableText } from '@portabletext/react';
@@ -171,6 +174,7 @@ const formatDownloadCount = (count) => (
 
 function BookStoreApp() {
   const { currentUser, userProfile, trackBookPurchase } = useAuth();
+  const { cartItems, addToCart } = useCart();
   const [booksList, setBooksList] = useState([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -185,6 +189,7 @@ function BookStoreApp() {
   const [showFlipbookModal, setShowFlipbookModal] = useState(null);
   const [showRequestBookModal, setShowRequestBookModal] = useState(false);
   const [showCheckoutAuthModal, setShowCheckoutAuthModal] = useState(false);
+  const [showCartDrawer, setShowCartDrawer] = useState(false);
   const [isSubmittingBookRequest, setIsSubmittingBookRequest] = useState(false);
   const [bookRequestError, setBookRequestError] = useState('');
   const [siteSettings, setSiteSettings] = useState(DEFAULT_SITE_SETTINGS);
@@ -652,6 +657,40 @@ function BookStoreApp() {
     handleBookDownload(book);
   };
 
+  const handleAddToCart = (book) => {
+    try {
+      addToCart(book);
+      if (cartItems.some((item) => item.id === (book.sanityId || book.id))) {
+        setShowCartDrawer(true);
+      } else {
+        showToast(`Added "${book.title}" to your cart.`);
+      }
+    } catch (error) {
+      console.error('Unable to add this book to the cart:', error);
+      showToast('This book could not be added to your cart.');
+    }
+  };
+
+  const handleCartCheckout = (book) => {
+    const hasPhone = /^[6-9]\d{9}$/.test(userProfile?.phone?.trim() || '');
+    if (!currentUser || !hasPhone) {
+      setShowCheckoutAuthModal(true);
+      return;
+    }
+    if (!book.pdfUrl) {
+      showToast('Payment link will be updated soon!');
+      return;
+    }
+
+    window.open(book.pdfUrl, '_blank', 'noopener,noreferrer');
+    void trackBookPurchase(book).catch((error) => {
+      console.error('Failed to track the cart checkout:', error);
+      showToast(error.message || 'Checkout tracking could not be saved.');
+    });
+    handleBookDownload(book);
+    setShowCartDrawer(false);
+  };
+
   const handleBookRating = (book, userStar) => {
     if (!book.sanityId) return false;
 
@@ -999,6 +1038,24 @@ function BookStoreApp() {
 
             <div className="hidden xl:flex shrink-0 items-center gap-2">
               <UserButton />
+              {currentUser && (
+                <a href="/my-library" className="whitespace-nowrap rounded-lg border border-blue-700/60 px-2.5 py-2 text-xs font-semibold text-white transition hover:bg-blue-900">
+                  My Library
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowCartDrawer(true)}
+                aria-label={`Open cart with ${cartItems.length} items`}
+                className="relative rounded-lg border border-blue-700/60 p-2 text-white transition hover:bg-blue-900"
+              >
+                <ShoppingCart className="h-5 w-5" />
+                {cartItems.length > 0 && (
+                  <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-black text-slate-950">
+                    {cartItems.length}
+                  </span>
+                )}
+              </button>
               <button
                 onClick={() => {
                   setBookRequestError('');
@@ -1011,6 +1068,19 @@ function BookStoreApp() {
             </div>
 
             <div className="xl:hidden flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowCartDrawer(true)}
+                aria-label={`Open cart with ${cartItems.length} items`}
+                className="relative rounded-md border border-blue-700 p-2 text-white"
+              >
+                <ShoppingCart className="h-4 w-4" />
+                {cartItems.length > 0 && (
+                  <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-400 px-1 text-[9px] font-black text-slate-950">
+                    {cartItems.length}
+                  </span>
+                )}
+              </button>
               <button
                 onClick={() => {
                   setBookRequestError('');
@@ -1095,6 +1165,11 @@ function BookStoreApp() {
               PYQ Papers
             </a>
             <div className="grid grid-cols-2 gap-2 border-t border-blue-800/70 pt-3">
+              {currentUser && (
+                <a href="/my-library" className="col-span-2 rounded-lg border border-blue-700 px-3 py-2.5 text-center text-sm font-semibold text-amber-300 transition hover:bg-blue-900/60">
+                  My Library
+                </a>
+              )}
               <a href="https://xamtoppr.com/login" className="rounded-lg border border-blue-700 px-3 py-2.5 text-center text-sm font-semibold text-slate-100 transition hover:bg-blue-900/60">
                 Log In
               </a>
@@ -1576,16 +1651,31 @@ function BookStoreApp() {
                         )}
                         
                         {isPaid ? (
-                          <a
-                            href={book.pdfUrl || '#'}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(event) => handlePaidBookPurchase(event, book)}
-                            className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2.5 rounded-xl transition font-bold text-xs shadow-sm flex items-center gap-1.5"
-                          >
-                            <ShoppingCart className="w-3.5 h-3.5" />
-                            <span>{book.price ? `Buy • ${book.price}` : 'Buy'}</span>
-                          </a>
+                          <>
+                            <a
+                              href={book.pdfUrl || '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(event) => handlePaidBookPurchase(event, book)}
+                              className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2.5 rounded-xl transition font-bold text-xs shadow-sm flex items-center gap-1.5"
+                            >
+                              <ShoppingCart className="w-3.5 h-3.5" />
+                              <span>{book.price ? `Buy • ${book.price}` : 'Buy'}</span>
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (cartItems.some((item) => item.id === book.sanityId)) {
+                                  setShowCartDrawer(true);
+                                } else {
+                                  handleAddToCart(book);
+                                }
+                              }}
+                              className="rounded-xl border border-blue-200 bg-blue-50 px-2.5 py-2.5 text-[10px] font-bold text-blue-950 transition hover:bg-blue-100"
+                            >
+                              {cartItems.some((item) => item.id === book.sanityId) ? 'Go to Cart' : 'Add to Cart'}
+                            </button>
+                          </>
                         ) : (
                           <a
                             href={book.pdfUrl || '#'}
@@ -3002,7 +3092,7 @@ function BookStoreApp() {
                   {savedBooks.includes(selectedBookForModal.id) ? 'Saved in Library' : 'Save for Later'}
                 </button>
 
-               <div className="flex items-center gap-2.5">
+               <div className="flex flex-wrap items-center gap-2.5">
                   {isPaidBook ? (
                     <>
                       {/* Paid Book: Sample dekhne ka option */}
@@ -3030,6 +3120,20 @@ function BookStoreApp() {
                         <ShoppingCart className="w-4 h-4 text-white" />
                         <span>Buy Now ({selectedBookForModal.price || selectedBookForModal.badge})</span>
                       </a>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const alreadyInCart = cartItems.some((item) => item.id === selectedBookForModal.sanityId);
+                          if (alreadyInCart) {
+                            setShowCartDrawer(true);
+                          } else {
+                            handleAddToCart(selectedBookForModal);
+                          }
+                        }}
+                        className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-xs font-bold text-blue-950 transition hover:bg-blue-100"
+                      >
+                        {cartItems.some((item) => item.id === selectedBookForModal.sanityId) ? 'Go to Cart' : 'Add to Cart'}
+                      </button>
                     </>
                   ) : (
                     /* Free Material: Sample hatakar seedhe Poori PDF ka Single Button */
@@ -3229,6 +3333,11 @@ function BookStoreApp() {
           © 2026 XamToppr Edutech Private Limited. All Rights Reserved.
         </div>
       </footer>
+      <CartDrawer
+        isOpen={showCartDrawer}
+        onClose={() => setShowCartDrawer(false)}
+        onProceedCheckout={handleCartCheckout}
+      />
       <AuthModal
         isOpen={showCheckoutAuthModal}
         onClose={() => setShowCheckoutAuthModal(false)}
@@ -3360,6 +3469,7 @@ export default function App() {
   const normalizedPathname = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
   const contentPage = SITE_CONTENT_PAGES[normalizedPathname];
   if (contentPage) return <SiteContentPage page={contentPage} />;
+  if (normalizedPathname === '/my-library') return <MyLibrary />;
 
   return <BookStoreApp />;
 }

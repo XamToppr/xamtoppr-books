@@ -115,6 +115,29 @@ export default function UserButton() {
                   <span>📚 My Purchases</span>
                 </button>
 
+                <a
+                  href="/my-library"
+                  onClick={() => setMenuOpen(false)}
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "9px 14px",
+                    background: "none",
+                    border: "none",
+                    textAlign: "left",
+                    fontSize: "13px",
+                    color: "#374151",
+                    textDecoration: "none",
+                    cursor: "pointer"
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "#f3f4f6")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+                >
+                  <span>📚 My Library</span>
+                </a>
+
                 <button
                   onClick={() => {
                     setMenuOpen(false);
