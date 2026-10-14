@@ -2,6 +2,8 @@ import { defineConfig } from 'sanity';
 import { structureTool } from 'sanity/structure';
 import { schemaTypes } from './sanity/schemaTypes.js';
 import StudentActivityLeads from './src/components/admin/StudentActivityLeads.jsx';
+import CopyCouponAction from './sanity/actions/copyCouponAction.js';
+import { createCouponPublishAction } from './sanity/couponActions.js';
 
 const ADMIN_ROLE = 'administrator';
 const RESTRICTED_ACTIONS = new Set(['delete', 'discardChanges', 'unpublish']);
@@ -25,8 +27,17 @@ export default defineConfig({
       const isAdministrator = context.currentUser?.roles?.some(
         (role) => role.name === ADMIN_ROLE
       );
-      if (isAdministrator) return prev;
-      return prev.filter((Action) => !RESTRICTED_ACTIONS.has(Action.action));
+      const accessControlledActions = isAdministrator
+        ? prev
+        : prev.filter((Action) => !RESTRICTED_ACTIONS.has(Action.action));
+      if (context.schemaType !== 'coupon') return accessControlledActions;
+
+      return [
+        ...accessControlledActions.map((Action) => (
+          Action.action === 'publish' ? createCouponPublishAction(Action) : Action
+        )),
+        CopyCouponAction
+      ];
     }
   },
   plugins: [

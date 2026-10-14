@@ -1,12 +1,18 @@
 import React from 'react';
+import { useState } from 'react';
 import { ShoppingCart, Trash2, X } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
+import CouponField from '../coupon/CouponField';
 
 const formatPrice = (amount) => `₹${Number(amount || 0).toLocaleString('en-IN')}`;
 
 export default function CartDrawer({ isOpen, onClose, onProceedCheckout }) {
   const { cartItems, cartTotal, removeFromCart } = useCart();
+  const [couponState, setCouponState] = useState(null);
+  const cartKey = cartItems.map((item) => `${item.id}:${item.price}`).join('|');
+  const coupon = couponState?.items === cartItems ? couponState.value : null;
   if (!isOpen) return null;
+  const payableTotal = coupon?.finalAmount ?? cartTotal;
 
   return (
     <div
@@ -69,22 +75,23 @@ export default function CartDrawer({ isOpen, onClose, onProceedCheckout }) {
               ))}
             </ul>
             <footer className="border-t border-slate-200 bg-slate-50 p-5">
+              <CouponField
+                key={cartKey}
+                orderAmount={cartTotal}
+                onChange={(value) => setCouponState(value ? { items: cartItems, value } : null)}
+                className="mb-4"
+              />
               <div className="mb-4 flex items-center justify-between text-sm">
-                <span className="font-semibold text-slate-600">Order total</span>
-                <span className="text-lg font-black text-slate-950">{formatPrice(cartTotal)}</span>
+                <span className="font-semibold text-slate-600">{coupon ? 'Payable total' : 'Order total'}</span>
+                <span className="text-lg font-black text-slate-950">{formatPrice(payableTotal)}</span>
               </div>
               <button
                 type="button"
-                onClick={() => onProceedCheckout(cartItems[0])}
+                onClick={() => onProceedCheckout(cartItems, coupon)}
                 className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-extrabold text-white transition hover:bg-emerald-500"
               >
-                Proceed to Checkout
+                {coupon ? `Pay • ${formatPrice(payableTotal)}` : 'Proceed to Checkout'}
               </button>
-              {cartItems.length > 1 && (
-                <p className="mt-2 text-center text-xs leading-relaxed text-slate-500">
-                  Checkout opens the first book’s payment link. Other books will stay in your cart.
-                </p>
-              )}
             </footer>
           </>
         )}

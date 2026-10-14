@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { BookOpen, ShoppingBag, ShoppingCart } from 'lucide-react';
 import { doc, getDoc } from 'firebase/firestore';
 import AuthModal from '../auth/AuthModal';
@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { db } from '../../services/firebase';
 import sanityClient from '../../sanityClient';
+import { initiatePayment } from '../../services/paymentService';
 
 const formatPurchaseDate = (value) => {
   if (!value) return 'Date unavailable';
@@ -18,13 +19,14 @@ const formatPurchaseDate = (value) => {
 };
 
 export default function MyLibrary() {
-  const { currentUser, userProfile } = useAuth();
-  const { cartItems } = useCart();
+  const { currentUser, userProfile, refreshUserProfile } = useAuth();
+  const { cartItems, clearCart } = useCart();
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showCartDrawer, setShowCartDrawer] = useState(false);
+  const paymentInProgressRef = useRef(false);
 
   useEffect(() => {
     let isCurrentRequest = true;
@@ -61,7 +63,12 @@ export default function MyLibrary() {
             _id,
             title,
             "coverImageUrl": coverImage.asset->url,
-            "samplePdfUrl": samplePdfFile.asset->url
+            "samplePdfUrl": samplePdfFile.asset->url,
+            fullPdfFile {
+              asset-> {
+                url
+              }
+            }
           }`,
           { ids: bookIds }
         );
@@ -78,7 +85,8 @@ export default function MyLibrary() {
             id: bookId,
             title: catalogBook.title || entry.title || entry.bookTitle || 'Purchased book',
             coverImage: catalogBook.coverImageUrl || entry.coverImage || '',
-            readUrl: catalogBook.samplePdfUrl || entry.readUrl || entry.viewUrl || '',
+            fullPdfFile: catalogBook.fullPdfFile || null,
+            samplePdfUrl: catalogBook.samplePdfUrl || '',
             purchasedAt: entry.purchasedAt || entry.purchaseDate || entry.createdAt || null
           };
         }).sort((left, right) => new Date(right.purchasedAt || 0) - new Date(left.purchasedAt || 0));
@@ -98,18 +106,37 @@ export default function MyLibrary() {
     };
   }, [currentUser]);
 
-  const handleCartCheckout = (book) => {
+  const handleCartCheckout = async (items, coupon = null) => {
+    if (paymentInProgressRef.current) return;
     if (!currentUser || !/^[6-9]\d{9}$/.test(userProfile?.phone?.trim() || '')) {
       setShowAuthModal(true);
       return;
     }
-    if (!book.pdfUrl) {
-      setLoadError('This book does not have a checkout link yet.');
+    if (!Array.isArray(items) || items.length === 0) {
+      setLoadError('Your cart is empty.');
       return;
     }
 
-    window.open(book.pdfUrl, '_blank', 'noopener,noreferrer');
     setShowCartDrawer(false);
+    setLoadError('');
+    paymentInProgressRef.current = true;
+    await initiatePayment({
+      items,
+      totalAmount: coupon?.finalAmount ?? items.reduce((sum, item) => sum + (Number(item.price) || 0), 0),
+      couponCode: coupon?.code || '',
+      user: currentUser,
+      phone: userProfile.phone,
+      refreshUserProfile,
+      clearCart,
+      onSuccess: () => {
+        paymentInProgressRef.current = false;
+        window.location.assign('/my-library');
+      },
+      onFailure: (error) => {
+        paymentInProgressRef.current = false;
+        setLoadError(error.message || 'Payment could not be completed.');
+      }
+    });
   };
 
   return (
@@ -183,14 +210,24 @@ export default function MyLibrary() {
                 <div className="p-4">
                   <h2 className="line-clamp-2 min-h-12 font-extrabold text-slate-900">{book.title}</h2>
                   <p className="mt-2 text-xs text-slate-500">Purchased {formatPurchaseDate(book.purchasedAt)}</p>
-                  {book.readUrl ? (
-                    <a href={book.readUrl} target="_blank" rel="noopener noreferrer" className="mt-4 block rounded-lg bg-blue-950 px-4 py-2.5 text-center text-sm font-bold text-white hover:bg-blue-900">
-                      Read Now
-                    </a>
+                  {book.fullPdfFile?.asset?.url ? (
+                    <>
+                      <a href={book.fullPdfFile.asset.url} target="_blank" rel="noopener noreferrer" className="mt-4 block rounded-lg bg-blue-950 px-4 py-2.5 text-center text-sm font-bold text-white hover:bg-blue-900">
+                        📖 Read Full Book
+                      </a>
+                      <a href={book.fullPdfFile.asset.url} download className="mt-2 block rounded-lg border border-blue-200 px-4 py-2 text-center text-xs font-bold text-blue-950 hover:bg-blue-50">
+                        ⬇ Download PDF
+                      </a>
+                    </>
                   ) : (
-                    <button type="button" disabled className="mt-4 w-full rounded-lg bg-slate-200 px-4 py-2.5 text-sm font-bold text-slate-500">
-                      View link unavailable
-                    </button>
+                    <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-center text-xs font-semibold text-amber-800">
+                      Full book PDF is not available yet.
+                    </p>
+                  )}
+                  {book.samplePdfUrl && (
+                    <a href={book.samplePdfUrl} target="_blank" rel="noopener noreferrer" className="mt-2 block rounded-lg border border-slate-200 px-4 py-2 text-center text-xs font-bold text-slate-700 hover:bg-slate-50">
+                      Preview Sample PDF
+                    </a>
                   )}
                 </div>
               </article>

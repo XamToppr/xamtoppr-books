@@ -8,24 +8,28 @@ The XamToppr Books web portal provides competitive-exam books, study notes, PDF 
 - **Authentication:** Firebase Authentication with Google sign-in and browser-local persistence.
 - **User profiles:** Firestore `users/{uid}` documents store the account profile and phone number.
 - **Shopping cart:** A global React `CartContext` persists selected catalog books in browser `localStorage`.
+- **Coupons:** Sanity-managed coupon documents are validated in the UI and authoritatively revalidated by the order API before checkout.
+- **Payments:** Razorpay Checkout handles single-book and cart purchases. Server endpoints create catalog-priced orders and verify Razorpay signatures and captured-payment status before recording purchases.
 - **CMS:** Sanity manages books, notifications, site content, book requests, and student profile records.
 - **Server endpoints:** Vercel Functions under `api/` write to Sanity with a server-side token. Vite middleware in `vite.config.js` supplies the matching endpoints during local development.
-- **Interactive reading:** `react-pageflip` powers the sample flipbook. Paid checkout links and existing book-viewer behavior remain in the frontend.
+- **Interactive reading:** `react-pageflip` powers the sample flipbook; paid books open Razorpay Checkout.
 
 ### Main source locations
 
 | Path | Responsibility |
 | --- | --- |
-| `src/App.jsx` | Store UI, book viewer and flipbook, book-request form, checkout links, and Sanity content reads |
+| `src/App.jsx` | Store UI, book viewer and flipbook, book-request form, single-book checkout, and Sanity content reads |
 | `src/context/AuthContext.jsx` | Firebase auth state, Firestore user profile, duplicate-phone check, and student sync request |
 | `src/context/CartContext.jsx` | Persistent cart state and cart actions |
 | `src/components/profile/MyLibrary.jsx` | `/my-library` page backed by the signed-in user's Firestore purchase fields and Sanity catalog |
 | `src/components/cart/CartDrawer.jsx` | Cart item list, removal, total, and checkout action |
 | `src/services/firebase.js` | Firebase app, Auth, Firestore, and local persistence initialization |
 | `src/sanityClient.js` | Public, read-only Sanity client |
-| `sanity/schemaTypes.js` | Sanity document and object schemas |
+| `sanity/schemaTypes.js`, `sanity/schemas/coupon.js` | Sanity document and object schemas, including coupons |
 | `sanity.config.js` | Embedded Studio configuration at `/admin` |
 | `api/sync-student.js` | Authenticated server-side student profile upsert |
+| `api/create-razorpay-order.js` | Creates authenticated Razorpay orders from current Sanity catalog prices |
+| `api/verify-razorpay-payment.js` | Verifies Razorpay payment signature/capture and records the purchase |
 | `api/log-user-activity.js` | Authenticated student activity sync to Sanity |
 | `api/request-book.js` | Server-side book request creation |
 | `server/studentProfileSync.js` | Firebase ID-token verification and student document mapping |
@@ -49,21 +53,34 @@ Sanity Studio is available at `/admin`. Schemas in `sanity/schemaTypes.js` inclu
 - `book`
 - `bookRequest`
 - `studentUser`
+- `coupon`
 - `siteSettings`
 - `examNotification`
 - Supporting objects for dates, salary entries, selection stages, exam patterns, syllabus, document specifications, tables, rich notes, and guide blocks.
 
-The `studentUser` document uses a stable ID (`student_<Firebase UID>`) and fields `fullName`, `email`, `phone`, `firebaseUid`, `createdAt`, and `purchasedBooks`. Each login/profile sync updates profile fields without replacing existing orders. `purchasedBooks` contains a book reference, title snapshot, amount, order/payment ID, and purchase timestamp. `bookRequest` documents are also written through a server endpoint.
+The `studentUser` document uses a stable ID (`student_<Firebase UID>`) and fields `fullName`, `email`, `phone`, `firebaseUid`, `createdAt`, and `purchasedBooks`. Each login/profile sync updates profile fields without replacing existing orders. `purchasedBooks` contains a book reference, title snapshot, original amount, final amount paid, applied coupon code, order/payment ID, and purchase timestamp. `bookRequest` documents are also written through a server endpoint.
+
+Create coupon documents in Sanity Studio under **Coupon**. Coupon codes must be uppercase and may contain letters, numbers, hyphens, and underscores. Choose `percentage` or `flat`, set a positive discount value, and optionally set a minimum order amount and expiry. Toggle **Active** off to disable a coupon without deleting it. Percentage discounts are limited to 100%; a coupon must leave at least ₹0.01 payable.
+
+Each paid Sanity `book` can have a **Sample PDF** (`samplePdfFile`) and a separate **Original Full Book PDF (Paid Only)** (`fullPdfFile`). Upload the sample separately from the full book. Store the original in `fullPdfFile`; do not put a full book in the sample field.
 
 ### Purchase tracking
 
-Opening a payment or checkout link does **not** create a purchase record, modify `users/{uid}.purchasedBooks`, or award purchase coins. The app has no payment-provider confirmation callback. The `purchase_complete` activity is rejected from browser/API requests; only a verified payment-provider webhook should record completed purchases and append to `student_<uid>.purchasedBooks`.
+Buy Now and Proceed to Checkout use Razorpay Checkout for one or multiple books. The browser sends only Sanity book IDs, an optional coupon code, and its expected payable amount; `/api/create-razorpay-order` authenticates the Firebase user, resolves authoritative `offerPrice` values from Sanity, fetches the current coupon directly from Sanity, and validates its active status, expiry, minimum order, discount type, and value. The server recalculates the discount and payable amount in paise (`Math.round(finalDiscountedAmount * 100)`), rejecting stale or modified browser totals before creating the Razorpay order. The same discounted amount is displayed in Checkout. On Razorpay's callback, `/api/verify-razorpay-payment` validates the Razorpay HMAC signature and checks the payment against Razorpay's API, including that its status is `captured`, amount and currency match the order, and the order belongs to the signed-in Firebase UID. Only after those checks does the server append order entries (including original amount, final amount, and coupon code) to `student_<uid>.purchasedBooks` and create a `purchase_complete` Sanity activity. The client then awaits the verified purchase write to `users/{uid}` and Firestore `userActivities`, refreshes AuthContext's in-memory `userProfile`, and only then clears the cart and navigates to `/my-library`. Payment IDs are deduplicated. Guests are prompted to sign in before checkout.
+
+### Full-book unlocking
+
+My Library reads the signed-in user's purchase IDs/details from Firestore, then queries Sanity only for those book IDs. It displays **Read Full Book** and **Download PDF** actions only when the matching book has a `fullPdfFile` asset URL; the sample PDF remains a separate **Preview Sample PDF** action. Keep the full original PDF in `fullPdfFile` and the preview in `samplePdfFile` to maintain the distinct unlocked and sample resources. This is an application-level entitlement gate; Sanity file asset URLs are not intrinsically private, so use authenticated private storage and a server-side entitlement-checked delivery endpoint if the original PDFs must not be accessible to anyone who obtains an asset URL.
+
+The single-book detail view and cart drawer accept coupons before checkout. Applying a coupon shows the savings and recalculates the payable total; removing it restores the original price. The UI performs a read-only Sanity lookup for a responsive preview, but the authenticated order endpoint revalidates the coupon and signs the validated coupon/pricing into the order metadata. Coupon code and final amount are stored alongside each verified Sanity and Firestore purchase record.
+
+The Razorpay key secret is server-only. A captured payment whose browser callback is interrupted may require reconciliation; configure a Razorpay webhook for operational recovery before relying on browser callbacks as the only fulfillment notification.
 
 ### My Library and cart
 
 The `/my-library` route reads `users/{uid}.purchasedBooks` and `users/{uid}.purchasedBookIds` from Firestore, then resolves matching book documents from the public Sanity catalog for titles, covers, and sample reading links. Only a verified purchase integration should populate those purchase fields. The page provides a Read Now action when the book has a sample PDF; unavailable reading links are shown as disabled rather than redirecting to a payment link.
 
-`CartProvider` wraps the app and persists its `cartItems` in `localStorage` under `xamtoppr-books-cart`. Its `addToCart`, `removeFromCart`, and `clearCart` actions maintain a derived `cartTotal`. Paid book cards and detail views expose Add to Cart/Go to Cart actions, and the header cart drawer shows selected books, removes items, and calculates the total. Since there is no cart-level payment integration, Proceed to Checkout opens the first item's existing payment link and leaves the remaining items in the cart.
+`CartProvider` wraps the app and persists its `cartItems` in `localStorage` under `xamtoppr-books-cart`. Its `addToCart`, `removeFromCart`, and `clearCart` actions maintain a derived `cartTotal`. Paid book cards and detail views expose Add to Cart/Go to Cart actions, and the header cart drawer shows selected books, removes items, and calculates the total. Proceed to Checkout creates one Razorpay order for all selected books and clears the cart only after verified payment and successful Firestore library updates.
 
 ## Student Activity & Leads
 
@@ -77,7 +94,7 @@ The `/my-library` route reads `users/{uid}.purchasedBooks` and `users/{uid}.purc
 | Add to Cart | `add_to_cart` | 20 |
 | Book Purchase Successful | `purchase_complete` | 50 |
 
-The first four events are logged from the app. A purchase-complete event must come from a verified payment-provider webhook; the client-facing endpoint rejects it so opening checkout cannot be mistaken for a successful purchase. Sanity `userActivity` documents contain student contact details, interested book, action, coins earned, cumulative coins, lead status, and timestamp. Lead status is `CONVERTED` for a verified purchase, `HOT` for add-to-cart or a cumulative balance of at least 100, `WARM` for sample reading, and otherwise `COLD`. Sanity student profiles also maintain `totalCoins`.
+The first four events are logged from the app. `purchase_complete` is recorded only after the server verifies Razorpay's payment signature and confirms the payment is captured; the generic client activity endpoint rejects purchase events. Sanity `userActivity` documents contain student contact details, interested book, action, coins earned, cumulative coins, lead status, and timestamp. Lead status is `CONVERTED` for a verified purchase, `HOT` for add-to-cart or a cumulative balance of at least 100, `WARM` for sample reading, and otherwise `COLD`. Sanity student profiles also maintain `totalCoins`.
 
 The Sanity Studio tool **Student Activity & Leads** groups activity events into one row per unique student, using Firebase UID (or the Sanity student reference, email, or phone as a fallback identity). The summary row shows contact details, highest lead status, total coins, activity count, latest interested book, and last-active time. Expand a student row to view every event in chronological order. Search applies to student name/phone; lead filters use the student's highest status, and activity filters include students who performed that event at least once.
 
@@ -105,12 +122,13 @@ These Firebase web app values are public client configuration (not service-accou
 | `VITE_FIREBASE_STORAGE_BUCKET` | Yes | Firebase app configuration |
 | `VITE_FIREBASE_MESSAGING_SENDER_ID` | Yes | Firebase app configuration |
 | `VITE_FIREBASE_APP_ID` | Yes | Firebase app configuration |
+| `VITE_RAZORPAY_KEY_ID` | Yes for checkout | Public Razorpay Checkout key ID used by the browser |
 
 ### Sanity configuration
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `SANITY_API_WRITE_TOKEN` | Yes for writes | **Server-only** token with write access for student sync and book requests |
+| `SANITY_API_WRITE_TOKEN` | Yes for writes | **Server-only** token with write access for student sync, activity, and purchase records |
 | `SANITY_PROJECT_ID` | No | Server project ID; defaults to `rkev3aui` |
 | `SANITY_DATASET` | No | Server dataset; defaults to `production` |
 | `VITE_SANITY_PROJECT_ID` | No | Public Sanity project ID override; also accepted as a server-side compatibility fallback |
@@ -118,7 +136,15 @@ These Firebase web app values are public client configuration (not service-accou
 | `VITE_SANITY_WRITE_TOKEN` | Compatibility only | Accepted by server endpoints if the preferred token name is unavailable; **never reference it in frontend code** |
 | `VITE_SANITY_API_WRITE_TOKEN` | Compatibility only | Legacy server-side token fallback; **never reference it in frontend code** |
 
-For a typical local `.env`, provide all six Firebase variables and `SANITY_API_WRITE_TOKEN`. Project ID and dataset can be omitted to use the defaults. Do not paste real values into this README or commit the `.env` file.
+### Razorpay configuration
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `VITE_RAZORPAY_KEY_ID` | Yes | Public Checkout key ID bundled for Razorpay.js |
+| `RAZORPAY_KEY_ID` | Yes for server order creation | Server-side Razorpay key ID; should match the browser key ID |
+| `RAZORPAY_KEY_SECRET` | Yes | **Server-only** secret for Razorpay REST API authentication and payment signature verification |
+
+For a typical local `.env`, provide all six Firebase variables, the Razorpay test key ID, `RAZORPAY_KEY_SECRET`, and `SANITY_API_WRITE_TOKEN`. Project ID and dataset can be omitted to use the defaults. Never use a Razorpay live secret in browser variables. Do not paste real values into this README or commit the `.env` file.
 
 ### Local `.env` template
 
@@ -129,8 +155,11 @@ VITE_FIREBASE_PROJECT_ID=
 VITE_FIREBASE_STORAGE_BUCKET=
 VITE_FIREBASE_MESSAGING_SENDER_ID=
 VITE_FIREBASE_APP_ID=
+VITE_RAZORPAY_KEY_ID=rzp_test_replace_with_test_key_id
 
 SANITY_API_WRITE_TOKEN=
+RAZORPAY_KEY_ID=rzp_test_replace_with_test_key_id
+RAZORPAY_KEY_SECRET=replace_with_test_key_secret
 # Optional overrides:
 # SANITY_PROJECT_ID=rkev3aui
 # SANITY_DATASET=production
@@ -149,7 +178,15 @@ npm install
 npm run dev
 ```
 
-The Vite middleware implements `/api/request-book`, `/api/sync-student`, and `/api/log-user-activity` for local use. Configure the environment variables above, then visit the URL printed by Vite. Sanity Studio is served by the application at `/admin`.
+The Vite middleware implements `/api/request-book`, `/api/sync-student`, `/api/log-user-activity`, `/api/create-razorpay-order`, and `/api/verify-razorpay-payment` for local use. Configure the environment variables above, then visit the URL printed by Vite. Sanity Studio is served by the application at `/admin`.
+
+### Razorpay test mode
+
+1. Create or open a Razorpay account and use its **Test Mode** API key pair for local development.
+2. Set `VITE_RAZORPAY_KEY_ID` in the Vite environment and set both `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` for server endpoints. The secret must not use a `VITE_` prefix.
+3. Set the Sanity write token and Firebase web configuration as described above; the server must be able to verify Firebase ID tokens and write purchase records to Sanity.
+4. Restart Vite after changing environment values, sign in, and test a single-book purchase and a multi-book cart checkout using Razorpay's official test payment methods.
+5. Confirm that declined/cancelled payments create no purchase records, while a captured test payment appears in the user's My Library, the `studentUser.purchasedBooks` array, and the `purchase_complete` activity in Sanity.
 
 Useful checks:
 
@@ -163,9 +200,9 @@ npm run preview
 
 1. Import the Git repository into Vercel and set the project root to the repository root.
 2. Use `npm install` for install and `npm run build` for the build command. Vite outputs to `dist`.
-3. Add the six `VITE_FIREBASE_*` values and the server-only `SANITY_API_WRITE_TOKEN` in **Project Settings → Environment Variables** for Production (and Preview/Development as appropriate).
+3. Add the six `VITE_FIREBASE_*` values, `VITE_RAZORPAY_KEY_ID`, server-only `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`, and `SANITY_API_WRITE_TOKEN` in **Project Settings → Environment Variables** for Production (and Preview/Development as appropriate). Start with Razorpay test credentials.
 4. Optionally configure `SANITY_PROJECT_ID` and `SANITY_DATASET` if not using the defaults.
 5. Redeploy after adding or changing environment variables. Vercel serves `api/*.js` as serverless functions; `vercel.json` rewrites frontend paths to the SPA while `/api/*` routes are handled by their functions.
-6. Test Google login, refresh persistence, phone onboarding, student and activity records in Sanity Studio, leads filters/CSV export, and book requests after deployment.
+6. Test Google login, refresh persistence, phone onboarding, student and activity records in Sanity Studio, leads filters/CSV export, book requests, single-book checkout, multi-book checkout, and cancelled/declined payments.
 
 If `/api/sync-student` returns an error, inspect the response JSON and Vercel Function logs. A missing write token cannot be repaired by a browser fallback; configure the token as a server-side Vercel environment variable. Never solve this by exposing a Sanity write token through `VITE_` client code.

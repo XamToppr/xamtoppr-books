@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  arrayUnion,
   increment,
   runTransaction,
   serverTimestamp
@@ -25,7 +26,11 @@ const getActivityDetails = (details) => ({
 export async function logUserActivity(actionType, details = {}) {
   const user = auth.currentUser;
   const coinsEarned = ACTIVITY_COIN_VALUES[actionType];
-  if (!user || !coinsEarned || actionType === 'purchase_complete') return false;
+  const verifiedPayment = details.verifiedPayment;
+  if (!user || !coinsEarned
+    || (actionType === 'purchase_complete'
+      && (!verifiedPayment?.paymentId || !Array.isArray(verifiedPayment.purchases)
+        || verifiedPayment.purchases.length === 0))) return false;
 
   const userRef = doc(db, 'users', user.uid);
   const activityRef = doc(collection(db, 'userActivities'));
@@ -35,6 +40,10 @@ export async function logUserActivity(actionType, details = {}) {
     const result = await runTransaction(db, async (transaction) => {
       const userSnapshot = await transaction.get(userRef);
       const profile = userSnapshot.data() || {};
+      if (actionType === 'purchase_complete'
+        && (profile.processedPaymentIds || []).includes(verifiedPayment.paymentId)) {
+        return { logged: true, alreadyProcessed: true, totalCoins: Number(profile.totalCoins) || 0 };
+      }
       const visitDate = getLocalDate();
       if (actionType === 'daily_login_visit' && profile.lastDailyVisitDate === visitDate) {
         return { logged: false, totalCoins: Number(profile.totalCoins) || 0 };
@@ -52,11 +61,35 @@ export async function logUserActivity(actionType, details = {}) {
         totalCoins,
         timestamp: serverTimestamp()
       };
+      if (actionType === 'purchase_complete') {
+        activity.paymentId = verifiedPayment.paymentId;
+        activity.bookTitle = verifiedPayment.purchases.length === 1
+          ? verifiedPayment.purchases[0].title
+          : `${verifiedPayment.purchases.length} books`;
+      }
       const userUpdates = {
         totalCoins: increment(coinsEarned),
         lastActiveAt: serverTimestamp()
       };
       if (actionType === 'daily_login_visit') userUpdates.lastDailyVisitDate = visitDate;
+      if (actionType === 'purchase_complete') {
+        userUpdates.purchasedBookIds = arrayUnion(
+          ...verifiedPayment.purchases.map((purchase) => purchase.bookId)
+        );
+        userUpdates.purchasedBooks = arrayUnion(
+          ...verifiedPayment.purchases.map((purchase) => ({
+            bookId: purchase.bookId,
+            bookTitle: purchase.title,
+            price: purchase.finalAmount ?? purchase.amount,
+            amount: purchase.amount,
+            finalAmount: purchase.finalAmount ?? purchase.amount,
+            appliedCoupon: purchase.appliedCoupon || '',
+            paymentId: verifiedPayment.paymentId,
+            purchasedAt: purchase.purchasedAt
+          }))
+        );
+        userUpdates.processedPaymentIds = arrayUnion(verifiedPayment.paymentId);
+      }
 
       transaction.set(activityRef, activity);
       transaction.set(userRef, userUpdates, { merge: true });
@@ -64,6 +97,8 @@ export async function logUserActivity(actionType, details = {}) {
     });
 
     if (!result.logged) return false;
+
+    if (actionType === 'purchase_complete') return true;
 
     try {
       const idToken = await user.getIdToken();

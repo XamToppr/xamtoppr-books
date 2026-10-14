@@ -1,5 +1,6 @@
 import { createElement } from 'react';
 import { defineArrayMember, defineField, defineType, PatchEvent, set } from 'sanity';
+import coupon from './schemas/coupon.js';
 
 const examCategorySuggestions = ['SSC', 'Railway', 'Banking', 'Teaching', 'Defence', 'State Exams', 'UPSC'];
 
@@ -729,6 +730,14 @@ const book = defineType({
       group: 'media',
       options: { accept: '.pdf,application/pdf' }
     }),
+    defineField({
+      name: 'fullPdfFile',
+      title: 'Original Full Book PDF (Paid Only)',
+      description: 'Upload the complete original book PDF here. Only unlocked for students who purchase.',
+      type: 'file',
+      group: 'media',
+      options: { accept: '.pdf' }
+    }),
     defineField({ name: 'fileSize', title: 'File Size', type: 'string', group: 'media' }),
     defineField({ name: 'totalPages', title: 'Total Pages', type: 'number', group: 'media', validation: (Rule) => Rule.min(0) }),
     defineField({
@@ -927,6 +936,8 @@ const studentUser = defineType({
             }),
             defineField({ name: 'bookTitle', title: 'Book Title', type: 'string' }),
             defineField({ name: 'amount', title: 'Amount Paid', type: 'number' }),
+            defineField({ name: 'finalAmount', title: 'Final Amount Paid', type: 'number' }),
+            defineField({ name: 'appliedCoupon', title: 'Applied Coupon', type: 'string' }),
             defineField({ name: 'orderId', title: 'Order / Payment ID', type: 'string' }),
             defineField({ name: 'purchasedAt', title: 'Purchase Date', type: 'datetime' })
           ],
@@ -1093,6 +1104,7 @@ export const schemaTypes = [
   bookRequest,
   studentUser,
   userActivity,
+  coupon,
   siteSettings,
   examNotification,
   importantDate,

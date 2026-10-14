@@ -134,6 +134,14 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const refreshUserProfile = async () => {
+    if (!currentUser) return null;
+    const profileSnapshot = await getDoc(doc(db, "users", currentUser.uid));
+    const profile = profileSnapshot.exists() ? profileSnapshot.data() : null;
+    setUserProfile(profile);
+    return profile;
+  };
+
   // Logout
   const logout = async () => {
     try {
@@ -199,6 +207,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         signInWithGoogle,
         updatePhoneNumber,
+        refreshUserProfile,
         logout,
       }}
     >

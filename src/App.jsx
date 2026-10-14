@@ -1,10 +1,12 @@
 import UserButton from './components/auth/UserButton';
 import AuthModal from './components/auth/AuthModal';
 import CartDrawer from './components/cart/CartDrawer';
+import CouponField from './components/coupon/CouponField';
 import MyLibrary from './components/profile/MyLibrary';
 import { useAuth } from './context/AuthContext';
 import { useCart } from './context/CartContext';
 import { logUserActivity } from './services/activityTracker';
+import { initiatePayment } from './services/paymentService';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import HTMLFlipBook from 'react-pageflip';
 import { PortableText } from '@portabletext/react';
@@ -174,8 +176,8 @@ const formatDownloadCount = (count) => (
 );
 
 function BookStoreApp() {
-  const { currentUser, userProfile, logout } = useAuth();
-  const { cartItems, addToCart } = useCart();
+  const { currentUser, userProfile, refreshUserProfile, logout } = useAuth();
+  const { cartItems, addToCart, clearCart } = useCart();
   const [booksList, setBooksList] = useState([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -185,6 +187,7 @@ function BookStoreApp() {
   const [sortBy, setSortBy] = useState('popular');
   const [savedBooks, setSavedBooks] = useState(['xt-bk-001']);
   const [selectedBookForModal, setSelectedBookForModal] = useState(null);
+  const [bookCoupon, setBookCoupon] = useState(null);
   const [ratingSelections, setRatingSelections] = useState({});
   const [ratedBooks, setRatedBooks] = useState(() => new Set());
   const [showFlipbookModal, setShowFlipbookModal] = useState(null);
@@ -221,6 +224,7 @@ function BookStoreApp() {
   }));
 
   const flipBookRef = useRef(null);
+  const paymentInProgressRef = useRef(false);
   const flipAudioRef = useRef(null);
   const downloadedBooksRef = useRef(new Set());
   const lastViewedBookIdRef = useRef(null);
@@ -230,6 +234,12 @@ function BookStoreApp() {
     { label: 'Privacy Policy', href: '/privacy-policy' },
     { label: 'Refund Policy', href: '/refund-policy' }
   ];
+  const selectedBookAmount = Number(selectedBookForModal?.offerPrice) || 0;
+  const selectedBookCoupon = bookCoupon
+    && bookCoupon.bookId === selectedBookForModal?.sanityId
+    && (Number(bookCoupon.orderAmount) || 0) === selectedBookAmount
+    ? bookCoupon.value || null
+    : null;
 
   useEffect(() => {
     const updateViewportSize = () => {
@@ -662,23 +672,32 @@ function BookStoreApp() {
     setActiveSlideIndex(0);
   };
 
-  const handlePaidBookPurchase = (event, book) => {
+  const handlePaidBookPurchase = async (event, book, coupon = null) => {
+    event.preventDefault();
+    if (paymentInProgressRef.current) return;
     const hasPhone = /^[6-9]\d{9}$/.test(userProfile?.phone?.trim() || '');
     if (!currentUser || !hasPhone) {
-      event.preventDefault();
-      if (!currentUser || viewportSize.width < 1280) {
-        setShowCheckoutAuthModal(true);
+      setShowCheckoutAuthModal(true);
+      return;
+    }
+
+    paymentInProgressRef.current = true;
+    await initiatePayment({
+      items: [book],
+      totalAmount: coupon?.finalAmount ?? (Number(book.offerPrice) || 0),
+      couponCode: coupon?.code || '',
+      user: currentUser,
+      phone: userProfile.phone,
+      refreshUserProfile,
+      onSuccess: () => {
+        paymentInProgressRef.current = false;
+        window.location.assign('/my-library');
+      },
+      onFailure: (error) => {
+        paymentInProgressRef.current = false;
+        showToast(error.message || 'Payment could not be completed.');
       }
-      return;
-    }
-
-    if (!book.pdfUrl) {
-      event.preventDefault();
-      showToast('Payment link will be updated soon!');
-      return;
-    }
-
-    handleBookDownload(book);
+    });
   };
 
   const handleAddToCart = (book) => {
@@ -695,19 +714,37 @@ function BookStoreApp() {
     }
   };
 
-  const handleCartCheckout = (book) => {
+  const handleCartCheckout = async (items, coupon = null) => {
+    if (paymentInProgressRef.current) return;
     const hasPhone = /^[6-9]\d{9}$/.test(userProfile?.phone?.trim() || '');
     if (!currentUser || !hasPhone) {
       setShowCheckoutAuthModal(true);
       return;
     }
-    if (!book.pdfUrl) {
-      showToast('Payment link will be updated soon!');
+    if (!Array.isArray(items) || items.length === 0) {
+      showToast('Your cart is empty.');
       return;
     }
 
-    window.open(book.pdfUrl, '_blank', 'noopener,noreferrer');
     setShowCartDrawer(false);
+    paymentInProgressRef.current = true;
+    await initiatePayment({
+      items,
+      totalAmount: coupon?.finalAmount ?? items.reduce((sum, item) => sum + (Number(item.price) || 0), 0),
+      couponCode: coupon?.code || '',
+      user: currentUser,
+      phone: userProfile.phone,
+      refreshUserProfile,
+      clearCart,
+      onSuccess: () => {
+        paymentInProgressRef.current = false;
+        window.location.assign('/my-library');
+      },
+      onFailure: (error) => {
+        paymentInProgressRef.current = false;
+        showToast(error.message || 'Payment could not be completed.');
+      }
+    });
   };
 
   const handleBookRating = (book, userStar) => {
@@ -3162,17 +3199,27 @@ function BookStoreApp() {
                         <span>Read Sample PDF</span>
                       </a>
 
+                      <CouponField
+                        key={`${selectedBookForModal.sanityId}:${selectedBookAmount}`}
+                        orderAmount={selectedBookAmount}
+                        onChange={(value) => setBookCoupon(value ? {
+                          bookId: selectedBookForModal.sanityId,
+                          orderAmount: selectedBookAmount,
+                          value
+                        } : null)}
+                        className="basis-full"
+                      />
                       {/* Paid Book: Buy Now */}
-                      <a
-                        href={selectedBookForModal.pdfUrl || '#'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(event) => handlePaidBookPurchase(event, selectedBookForModal)}
+                      <button
+                        type="button"
+                        onClick={(event) => handlePaidBookPurchase(event, selectedBookForModal, selectedBookCoupon)}
                         className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white text-xs sm:text-sm font-extrabold px-5 py-2.5 rounded-xl shadow-md transition flex items-center gap-2 transform active:scale-95"
                       >
                         <ShoppingCart className="w-4 h-4 text-white" />
-                        <span>Buy Now ({selectedBookForModal.price || selectedBookForModal.badge})</span>
-                      </a>
+                        <span>
+                          {selectedBookCoupon ? `Pay • ₹${selectedBookCoupon.finalAmount.toLocaleString('en-IN')}` : `Buy Now (${selectedBookForModal.price || selectedBookForModal.badge})`}
+                        </span>
+                      </button>
                       <button
                         type="button"
                         onClick={() => {
