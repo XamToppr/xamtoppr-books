@@ -145,7 +145,7 @@ These Firebase web app values are public client configuration (not service-accou
 | --- | --- | --- |
 | `VITE_RAZORPAY_KEY_ID` | Yes | Public Checkout key ID bundled for Razorpay.js |
 | `RAZORPAY_KEY_ID` | Yes for server order creation | Server-side Razorpay key ID; should match the browser key ID |
-| `RAZORPAY_KEY_SECRET` | Yes | **Server-only** secret for Razorpay REST API authentication and payment signature verification |
+| `RAZORPAY_KEY_SECRET` | Yes | **Server-only** secret for Razorpay REST API authentication and payment signature verification (`RAZORPAY_SECRET` is accepted as a legacy server-only fallback) |
 
 For a typical local `.env`, provide all six Firebase variables, the Razorpay test key ID, `RAZORPAY_KEY_SECRET`, and `SANITY_API_WRITE_TOKEN`. Project ID and dataset can be omitted to use the defaults. Never use a Razorpay live secret in browser variables. Do not paste real values into this README or commit the `.env` file.
 

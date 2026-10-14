@@ -17,7 +17,7 @@ const getString = (value) => (typeof value === 'string' ? value.trim() : '');
 
 function getPaymentConfig(env) {
   const keyId = env.RAZORPAY_KEY_ID || env.VITE_RAZORPAY_KEY_ID;
-  const keySecret = env.RAZORPAY_KEY_SECRET;
+  const keySecret = env.RAZORPAY_KEY_SECRET || env.RAZORPAY_SECRET;
   if (!keyId || !keySecret) {
     throw new PaymentRequestError(503, 'Razorpay server credentials are not configured.');
   }
@@ -318,18 +318,27 @@ export async function verifyRazorpayPayment({ body, authorization, env }) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     throw new PaymentRequestError(400, 'A valid request body is required.');
   }
+  const orderId = getString(
+    body.razorpay_order_id || body.order_id || body.razorpayOrderId || body.orderId
+  );
+  const paymentId = getString(
+    body.razorpay_payment_id || body.payment_id || body.razorpayPaymentId || body.paymentId
+  );
+  const signature = getString(
+    body.razorpay_signature || body.signature || body.razorpaySignature
+  );
+  if (!orderId || !paymentId || !signature) {
+    throw new PaymentRequestError(400, 'Missing order_id, payment_id, or signature.');
+  }
+  if (!/^[a-f\d]{64}$/i.test(signature)) {
+    throw new PaymentRequestError(400, 'Payment verification details are invalid.');
+  }
+
   const uid = getString(body.uid);
   const firebaseApiKey = getString(body.firebaseApiKey)
     || env.VITE_FIREBASE_API_KEY
     || env.FIREBASE_WEB_API_KEY;
   const firebaseUser = await authenticate(authorization, uid, firebaseApiKey);
-  const orderId = getString(body.orderId || body.razorpay_order_id || body.razorpayOrderId);
-  const paymentId = getString(body.paymentId || body.razorpay_payment_id || body.razorpayPaymentId);
-  const signature = getString(body.signature || body.razorpay_signature || body.razorpaySignature);
-  if (!orderId || !paymentId || !/^[a-f\d]{64}$/i.test(signature)) {
-    throw new PaymentRequestError(400, 'Payment verification details are invalid.');
-  }
-
   const config = getPaymentConfig(env);
   const orderPayload = readOrderToken(body.orderToken, config.keySecret);
   if (orderPayload.uid !== uid || orderPayload.orderId !== orderId
@@ -341,8 +350,10 @@ export async function verifyRazorpayPayment({ body, authorization, env }) {
     .update(`${orderId}|${paymentId}`)
     .digest();
   const receivedSignature = Buffer.from(signature, 'hex');
-  if (expectedSignature.length !== receivedSignature.length
-    || !timingSafeEqual(expectedSignature, receivedSignature)) {
+  const signatureIsValid = expectedSignature.length === receivedSignature.length
+    && timingSafeEqual(expectedSignature, receivedSignature);
+  console.log('Razorpay signature valid:', signatureIsValid);
+  if (!signatureIsValid) {
     throw new PaymentRequestError(403, 'Razorpay payment signature is invalid.');
   }
 
