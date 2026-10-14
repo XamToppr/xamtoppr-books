@@ -173,7 +173,7 @@ const formatDownloadCount = (count) => (
 );
 
 function BookStoreApp() {
-  const { currentUser, userProfile, trackBookPurchase } = useAuth();
+  const { currentUser, userProfile, trackBookPurchase, logout } = useAuth();
   const { cartItems, addToCart } = useCart();
   const [booksList, setBooksList] = useState([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -189,6 +189,7 @@ function BookStoreApp() {
   const [showFlipbookModal, setShowFlipbookModal] = useState(null);
   const [showRequestBookModal, setShowRequestBookModal] = useState(false);
   const [showCheckoutAuthModal, setShowCheckoutAuthModal] = useState(false);
+  const [showMobileAuthModal, setShowMobileAuthModal] = useState(false);
   const [showCartDrawer, setShowCartDrawer] = useState(false);
   const [isSubmittingBookRequest, setIsSubmittingBookRequest] = useState(false);
   const [bookRequestError, setBookRequestError] = useState('');
@@ -1106,6 +1107,7 @@ function BookStoreApp() {
             <button
               type="button"
               onClick={() => {
+                setMobileMenuOpen(false);
                 setCurrentTab('books');
                 setSelectedBlog(null);
               }}
@@ -1122,6 +1124,7 @@ function BookStoreApp() {
             <button
               type="button"
               onClick={() => {
+                setMobileMenuOpen(false);
                 setCurrentTab('blogs');
                 setSelectedBlog(null);
               }}
@@ -1143,40 +1146,84 @@ function BookStoreApp() {
 
         {mobileMenuOpen && (
           <div className="xl:hidden bg-[#0a1b3d] border-b border-blue-900 px-4 pt-3 pb-5 space-y-2">
-            <a href="https://www.xamtoppr.com/" className="block w-full text-left px-3 py-2.5 rounded-lg text-slate-200 hover:bg-blue-900/50">
+            <a href="https://www.xamtoppr.com/" onClick={() => setMobileMenuOpen(false)} className="block w-full text-left px-3 py-2.5 rounded-lg text-slate-200 hover:bg-blue-900/50">
               Home
             </a>
-            <a href="https://xamtoppr.com/video" className="block w-full text-left px-3 py-2.5 rounded-lg text-slate-200 hover:bg-blue-900/50">
+            <a href="https://xamtoppr.com/video" onClick={() => setMobileMenuOpen(false)} className="block w-full text-left px-3 py-2.5 rounded-lg text-slate-200 hover:bg-blue-900/50">
               Courses
             </a>
-            <a href="https://xamtoppr.com/package/combo" className="block w-full text-left px-3 py-2.5 rounded-lg text-slate-200 hover:bg-blue-900/50">
+            <a href="https://xamtoppr.com/package/combo" onClick={() => setMobileMenuOpen(false)} className="block w-full text-left px-3 py-2.5 rounded-lg text-slate-200 hover:bg-blue-900/50">
               Test Series
             </a>
-            <a href="/" className="block w-full text-left px-3 py-2.5 rounded-lg text-amber-400 font-bold bg-blue-900/60 flex items-center justify-between">
+            <a href="/" onClick={() => setMobileMenuOpen(false)} className="block w-full text-left px-3 py-2.5 rounded-lg text-amber-400 font-bold bg-blue-900/60 flex items-center justify-between">
               <span className="flex items-center gap-2">
                 <BookOpen className="w-4 h-4" /> Free Books & PDF Library
               </span>
               <span className="bg-amber-500 text-slate-950 text-[10px] font-black px-1.5 py-0.5 rounded">FREE</span>
             </a>
-            <a href="https://xamtoppr.com/weekly-quiz" className="block w-full text-left px-3 py-2.5 rounded-lg text-slate-200 hover:bg-blue-900/50">
+            <a href="https://xamtoppr.com/weekly-quiz" onClick={() => setMobileMenuOpen(false)} className="block w-full text-left px-3 py-2.5 rounded-lg text-slate-200 hover:bg-blue-900/50">
               Current Affairs
             </a>
-            <a href="https://xamtoppr.com/blog" className="block w-full text-left px-3 py-2.5 rounded-lg text-slate-200 hover:bg-blue-900/50">
+            <a href="https://xamtoppr.com/blog" onClick={() => setMobileMenuOpen(false)} className="block w-full text-left px-3 py-2.5 rounded-lg text-slate-200 hover:bg-blue-900/50">
               PYQ Papers
             </a>
-            <div className="grid grid-cols-2 gap-2 border-t border-blue-800/70 pt-3">
-              {currentUser && (
-                <a href="/my-library" className="col-span-2 rounded-lg border border-blue-700 px-3 py-2.5 text-center text-sm font-semibold text-amber-300 transition hover:bg-blue-900/60">
+            {currentUser ? (
+              <div className="space-y-2 border-t border-blue-800/70 pt-3">
+                <div className="flex items-center gap-3 rounded-lg bg-blue-900/50 p-3">
+                  {currentUser.photoURL ? (
+                    <img src={currentUser.photoURL} alt="" className="h-10 w-10 rounded-full object-cover" />
+                  ) : (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+                      {(currentUser.displayName || 'U')[0].toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-white">{currentUser.displayName || 'Student'}</p>
+                    <p className="truncate text-xs text-slate-300">{currentUser.email}</p>
+                  </div>
+                </div>
+                <a
+                  href="/my-library"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block rounded-lg border border-blue-700 px-3 py-2.5 text-center text-sm font-semibold text-amber-300 transition hover:bg-blue-900/60"
+                >
                   My Library
                 </a>
-              )}
-              <a href="https://xamtoppr.com/login" className="rounded-lg border border-blue-700 px-3 py-2.5 text-center text-sm font-semibold text-slate-100 transition hover:bg-blue-900/60">
-                Log In
-              </a>
-              <a href="https://xamtoppr.com/register" className="rounded-lg bg-amber-500 px-3 py-2.5 text-center text-sm font-bold text-slate-950 transition hover:bg-amber-400">
-                Sign Up Free
-              </a>
-            </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    void logout().catch((error) => console.error('Failed to log out:', error));
+                  }}
+                  className="w-full rounded-lg border border-rose-400/40 px-3 py-2.5 text-center text-sm font-semibold text-rose-200 transition hover:bg-rose-950/40"
+                >
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 border-t border-blue-800/70 pt-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setShowMobileAuthModal(true);
+                  }}
+                  className="rounded-lg border border-blue-700 px-3 py-2.5 text-center text-sm font-semibold text-slate-100 transition hover:bg-blue-900/60"
+                >
+                  Log In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setShowMobileAuthModal(true);
+                  }}
+                  className="rounded-lg bg-amber-500 px-3 py-2.5 text-center text-sm font-bold text-slate-950 transition hover:bg-amber-400"
+                >
+                  Sign Up Free
+                </button>
+              </div>
+            )}
           </div>
         )}
       </header>
@@ -3324,8 +3371,11 @@ function BookStoreApp() {
         onProceedCheckout={handleCartCheckout}
       />
       <AuthModal
-        isOpen={showCheckoutAuthModal}
-        onClose={() => setShowCheckoutAuthModal(false)}
+        isOpen={showCheckoutAuthModal || showMobileAuthModal}
+        onClose={() => {
+          setShowCheckoutAuthModal(false);
+          setShowMobileAuthModal(false);
+        }}
       />
     </div>
   );
