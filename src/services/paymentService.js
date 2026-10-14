@@ -24,7 +24,12 @@ async function postPaymentRequest(path, body, user) {
     throw new Error(`Payment request returned an invalid response (status ${response.status}).`, { cause: error });
   }
   if (!response.ok) {
-    throw new Error(result.error || result.message || `Payment request failed with status ${response.status}.`);
+    const error = new Error(
+      result.error || result.message || `Payment request failed with status ${response.status}.`
+    );
+    error.responseData = result;
+    error.status = response.status;
+    throw error;
   }
   return result;
 }
@@ -88,12 +93,21 @@ export async function initiatePayment({
       theme: { color: '#0d9488' },
       handler: async (response) => {
         try {
-          const verification = await postPaymentRequest('/api/verify-razorpay-payment', {
-            razorpay_order_id: response.razorpay_order_id,
-            razorpay_payment_id: response.razorpay_payment_id,
-            razorpay_signature: response.razorpay_signature,
-            orderToken: order.orderToken
-          }, user);
+          let verification;
+          try {
+            verification = await postPaymentRequest('/api/verify-razorpay-payment', {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              orderToken: order.orderToken
+            }, user);
+          } catch (error) {
+            console.error(
+              'Verify payment response error:',
+              error.responseData || error.message
+            );
+            throw error;
+          }
           if (verification.success !== true || !Array.isArray(verification.purchases)) {
             throw new Error(verification.message || 'The payment could not be verified.');
           }
