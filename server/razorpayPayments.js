@@ -211,6 +211,7 @@ export async function createRazorpayOrder({ body, authorization, env }) {
   const order = await razorpayRequest('/orders', 'POST', config, {
     amount: amountPaise,
     currency: 'INR',
+    payment_capture: 1,
     receipt: `xam_${randomUUID().replaceAll('-', '').slice(0, 28)}`,
     notes: { firebaseUid: uid }
   });
@@ -345,17 +346,32 @@ export async function verifyRazorpayPayment({ body, authorization, env }) {
     throw new PaymentRequestError(403, 'Razorpay payment signature is invalid.');
   }
 
-  const [order, payment] = await Promise.all([
+  const [order, fetchedPayment] = await Promise.all([
     razorpayRequest(`/orders/${encodeURIComponent(orderId)}`, 'GET', config),
     razorpayRequest(`/payments/${encodeURIComponent(paymentId)}`, 'GET', config)
   ]);
   if (order.notes?.firebaseUid !== uid
     || order.amount !== orderPayload.amount
     || order.currency !== 'INR'
+    || fetchedPayment.order_id !== orderId
+    || fetchedPayment.amount !== orderPayload.amount
+    || fetchedPayment.currency !== 'INR') {
+    throw new PaymentRequestError(409, 'The payment details do not match this order.');
+  }
+
+  let payment = fetchedPayment;
+  if (payment.status === 'authorized') {
+    payment = await razorpayRequest(
+      `/payments/${encodeURIComponent(paymentId)}/capture`,
+      'POST',
+      config,
+      { amount: payment.amount, currency: payment.currency }
+    );
+  }
+  if (payment.status !== 'captured'
     || payment.order_id !== orderId
     || payment.amount !== orderPayload.amount
-    || payment.currency !== 'INR'
-    || payment.status !== 'captured') {
+    || payment.currency !== 'INR') {
     throw new PaymentRequestError(409, 'The payment has not been captured for this order.');
   }
 
@@ -366,6 +382,7 @@ export async function verifyRazorpayPayment({ body, authorization, env }) {
   const purchasedAt = new Date().toISOString();
   return {
     success: true,
+    message: 'Payment verified successfully',
     paymentId,
     purchases: orderPayload.items.map((item) => ({
       bookId: item.bookId,
