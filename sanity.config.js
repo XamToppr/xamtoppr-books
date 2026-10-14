@@ -3,21 +3,8 @@ import { structureTool } from 'sanity/structure';
 import { schemaTypes } from './sanity/schemaTypes.js';
 import StudentActivityLeads from './src/components/admin/StudentActivityLeads.jsx';
 
-const actionWrappers = new WeakMap();
-
-function keepDestructiveActionsEnabled(Action) {
-  const cachedAction = actionWrappers.get(Action);
-  if (cachedAction) return cachedAction;
-
-  const WrappedAction = (props) => {
-    const action = Action(props);
-    if (action?.action !== 'delete' && action?.action !== 'discardChanges') return action;
-    return { ...action, disabled: false };
-  };
-
-  actionWrappers.set(Action, WrappedAction);
-  return WrappedAction;
-}
+const ADMIN_ROLE = 'administrator';
+const RESTRICTED_ACTIONS = new Set(['delete', 'discardChanges', 'unpublish']);
 
 export default defineConfig({
   name: 'default',
@@ -34,7 +21,13 @@ export default defineConfig({
     }
   ],
   document: {
-    actions: (prev) => prev.map(keepDestructiveActionsEnabled)
+    actions: (prev, context) => {
+      const isAdministrator = context.currentUser?.roles?.some(
+        (role) => role.name === ADMIN_ROLE
+      );
+      if (isAdministrator) return prev;
+      return prev.filter((Action) => !RESTRICTED_ACTIONS.has(Action.action));
+    }
   },
   plugins: [
     structureTool({

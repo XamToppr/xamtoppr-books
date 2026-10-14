@@ -83,6 +83,10 @@ The Sanity Studio tool **Student Activity & Leads** groups activity events into 
 
 The CSV export uses the same filtered, deduplicated student rows and is named `xamtoppr-leads-YYYY-MM-DD.csv`. Its columns are Name, Phone, Email, Lead Status, Total Coins, Total Actions, Latest Interested Book, and Last Active Time. Lead status is Hot if the student has added a book to cart or has at least 100 total coins; otherwise it is Warm if the student has read a sample; all others are Cold. The `studentUser` schema includes the `purchasedBooks` array and `totalCoins`.
 
+### Sanity document action roles
+
+`sanity.config.js` resolves document actions using the logged-in user's Sanity roles. Users with the `administrator` role retain the default actions, including Delete. All other users (including editors and users without an administrator role) have Delete, Discard Changes, and Unpublish removed from the document action menu. Other actions such as Publish and Duplicate remain available, and editors can create and edit documents and upload assets according to their assigned Sanity permissions. Manage role membership and underlying dataset permissions in Sanity Manage; this Studio action-menu restriction is a UX safeguard and does not replace server-side/API access controls.
+
 The public Sanity client is read-only. Book requests, profile records, and activity events are written by server endpoints using a Sanity token with dataset write permission. **Do not configure a write token in browser code or commit real credentials.** Although compatibility fallbacks accept `VITE_SANITY_WRITE_TOKEN` and `VITE_SANITY_API_WRITE_TOKEN` on the server, prefer the non-prefixed, server-only `SANITY_API_WRITE_TOKEN`.
 
 ## Environment variables
