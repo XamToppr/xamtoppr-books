@@ -48,7 +48,7 @@ export function CartProvider({ children }) {
     }];
     cartItemsRef.current = nextItems;
     setCartItems(nextItems);
-    void logUserActivity('ADD_TO_CART', {
+    void logUserActivity('add_to_cart', {
       bookId,
       bookTitle: book.title
     });

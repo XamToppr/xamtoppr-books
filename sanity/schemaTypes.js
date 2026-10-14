@@ -910,6 +910,7 @@ const studentUser = defineType({
     defineField({ name: 'phone', title: 'Phone', type: 'string' }),
     defineField({ name: 'firebaseUid', title: 'Firebase UID', type: 'string' }),
     defineField({ name: 'createdAt', title: 'Created At', type: 'datetime' }),
+    defineField({ name: 'totalCoins', title: 'Total Coins', type: 'number', initialValue: 0 }),
     defineField({
       name: 'purchasedBooks',
       title: 'Purchased Books / Orders',
@@ -948,6 +949,72 @@ const studentUser = defineType({
   },
   orderings: [
     { title: 'Newest first', name: 'createdAtDesc', by: [{ field: 'createdAt', direction: 'desc' }] }
+  ]
+});
+
+const userActivity = defineType({
+  name: 'userActivity',
+  title: 'Student Activity',
+  type: 'document',
+  fields: [
+    defineField({ name: 'uid', title: 'Firebase UID', type: 'string' }),
+    defineField({
+      name: 'student',
+      title: 'Student',
+      type: 'reference',
+      to: [{ type: 'studentUser' }]
+    }),
+    defineField({ name: 'studentName', title: 'Student Name', type: 'string' }),
+    defineField({ name: 'phone', title: 'Phone', type: 'string' }),
+    defineField({ name: 'email', title: 'Email', type: 'string' }),
+    defineField({
+      name: 'book',
+      title: 'Interested Book',
+      type: 'reference',
+      to: [{ type: 'book' }]
+    }),
+    defineField({ name: 'bookId', title: 'Book ID', type: 'string' }),
+    defineField({ name: 'bookTitle', title: 'Interested Book Title', type: 'string' }),
+    defineField({
+      name: 'action',
+      title: 'Activity',
+      type: 'string',
+      options: {
+        list: [
+          { title: 'Daily Website Visit', value: 'daily_login_visit' },
+          { title: 'Book Detail Modal Open', value: 'view_book_detail' },
+          { title: 'Sample PDF / Flipbook Open', value: 'read_sample_pdf' },
+          { title: 'Add to Cart', value: 'add_to_cart' },
+          { title: 'Purchase Successful', value: 'purchase_complete' }
+        ]
+      }
+    }),
+    defineField({ name: 'coinsEarned', title: 'Coins Earned', type: 'number' }),
+    defineField({ name: 'totalCoins', title: 'Total Coins After Activity', type: 'number' }),
+    defineField({
+      name: 'leadStatus',
+      title: 'Lead Status',
+      type: 'string',
+      options: {
+        list: [
+          { title: 'Hot', value: 'HOT' },
+          { title: 'Warm', value: 'WARM' },
+          { title: 'Converted', value: 'CONVERTED' },
+          { title: 'Cold', value: 'COLD' }
+        ]
+      }
+    }),
+    defineField({ name: 'timestamp', title: 'Date & Time', type: 'datetime' })
+  ],
+  preview: {
+    select: { title: 'studentName', subtitle: 'action' },
+    prepare: ({ title, subtitle }) => ({
+      title: title || 'Student activity',
+      subtitle: subtitle || 'Unknown activity'
+    })
+  },
+  orderings: [
+    { title: 'Newest first', name: 'timestampDesc', by: [{ field: 'timestamp', direction: 'desc' }] }
   ]
 });
 
@@ -1025,6 +1092,7 @@ export const schemaTypes = [
   notificationLink,
   bookRequest,
   studentUser,
+  userActivity,
   siteSettings,
   examNotification,
   importantDate,

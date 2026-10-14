@@ -26,7 +26,7 @@ The XamToppr Books web portal provides competitive-exam books, study notes, PDF 
 | `sanity/schemaTypes.js` | Sanity document and object schemas |
 | `sanity.config.js` | Embedded Studio configuration at `/admin` |
 | `api/sync-student.js` | Authenticated server-side student profile upsert |
-| `api/track-purchase.js` | Authenticated checkout/purchase event tracking |
+| `api/log-user-activity.js` | Authenticated student activity sync to Sanity |
 | `api/request-book.js` | Server-side book request creation |
 | `server/studentProfileSync.js` | Firebase ID-token verification and student document mapping |
 | `vite.config.js` | Vite development server and local API middleware |
@@ -57,21 +57,31 @@ The `studentUser` document uses a stable ID (`student_<Firebase UID>`) and field
 
 ### Purchase tracking
 
-When a signed-in user with a saved phone clicks a paid book's **Buy Now** action, the app adds the Sanity book ID to `users/{uid}.purchasedBookIds` in Firestore and sends an authenticated request to `/api/track-purchase`. The server verifies the Firebase ID token, looks up the book in Sanity (using the catalog title and current offer price rather than trusting client-supplied values), then appends a purchase entry to `student_<uid>.purchasedBooks`. The entry is visible under the student's document in Sanity Studio.
-
-The current application opens the configured book link and does not receive a payment-provider confirmation or webhook. Therefore, this entry represents a **checkout/test-purchase trigger**, and its generated `checkout_<UUID>` value is a tracking ID rather than a confirmed gateway payment ID. The amount is the catalog offer price at click time. To record only settled payments, connect the provider's verified payment webhook before treating these entries as completed purchases.
+Opening a payment or checkout link does **not** create a purchase record, modify `users/{uid}.purchasedBooks`, or award purchase coins. The app has no payment-provider confirmation callback. The `purchase_complete` activity is rejected from browser/API requests; only a verified payment-provider webhook should record completed purchases and append to `student_<uid>.purchasedBooks`.
 
 ### My Library and cart
 
-The `/my-library` route reads `users/{uid}.purchasedBooks` and `users/{uid}.purchasedBookIds` from Firestore, then resolves matching book documents from the public Sanity catalog for titles, covers, and sample reading links. Checkout tracking appends an ID and purchase summary to the profile arrays. The page provides a Read Now action when the book has a sample PDF; unavailable reading links are shown as disabled rather than redirecting to a payment link.
+The `/my-library` route reads `users/{uid}.purchasedBooks` and `users/{uid}.purchasedBookIds` from Firestore, then resolves matching book documents from the public Sanity catalog for titles, covers, and sample reading links. Only a verified purchase integration should populate those purchase fields. The page provides a Read Now action when the book has a sample PDF; unavailable reading links are shown as disabled rather than redirecting to a payment link.
 
 `CartProvider` wraps the app and persists its `cartItems` in `localStorage` under `xamtoppr-books-cart`. Its `addToCart`, `removeFromCart`, and `clearCart` actions maintain a derived `cartTotal`. Paid book cards and detail views expose Add to Cart/Go to Cart actions, and the header cart drawer shows selected books, removes items, and calculates the total. Since there is no cart-level payment integration, Proceed to Checkout opens the first item's existing payment link and leaves the remaining items in the cart.
 
-## Activity and coin rewards (Phase 1)
+## Student Activity & Leads
 
-`src/services/activityTracker.js` records authenticated activity in `userActivities` and atomically increments `users/{uid}.totalCoins` while updating `lastActiveAt`. The current coin values are 5 for viewing book details, 15 for reading a sample PDF/opening a flipbook sample, 20 for adding a new book to the cart, and 10 for the first daily visit. Daily visit rewards use a per-user local-calendar date field and a Firestore transaction to prevent repeat awards from refreshes or concurrent tabs. If Firebase is unavailable, activity writes fail in the background and do not interrupt the user action; signed-out activity does not earn coins.
+`src/services/activityTracker.js` logs signed-in activity to Firestore `userActivities`, increments `users/{uid}.totalCoins` in a transaction, and updates `lastActiveAt`. Daily website visits are deduplicated per local calendar day. Logging is background work; offline or Sanity failures do not block the UI. Signed-out users do not earn coins.
 
-The public Sanity client is read-only. Book requests and student records are written by the server endpoints using a Sanity token with dataset write permission. **Do not configure a write token in browser code or commit real credentials.** Although compatibility fallbacks accept `VITE_SANITY_WRITE_TOKEN` and `VITE_SANITY_API_WRITE_TOKEN` on the server, prefer the non-prefixed, server-only `SANITY_API_WRITE_TOKEN`.
+| Event | Firestore/Sanity action | Coins |
+| --- | --- | ---: |
+| Daily Website Visit | `daily_login_visit` | 10 |
+| Book Detail Modal Open | `view_book_detail` | 5 |
+| Sample PDF / Flipbook Open | `read_sample_pdf` | 15 |
+| Add to Cart | `add_to_cart` | 20 |
+| Book Purchase Successful | `purchase_complete` | 50 |
+
+The first four events are logged from the app. A purchase-complete event must come from a verified payment-provider webhook; the client-facing endpoint rejects it so opening checkout cannot be mistaken for a successful purchase. Sanity `userActivity` documents contain student contact details, interested book, action, coins earned, cumulative coins, lead status, and timestamp. Lead status is `CONVERTED` for a verified purchase, `HOT` for add-to-cart or a cumulative balance of at least 100, `WARM` for sample reading, and otherwise `COLD`. Sanity student profiles also maintain `totalCoins`.
+
+The Sanity Studio tool **Student Activity & Leads** provides filters for activity type and lead status, name/phone search, and CSV export of the filtered results. The CSV is named `xamtoppr-leads-YYYY-MM-DD.csv` and includes student, contact, interested book, activity, coin, lead-status, and date/time columns. The `studentUser` schema includes the `purchasedBooks` array and `totalCoins`.
+
+The public Sanity client is read-only. Book requests, profile records, and activity events are written by server endpoints using a Sanity token with dataset write permission. **Do not configure a write token in browser code or commit real credentials.** Although compatibility fallbacks accept `VITE_SANITY_WRITE_TOKEN` and `VITE_SANITY_API_WRITE_TOKEN` on the server, prefer the non-prefixed, server-only `SANITY_API_WRITE_TOKEN`.
 
 ## Environment variables
 
@@ -133,7 +143,7 @@ npm install
 npm run dev
 ```
 
-The Vite middleware implements `/api/request-book` and `/api/sync-student` for local use. Configure the environment variables above, then visit the URL printed by Vite. Sanity Studio is served by the application at `/admin`.
+The Vite middleware implements `/api/request-book`, `/api/sync-student`, and `/api/log-user-activity` for local use. Configure the environment variables above, then visit the URL printed by Vite. Sanity Studio is served by the application at `/admin`.
 
 Useful checks:
 
@@ -150,6 +160,6 @@ npm run preview
 3. Add the six `VITE_FIREBASE_*` values and the server-only `SANITY_API_WRITE_TOKEN` in **Project Settings → Environment Variables** for Production (and Preview/Development as appropriate).
 4. Optionally configure `SANITY_PROJECT_ID` and `SANITY_DATASET` if not using the defaults.
 5. Redeploy after adding or changing environment variables. Vercel serves `api/*.js` as serverless functions; `vercel.json` rewrites frontend paths to the SPA while `/api/*` routes are handled by their functions.
-6. Test Google login, refresh persistence, phone onboarding, student record creation in Sanity Studio, and book requests after deployment.
+6. Test Google login, refresh persistence, phone onboarding, student and activity records in Sanity Studio, leads filters/CSV export, and book requests after deployment.
 
 If `/api/sync-student` returns an error, inspect the response JSON and Vercel Function logs. A missing write token cannot be repaired by a browser fallback; configure the token as a server-side Vercel environment variable. Never solve this by exposing a Sanity write token through `VITE_` client code.

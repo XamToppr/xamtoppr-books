@@ -9,7 +9,6 @@ import {
   doc, 
   getDoc, 
   getDocs,
-  arrayUnion,
   query,
   setDoc, 
   serverTimestamp,
@@ -135,59 +134,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const trackBookPurchase = async (book) => {
-    if (!currentUser) {
-      throw new Error("Sign in before starting checkout.");
-    }
-    if (!book?.sanityId) {
-      throw new Error("This book is missing its Sanity ID and cannot be tracked.");
-    }
-
-    const idToken = await currentUser.getIdToken();
-    const firestoreWrite = setDoc(
-      doc(db, "users", currentUser.uid),
-      {
-        purchasedBookIds: arrayUnion(book.sanityId),
-        purchasedBooks: arrayUnion({
-          bookId: book.sanityId,
-          title: book.title,
-          coverImage: book.coverImage || "",
-          readUrl: book.samplePdfUrl || "",
-          purchasedAt: new Date().toISOString(),
-        }),
-      },
-      { merge: true }
-    );
-    const sanityWrite = fetch("/api/track-purchase", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${idToken}`,
-      },
-      body: JSON.stringify({
-        uid: currentUser.uid,
-        bookId: book.sanityId,
-        phone: userProfile?.phone || "",
-        firebaseApiKey: auth.app.options.apiKey,
-      }),
-    }).then(async (response) => {
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || `Purchase tracking failed with status ${response.status}.`);
-      }
-      return result;
-    });
-
-    const results = await Promise.allSettled([firestoreWrite, sanityWrite]);
-    const failedWrites = results.filter((result) => result.status === "rejected");
-    failedWrites.forEach((result) => {
-      console.error("Purchase tracking write failed:", result.reason);
-    });
-    if (failedWrites.length) {
-      throw new Error("The checkout was opened, but purchase tracking could not be fully saved.");
-    }
-  };
-
   // Logout
   const logout = async () => {
     try {
@@ -216,7 +162,7 @@ export const AuthProvider = ({ children }) => {
               setUserProfile(profile);
               setCurrentUser(user);
               void syncStudentProfile(user, profile?.phone || "");
-              void logUserActivity("DAILY_VISIT");
+              void logUserActivity("daily_login_visit");
             } else {
               setUserProfile(null);
               setCurrentUser(null);
@@ -253,7 +199,6 @@ export const AuthProvider = ({ children }) => {
         loading,
         signInWithGoogle,
         updatePhoneNumber,
-        trackBookPurchase,
         logout,
       }}
     >

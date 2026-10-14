@@ -18,7 +18,7 @@ const formatPurchaseDate = (value) => {
 };
 
 export default function MyLibrary() {
-  const { currentUser, userProfile, trackBookPurchase } = useAuth();
+  const { currentUser, userProfile } = useAuth();
   const { cartItems } = useCart();
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -109,10 +109,6 @@ export default function MyLibrary() {
     }
 
     window.open(book.pdfUrl, '_blank', 'noopener,noreferrer');
-    void trackBookPurchase(book).catch((error) => {
-      console.error('Failed to track the cart checkout:', error);
-      setLoadError(error.message || 'Checkout tracking could not be saved.');
-    });
     setShowCartDrawer(false);
   };
 

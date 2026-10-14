@@ -1,6 +1,7 @@
 import { defineConfig } from 'sanity';
 import { structureTool } from 'sanity/structure';
 import { schemaTypes } from './sanity/schemaTypes.js';
+import StudentActivityLeads from './src/components/admin/StudentActivityLeads.jsx';
 
 const actionWrappers = new WeakMap();
 
@@ -24,6 +25,14 @@ export default defineConfig({
   projectId: 'rkev3aui',
   dataset: 'production',
   basePath: '/admin',
+  tools: (prev) => [
+    ...prev,
+    {
+      name: 'student-activity-leads',
+      title: 'Student Activity & Leads',
+      component: StudentActivityLeads
+    }
+  ],
   document: {
     actions: (prev) => prev.map(keepDestructiveActionsEnabled)
   },

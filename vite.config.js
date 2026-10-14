@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@sanity/client'
 import { appendStudentPurchase, syncStudentDocument, verifyFirebaseIdToken } from './server/studentProfileSync.js'
+import { createSanityUserActivity, USER_ACTIVITY_COIN_VALUES } from './server/userActivitySync.js'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -202,7 +203,122 @@ const localStudentProfileApi = (env) => {
   }
 }
 
-const localStudentPurchaseApi = (env) => {
+const localUserActivityApi = (env) => {
+  const writeToken = env.SANITY_API_WRITE_TOKEN
+    || env.VITE_SANITY_WRITE_TOKEN
+    || env.VITE_SANITY_API_WRITE_TOKEN
+  const client = writeToken
+    ? createClient({
+      projectId: env.SANITY_PROJECT_ID || env.VITE_SANITY_PROJECT_ID || 'rkev3aui',
+      dataset: env.SANITY_DATASET || env.VITE_SANITY_DATASET || 'production',
+      apiVersion: '2024-01-01',
+      token: writeToken,
+      useCdn: false
+    })
+    : null
+
+  return {
+    name: 'local-user-activity-api',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use('/api/log-user-activity', async (request, response) => {
+        response.setHeader('Content-Type', 'application/json')
+        if (request.method !== 'POST') {
+          response.setHeader('Allow', 'POST')
+          response.statusCode = 405
+          response.end(JSON.stringify({ success: false, error: 'Method not allowed.' }))
+          return
+        }
+        if (!client) {
+          response.statusCode = 503
+          response.end(JSON.stringify({ success: false, error: 'Activity logging is missing a server-side Sanity write token.' }))
+          return
+        }
+
+        const idToken = request.headers.authorization?.match(/^Bearer\s+(.+)$/i)?.[1]
+        if (!idToken) {
+          response.statusCode = 401
+          response.end(JSON.stringify({ success: false, error: 'Authentication is required.' }))
+          return
+        }
+
+        try {
+          let rawBody = ''
+          for await (const chunk of request) rawBody += chunk
+          const body = JSON.parse(rawBody)
+          if (!body || typeof body !== 'object' || Array.isArray(body)) {
+            response.statusCode = 400
+            response.end(JSON.stringify({ success: false, error: 'A valid request body is required.' }))
+            return
+          }
+
+          const getString = (value) => (typeof value === 'string' ? value.trim() : '')
+          const uid = getString(body.uid)
+          const action = getString(body.action)
+          const bookId = getString(body.bookId)
+          const bookTitle = getString(body.bookTitle)
+          const phone = getString(body.phone)
+          const firebaseApiKey = getString(body.firebaseApiKey)
+            || env.VITE_FIREBASE_API_KEY
+            || env.FIREBASE_WEB_API_KEY
+          const totalCoins = Number(body.totalCoins)
+          if (!uid || !USER_ACTIVITY_COIN_VALUES[action] || bookId.length > 200
+            || bookTitle.length > 300 || phone.length > 32
+            || !Number.isSafeInteger(totalCoins) || totalCoins < 0) {
+            response.statusCode = 400
+            response.end(JSON.stringify({ success: false, error: 'Activity details are invalid.' }))
+            return
+          }
+          if (action === 'purchase_complete') {
+            response.statusCode = 403
+            response.end(JSON.stringify({
+              success: false,
+              error: 'Purchase completion must be recorded by a verified payment-provider webhook.'
+            }))
+            return
+          }
+          if (!firebaseApiKey) {
+            response.statusCode = 503
+            response.end(JSON.stringify({ success: false, error: 'The Firebase public API key is not configured.' }))
+            return
+          }
+
+          const firebaseUser = await verifyFirebaseIdToken(idToken, firebaseApiKey)
+          if (uid !== firebaseUser.localId) {
+            response.statusCode = 403
+            response.end(JSON.stringify({ success: false, error: 'The requested user does not match the authenticated account.' }))
+            return
+          }
+
+          const result = await createSanityUserActivity(client, firebaseUser, {
+            action,
+            bookId,
+            bookTitle,
+            phone
+          })
+          response.statusCode = 200
+          response.end(JSON.stringify({ success: true, ...result }))
+        } catch (error) {
+          if (error instanceof SyntaxError) {
+            response.statusCode = 400
+            response.end(JSON.stringify({ success: false, error: 'Request body must be valid JSON.' }))
+            return
+          }
+          if (error.code === 'INVALID_FIREBASE_TOKEN') {
+            response.statusCode = 401
+            response.end(JSON.stringify({ success: false, error: 'Authentication is invalid or expired.' }))
+            return
+          }
+          console.error('Failed to sync local student activity to Sanity:', error)
+          response.statusCode = 500
+          response.end(JSON.stringify({ success: false, error: 'Unable to sync student activity to Sanity.' }))
+        }
+      })
+    }
+  }
+}
+
+const _localStudentPurchaseApi = (env) => {
   const writeToken = env.SANITY_API_WRITE_TOKEN
     || env.VITE_SANITY_WRITE_TOKEN
     || env.VITE_SANITY_API_WRITE_TOKEN
@@ -336,7 +452,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       localBookRequestApi(env),
       localStudentProfileApi(env),
-      localStudentPurchaseApi(env),
+      localUserActivityApi(env),
       react(),
       tailwindcss(),
     ],

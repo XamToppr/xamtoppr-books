@@ -174,7 +174,7 @@ const formatDownloadCount = (count) => (
 );
 
 function BookStoreApp() {
-  const { currentUser, userProfile, trackBookPurchase, logout } = useAuth();
+  const { currentUser, userProfile, logout } = useAuth();
   const { cartItems, addToCart } = useCart();
   const [booksList, setBooksList] = useState([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -248,7 +248,7 @@ function BookStoreApp() {
     if (lastViewedBookIdRef.current === bookId) return;
 
     lastViewedBookIdRef.current = bookId;
-    void logUserActivity('VIEW_BOOK_DETAILS', {
+    void logUserActivity('view_book_detail', {
       bookId,
       bookTitle: selectedBookForModal.title
     });
@@ -653,7 +653,7 @@ function BookStoreApp() {
   };
 
   const openSampleFlipbook = (book) => {
-    void logUserActivity('READ_SAMPLE_PDF', {
+    void logUserActivity('read_sample_pdf', {
       bookId: book.sanityId,
       bookTitle: book.title
     });
@@ -678,10 +678,6 @@ function BookStoreApp() {
       return;
     }
 
-    void trackBookPurchase(book).catch((error) => {
-      console.error('Failed to track the book checkout:', error);
-      showToast(error.message || 'Checkout tracking could not be saved.');
-    });
     handleBookDownload(book);
   };
 
@@ -711,11 +707,6 @@ function BookStoreApp() {
     }
 
     window.open(book.pdfUrl, '_blank', 'noopener,noreferrer');
-    void trackBookPurchase(book).catch((error) => {
-      console.error('Failed to track the cart checkout:', error);
-      showToast(error.message || 'Checkout tracking could not be saved.');
-    });
-    handleBookDownload(book);
     setShowCartDrawer(false);
   };
 
@@ -3158,7 +3149,7 @@ function BookStoreApp() {
                         rel="noopener noreferrer"
                         onClick={() => {
                           if (sampleUrl) {
-                            void logUserActivity('READ_SAMPLE_PDF', {
+                            void logUserActivity('read_sample_pdf', {
                               bookId: selectedBookForModal.sanityId,
                               bookTitle: selectedBookForModal.title
                             });
