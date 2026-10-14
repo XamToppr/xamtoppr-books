@@ -2,6 +2,7 @@ import UserButton from './components/auth/UserButton';
 import AuthModal from './components/auth/AuthModal';
 import CartDrawer from './components/cart/CartDrawer';
 import CouponField from './components/coupon/CouponField';
+import Footer from './components/Footer';
 import MyLibrary from './components/profile/MyLibrary';
 import { useAuth } from './context/AuthContext';
 import { useCart } from './context/CartContext';
@@ -11,8 +12,10 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import HTMLFlipBook from 'react-pageflip';
 import { PortableText } from '@portabletext/react';
 import { Studio } from 'sanity';
+import { Link, Route, Routes } from 'react-router-dom';
 import sanityConfig from '../sanity.config.js';
 import sanityClient from './sanityClient';
+import BookDetailPage from './pages/BookDetailPage';
 import {
   BOOKS_FOR_STORE_QUERY,
   examNotificationDetailQuery,
@@ -228,12 +231,6 @@ function BookStoreApp() {
   const flipAudioRef = useRef(null);
   const downloadedBooksRef = useRef(new Set());
   const lastViewedBookIdRef = useRef(null);
-  const supportLinks = [
-    { label: 'About Us', href: '/about-us' },
-    { label: 'Terms & Conditions', href: '/terms-conditions' },
-    { label: 'Privacy Policy', href: '/privacy-policy' },
-    { label: 'Refund Policy', href: '/refund-policy' }
-  ];
   const selectedBookAmount = Number(selectedBookForModal?.offerPrice) || 0;
   const selectedBookCoupon = bookCoupon
     && bookCoupon.bookId === selectedBookForModal?.sanityId
@@ -610,6 +607,17 @@ function BookStoreApp() {
     setTimeout(() => {
       setToastMessage(null);
     }, 3500);
+  };
+
+  const copyBookLink = async (book) => {
+    const bookUrl = `${window.location.origin}/book/${encodeURIComponent(book.slug)}`;
+    try {
+      await navigator.clipboard.writeText(bookUrl);
+      showToast('Book link copied to clipboard!');
+    } catch (error) {
+      console.error('Unable to copy the book link:', error);
+      showToast('Could not copy the book link. Please try again.');
+    }
   };
 
   const toggleBookmark = (bookId, title) => {
@@ -1662,17 +1670,33 @@ function BookStoreApp() {
                           {book.badge}
                         </span>
 
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleBookmark(book.id, book.title);
-                          }}
-                          className={`p-1.5 rounded-full backdrop-blur-md transition ${
-                            isSaved ? 'bg-amber-500 text-slate-950' : 'bg-black/40 text-white/90 hover:text-white'
-                          }`}
-                        >
-                          <BookMarked className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            title="Copy book link"
+                            aria-label={`Copy link to ${book.title}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void copyBookLink(book);
+                            }}
+                            className="rounded-full bg-black/40 p-1.5 text-white/90 backdrop-blur-md transition hover:bg-black/70 hover:text-white"
+                          >
+                            <Share2 className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`${isSaved ? 'Remove' : 'Save'} ${book.title} ${isSaved ? 'from' : 'to'} saved books`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleBookmark(book.id, book.title);
+                            }}
+                            className={`p-1.5 rounded-full backdrop-blur-md transition ${
+                              isSaved ? 'bg-amber-500 text-slate-950' : 'bg-black/40 text-white/90 hover:text-white'
+                            }`}
+                          >
+                            <BookMarked className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
 
                       <div className="absolute bottom-2.5 inset-x-3 flex items-center justify-between z-10 text-[10px] text-slate-200 font-medium">
@@ -1742,13 +1766,13 @@ function BookStoreApp() {
                             <span>Flipbook 3D</span>
                           </button>
                         ) : (
-                          <button
-                            onClick={() => setSelectedBookForModal(book)}
+                          <Link
+                            to={`/book/${encodeURIComponent(book.slug)}`}
                             className="flex-1 bg-blue-950 hover:bg-blue-900 text-white text-xs font-bold py-2.5 px-3 rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm active:scale-98"
                           >
                             <Eye className="w-3.5 h-3.5 text-amber-400" />
                             <span>View Book</span>
-                          </button>
+                          </Link>
                         )}
                         
                         {isPaid ? (
@@ -3383,56 +3407,7 @@ function BookStoreApp() {
         </div>
       )}
 
-      {/* Footer */}
-      <footer className="border-t border-blue-950 bg-[#08152e] px-4 py-10 text-slate-300 sm:px-6 lg:px-8">
-        <div className="mx-auto grid max-w-7xl grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-[1.2fr_1fr_1fr]">
-          <div>
-            <a href="https://www.xamtoppr.com/" className="inline-flex rounded-lg bg-white px-1.5 py-1">
-              <img
-                src="/xamtoppr-logo.png"
-                alt="XamToppr - learning for earning"
-                className="h-12 w-auto"
-                width="139"
-                height="75"
-                loading="lazy"
-              />
-            </a>
-            <p className="mt-3 max-w-sm text-sm leading-relaxed text-slate-400">
-              Exam preparation books, study notes, and notification updates to help students learn, practice, and excel.
-            </p>
-          </div>
-
-          <div>
-            <h2 className="text-sm font-extrabold uppercase tracking-wider text-white">Support & Legal</h2>
-            <ul className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-1">
-              {supportLinks.map(({ label, href }) => (
-                <li key={href}>
-                  <a href={href} className="inline-flex min-h-8 items-center text-slate-400 transition hover:text-amber-300">
-                    {label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <h2 className="text-sm font-extrabold uppercase tracking-wider text-white">Contact Student Support</h2>
-            <div className="mt-3 flex flex-col items-start gap-3 text-sm">
-              <a href={`tel:${siteSettings.supportHelpline.replace(/[^\d+]/g, '')}`} className="inline-flex min-h-8 items-center gap-2 text-slate-300 transition hover:text-amber-300">
-                <Phone className="h-4 w-4 shrink-0 text-amber-400" />
-                {siteSettings.supportHelpline}
-              </a>
-              <a href={`mailto:${siteSettings.supportEmail}`} className="inline-flex min-h-8 items-center gap-2 break-all text-slate-300 transition hover:text-amber-300">
-                <Mail className="h-4 w-4 shrink-0 text-amber-400" />
-                {siteSettings.supportEmail}
-              </a>
-            </div>
-          </div>
-        </div>
-        <div className="mx-auto mt-8 max-w-7xl border-t border-slate-700/70 pt-5 text-center text-xs text-slate-500">
-          © 2026 XamToppr Edutech Private Limited. All Rights Reserved.
-        </div>
-      </footer>
+      <Footer {...siteSettings} />
       <CartDrawer
         isOpen={showCartDrawer}
         onClose={() => setShowCartDrawer(false)}
@@ -3552,14 +3527,12 @@ function SiteContentPage({ page }) {
         </article>
       </main>
 
-      <footer className="mt-auto border-t border-blue-950 bg-[#08152e] px-4 py-6 text-center text-xs text-slate-400 sm:px-6">
-        © 2026 XamToppr Edutech Private Limited. All Rights Reserved.
-      </footer>
+      <Footer />
     </div>
   );
 }
 
-export default function App() {
+function LegacyAppRoutes() {
   const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
   if (pathname === '/admin' || pathname.startsWith('/admin/')) {
     return (
@@ -3575,4 +3548,13 @@ export default function App() {
   if (normalizedPathname === '/my-library') return <MyLibrary />;
 
   return <BookStoreApp />;
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/book/:slug" element={<BookDetailPage />} />
+      <Route path="*" element={<LegacyAppRoutes />} />
+    </Routes>
+  );
 }

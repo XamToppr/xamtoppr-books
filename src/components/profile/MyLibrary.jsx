@@ -4,6 +4,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import AuthModal from '../auth/AuthModal';
 import UserButton from '../auth/UserButton';
 import CartDrawer from '../cart/CartDrawer';
+import Footer from '../Footer';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { db } from '../../services/firebase';
@@ -241,6 +242,7 @@ export default function MyLibrary() {
         onProceedCheckout={handleCartCheckout}
       />
       <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
+      <Footer />
     </div>
   );
 }

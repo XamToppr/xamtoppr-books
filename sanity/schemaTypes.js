@@ -642,7 +642,7 @@ const book = defineType({
     }),
     defineField({
       name: 'slug',
-      title: 'Slug',
+      title: 'URL Slug',
       type: 'slug',
       group: 'details',
       options: { source: 'title', maxLength: 96 },

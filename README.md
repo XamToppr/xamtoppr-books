@@ -18,7 +18,8 @@ The XamToppr Books web portal provides competitive-exam books, study notes, PDF 
 
 | Path | Responsibility |
 | --- | --- |
-| `src/App.jsx` | Store UI, book viewer and flipbook, book-request form, single-book checkout, and Sanity content reads |
+| `src/App.jsx` | Store UI, book viewer and flipbook, book-request form, routing, checkout, and Sanity content reads |
+| `src/pages/BookDetailPage.jsx` | `/book/:slug` book details, share metadata and links, coupons, and single-book checkout |
 | `src/context/AuthContext.jsx` | Firebase auth state, Firestore user profile, duplicate-phone check, and student sync request |
 | `src/context/CartContext.jsx` | Persistent cart state and cart actions |
 | `src/components/profile/MyLibrary.jsx` | `/my-library` page backed by the signed-in user's Firestore purchase fields and Sanity catalog |
@@ -63,6 +64,8 @@ The `studentUser` document uses a stable ID (`student_<Firebase UID>`) and field
 Create coupon documents in Sanity Studio under **Coupon**. Coupon codes must be uppercase and may contain letters, numbers, hyphens, and underscores. Choose `percentage` or `flat`, set a positive discount value, and optionally set a minimum order amount and expiry. Toggle **Active** off to disable a coupon without deleting it. Percentage discounts are limited to 100%; a coupon must leave at least ₹0.01 payable.
 
 Each paid Sanity `book` can have a **Sample PDF** (`samplePdfFile`) and a separate **Original Full Book PDF (Paid Only)** (`fullPdfFile`). Upload the sample separately from the full book. Store the original in `fullPdfFile`; do not put a full book in the sample field.
+
+Every book has a required title-derived URL slug. Book detail pages are available at `/book/:slug`; catalog cards link to the page and include a one-click copy-link action. The detail page sets a canonical URL and book-specific Open Graph and Twitter metadata, and provides WhatsApp and Telegram share links. The Vercel SPA rewrite also serves direct requests and page refreshes for these URLs.
 
 ### Purchase tracking
 

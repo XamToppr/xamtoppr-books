@@ -31,7 +31,29 @@ export const BOOKS_FOR_STORE_QUERY = `*[_type == "book"] | order(_createdAt desc
   tableOfContents[] { _key, chapterNo, title, pageRange }
 }`;
 
-export const BOOK_BY_SLUG_QUERY = '*[_type == "book" && slug.current == $slug][0]';
+export const BOOK_BY_SLUG_QUERY = `*[_type == "book" && slug.current == $slug][0] {
+  _id,
+  title,
+  "price": mrp,
+  "discountPrice": offerPrice,
+  "coverImage": coverImage.asset->url,
+  description,
+  tableOfContents[] { _key, chapterNo, title, pageRange },
+  "indexTable": tableOfContents[] { _key, chapterNo, title, pageRange },
+  "samplePdf": samplePdfFile.asset->url,
+  fullPdfFile { asset-> { url } },
+  slug,
+  exam,
+  examCategory,
+  subject,
+  author,
+  publisher,
+  language,
+  badge,
+  totalPages,
+  fileSize,
+  format
+}`;
 
 export const siteSettingsQuery = `*[_type == "siteSettings" && _id == "siteSettings"][0] {
   supportHelpline,
