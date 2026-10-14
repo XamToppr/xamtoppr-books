@@ -67,6 +67,10 @@ The `/my-library` route reads `users/{uid}.purchasedBooks` and `users/{uid}.purc
 
 `CartProvider` wraps the app and persists its `cartItems` in `localStorage` under `xamtoppr-books-cart`. Its `addToCart`, `removeFromCart`, and `clearCart` actions maintain a derived `cartTotal`. Paid book cards and detail views expose Add to Cart/Go to Cart actions, and the header cart drawer shows selected books, removes items, and calculates the total. Since there is no cart-level payment integration, Proceed to Checkout opens the first item's existing payment link and leaves the remaining items in the cart.
 
+## Activity and coin rewards (Phase 1)
+
+`src/services/activityTracker.js` records authenticated activity in `userActivities` and atomically increments `users/{uid}.totalCoins` while updating `lastActiveAt`. The current coin values are 5 for viewing book details, 15 for reading a sample PDF/opening a flipbook sample, 20 for adding a new book to the cart, and 10 for the first daily visit. Daily visit rewards use a per-user local-calendar date field and a Firestore transaction to prevent repeat awards from refreshes or concurrent tabs. If Firebase is unavailable, activity writes fail in the background and do not interrupt the user action; signed-out activity does not earn coins.
+
 The public Sanity client is read-only. Book requests and student records are written by the server endpoints using a Sanity token with dataset write permission. **Do not configure a write token in browser code or commit real credentials.** Although compatibility fallbacks accept `VITE_SANITY_WRITE_TOKEN` and `VITE_SANITY_API_WRITE_TOKEN` on the server, prefer the non-prefixed, server-only `SANITY_API_WRITE_TOKEN`.
 
 ## Environment variables

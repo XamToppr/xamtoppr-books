@@ -21,6 +21,7 @@ import {
   db,
   ensureBrowserLocalPersistence
 } from "../services/firebase";
+import { logUserActivity } from "../services/activityTracker";
 
 const AuthContext = createContext(null);
 
@@ -215,6 +216,7 @@ export const AuthProvider = ({ children }) => {
               setUserProfile(profile);
               setCurrentUser(user);
               void syncStudentProfile(user, profile?.phone || "");
+              void logUserActivity("DAILY_VISIT");
             } else {
               setUserProfile(null);
               setCurrentUser(null);

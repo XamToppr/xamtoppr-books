@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { logUserActivity } from '../services/activityTracker';
 
 const CartContext = createContext(null);
 const CART_STORAGE_KEY = 'xamtoppr-books-cart';
@@ -18,6 +19,7 @@ const readStoredCart = () => {
 
 export function CartProvider({ children }) {
   const [cartItems, setCartItems] = useState(readStoredCart);
+  const cartItemsRef = useRef(cartItems);
 
   useEffect(() => {
     try {
@@ -32,27 +34,36 @@ export function CartProvider({ children }) {
     if (!bookId || !book?.title) {
       throw new Error('A valid book is required to add it to the cart.');
     }
+    if (cartItemsRef.current.some((item) => item.id === bookId)) return;
 
-    setCartItems((items) => {
-      if (items.some((item) => item.id === bookId)) return items;
-      return [...items, {
-        id: bookId,
-        sanityId: book.sanityId || bookId,
-        title: book.title,
-        price: Number(book.offerPrice) || 0,
-        displayPrice: book.price || '',
-        coverImage: book.coverImage || '',
-        pdfUrl: book.pdfUrl || '',
-        samplePdfUrl: book.samplePdfUrl || ''
-      }];
+    const nextItems = [...cartItemsRef.current, {
+      id: bookId,
+      sanityId: book.sanityId || bookId,
+      title: book.title,
+      price: Number(book.offerPrice) || 0,
+      displayPrice: book.price || '',
+      coverImage: book.coverImage || '',
+      pdfUrl: book.pdfUrl || '',
+      samplePdfUrl: book.samplePdfUrl || ''
+    }];
+    cartItemsRef.current = nextItems;
+    setCartItems(nextItems);
+    void logUserActivity('ADD_TO_CART', {
+      bookId,
+      bookTitle: book.title
     });
   };
 
   const removeFromCart = (bookId) => {
-    setCartItems((items) => items.filter((book) => book.id !== bookId));
+    const nextItems = cartItemsRef.current.filter((book) => book.id !== bookId);
+    cartItemsRef.current = nextItems;
+    setCartItems(nextItems);
   };
 
-  const clearCart = () => setCartItems([]);
+  const clearCart = () => {
+    cartItemsRef.current = [];
+    setCartItems([]);
+  };
   const cartTotal = useMemo(
     () => cartItems.reduce((total, book) => total + (Number(book.price) || 0), 0),
     [cartItems]

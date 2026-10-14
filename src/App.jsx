@@ -4,6 +4,7 @@ import CartDrawer from './components/cart/CartDrawer';
 import MyLibrary from './components/profile/MyLibrary';
 import { useAuth } from './context/AuthContext';
 import { useCart } from './context/CartContext';
+import { logUserActivity } from './services/activityTracker';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import HTMLFlipBook from 'react-pageflip';
 import { PortableText } from '@portabletext/react';
@@ -222,6 +223,7 @@ function BookStoreApp() {
   const flipBookRef = useRef(null);
   const flipAudioRef = useRef(null);
   const downloadedBooksRef = useRef(new Set());
+  const lastViewedBookIdRef = useRef(null);
   const supportLinks = [
     { label: 'About Us', href: '/about-us' },
     { label: 'Terms & Conditions', href: '/terms-conditions' },
@@ -236,6 +238,21 @@ function BookStoreApp() {
     window.addEventListener('resize', updateViewportSize);
     return () => window.removeEventListener('resize', updateViewportSize);
   }, []);
+
+  useEffect(() => {
+    const bookId = selectedBookForModal?.sanityId;
+    if (!bookId) {
+      lastViewedBookIdRef.current = null;
+      return;
+    }
+    if (lastViewedBookIdRef.current === bookId) return;
+
+    lastViewedBookIdRef.current = bookId;
+    void logUserActivity('VIEW_BOOK_DETAILS', {
+      bookId,
+      bookTitle: selectedBookForModal.title
+    });
+  }, [selectedBookForModal?.sanityId, selectedBookForModal?.title]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -633,6 +650,16 @@ function BookStoreApp() {
           console.error('Failed to update the book download count in Sanity:', error);
         });
     }
+  };
+
+  const openSampleFlipbook = (book) => {
+    void logUserActivity('READ_SAMPLE_PDF', {
+      bookId: book.sanityId,
+      bookTitle: book.title
+    });
+    setShowFlipbookModal(book);
+    setFlipPageNumber(0);
+    setActiveSlideIndex(0);
   };
 
   const handlePaidBookPurchase = (event, book) => {
@@ -1574,7 +1601,7 @@ function BookStoreApp() {
                     <div
                       onClick={() => {
                         if (isVisualNote) {
-                          setShowFlipbookModal(book);
+                          openSampleFlipbook(book);
                         } else {
                           setSelectedBookForModal(book);
                         }
@@ -1643,7 +1670,7 @@ function BookStoreApp() {
                         <h3
                           onClick={() => {
                             if (isVisualNote) {
-                              setShowFlipbookModal(book);
+                              openSampleFlipbook(book);
                             } else {
                               setSelectedBookForModal(book);
                             }
@@ -1679,8 +1706,7 @@ function BookStoreApp() {
                         {isVisualNote ? (
                           <button
                             onClick={() => {
-                              setShowFlipbookModal(book);
-                              setFlipPageNumber(0);
+                              openSampleFlipbook(book);
                             }}
                             className="flex-1 bg-gradient-to-r from-purple-700 to-indigo-800 hover:from-purple-600 hover:to-indigo-700 text-white text-xs font-bold py-2.5 px-3 rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm active:scale-98"
                           >
@@ -2416,9 +2442,7 @@ function BookStoreApp() {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    setShowFlipbookModal(book);
-                                    setFlipPageNumber(0);
-                                    setActiveSlideIndex(0);
+                                    openSampleFlipbook(book);
                                   }}
                                   className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-800 px-3 py-2 text-xs font-bold text-white transition hover:bg-indigo-700"
                                 >
@@ -3133,7 +3157,13 @@ function BookStoreApp() {
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={() => {
-                          if (sampleUrl) handleBookDownload(selectedBookForModal);
+                          if (sampleUrl) {
+                            void logUserActivity('READ_SAMPLE_PDF', {
+                              bookId: selectedBookForModal.sanityId,
+                              bookTitle: selectedBookForModal.title
+                            });
+                            handleBookDownload(selectedBookForModal);
+                          }
                         }}
                         className="bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs sm:text-sm font-bold px-4 py-2.5 rounded-xl transition inline-flex items-center gap-1.5"
                       >
