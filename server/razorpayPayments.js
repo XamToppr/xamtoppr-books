@@ -323,9 +323,9 @@ export async function verifyRazorpayPayment({ body, authorization, env }) {
     || env.VITE_FIREBASE_API_KEY
     || env.FIREBASE_WEB_API_KEY;
   const firebaseUser = await authenticate(authorization, uid, firebaseApiKey);
-  const orderId = getString(body.orderId);
-  const paymentId = getString(body.paymentId);
-  const signature = getString(body.signature);
+  const orderId = getString(body.orderId || body.razorpay_order_id || body.razorpayOrderId);
+  const paymentId = getString(body.paymentId || body.razorpay_payment_id || body.razorpayPaymentId);
+  const signature = getString(body.signature || body.razorpay_signature || body.razorpaySignature);
   if (!orderId || !paymentId || !/^[a-f\d]{64}$/i.test(signature)) {
     throw new PaymentRequestError(400, 'Payment verification details are invalid.');
   }
