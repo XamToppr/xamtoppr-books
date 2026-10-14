@@ -386,23 +386,46 @@ export async function verifyRazorpayPayment({ body, authorization, env }) {
     throw new PaymentRequestError(409, 'The payment has not been captured for this order.');
   }
 
-  const sanity = getSanityClient(env);
-  const profile = await sanity.getDocument(`student_${uid}`);
-  const phone = getString(profile?.phone);
-  await recordSanityPurchase(sanity, firebaseUser, phone, paymentId, orderPayload);
   const purchasedAt = new Date().toISOString();
+  const purchases = orderPayload.items.map((item) => ({
+    bookId: item.bookId,
+    title: item.title,
+    amount: item.amount,
+    finalAmount: item.finalAmount,
+    appliedCoupon: orderPayload.coupon?.code || '',
+    orderId: paymentId,
+    purchasedAt
+  }));
+  let pdfUrls = [];
+
+  try {
+    const sanity = getSanityClient(env);
+    const books = await sanity.fetch(
+      '*[_type == "book" && _id in $bookIds]{_id, "pdfUrl": fullPdfFile.asset->url}',
+      { bookIds: orderPayload.items.map((item) => item.bookId) }
+    );
+    const pdfUrlsByBookId = new Map(books.map((book) => [book._id, book.pdfUrl || null]));
+    pdfUrls = orderPayload.items.map((item) => ({
+      bookId: item.bookId,
+      pdfUrl: pdfUrlsByBookId.get(item.bookId) || null
+    }));
+
+    try {
+      const profile = await sanity.getDocument(`student_${uid}`);
+      await recordSanityPurchase(sanity, firebaseUser, getString(profile?.phone), paymentId, orderPayload);
+    } catch (sanityErr) {
+      console.error('Sanity write error:', sanityErr);
+    }
+  } catch (sanityErr) {
+    console.error('Unable to resolve purchased PDF URLs from Sanity:', sanityErr);
+  }
+
   return {
     success: true,
     message: 'Payment verified successfully',
     paymentId,
-    purchases: orderPayload.items.map((item) => ({
-      bookId: item.bookId,
-      title: item.title,
-      amount: item.amount,
-      finalAmount: item.finalAmount,
-      appliedCoupon: orderPayload.coupon?.code || '',
-      orderId: paymentId,
-      purchasedAt
-    }))
+    pdfUrl: pdfUrls[0]?.pdfUrl || null,
+    pdfUrls,
+    purchases
   };
 }

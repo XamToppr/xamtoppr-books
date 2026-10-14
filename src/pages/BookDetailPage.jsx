@@ -214,6 +214,7 @@ export default function BookDetailPage() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [paymentInProgress, setPaymentInProgress] = useState(false);
   const [purchaseComplete, setPurchaseComplete] = useState(false);
+  const [purchasedPdfUrl, setPurchasedPdfUrl] = useState('');
   const paymentInProgressRef = useRef(false);
   const toastTimerRef = useRef(null);
   const loading = loadedSlug !== slug;
@@ -228,6 +229,7 @@ export default function BookDetailPage() {
           setLoadError('');
           setCoupon(null);
           setPurchaseComplete(false);
+          setPurchasedPdfUrl('');
           setLoadedSlug(slug);
         }
       })
@@ -372,11 +374,12 @@ export default function BookDetailPage() {
       user: currentUser,
       phone: userProfile.phone,
       refreshUserProfile,
-      onSuccess: () => {
+      onSuccess: ({ pdfUrl }) => {
         paymentInProgressRef.current = false;
         setPaymentInProgress(false);
         setPurchaseComplete(true);
-        showToast('Purchase complete. Your book is now in My Library.');
+        setPurchasedPdfUrl(pdfUrl || fullPdfUrl);
+        showToast('Payment successful! Your book is unlocked.');
       },
       onFailure: (error) => {
         paymentInProgressRef.current = false;
@@ -527,14 +530,14 @@ export default function BookDetailPage() {
 
                   {alreadyPurchased || purchaseComplete ? (
                     <div className="mt-4 flex flex-wrap gap-3">
-                      <Link to="/my-library" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-3 text-sm font-extrabold text-white hover:bg-emerald-600">
-                        <Check className="h-4 w-4" /> Go to My Library
-                      </Link>
-                      {fullPdfUrl && (
-                        <a href={fullPdfUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-emerald-700 px-5 py-3 text-sm font-extrabold text-emerald-800 hover:bg-emerald-50">
+                      {(purchasedPdfUrl || fullPdfUrl) && (
+                        <a href={purchasedPdfUrl || fullPdfUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-3 text-sm font-extrabold text-white hover:bg-emerald-600">
                           <BookOpen className="h-4 w-4" /> Read Full Book
                         </a>
                       )}
+                      <Link to="/my-library" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-emerald-700 px-5 py-3 text-sm font-extrabold text-emerald-800 hover:bg-emerald-50">
+                        <Check className="h-4 w-4" /> Read in My Library
+                      </Link>
                     </div>
                   ) : price > 0 ? (
                     <button

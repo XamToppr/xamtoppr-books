@@ -112,23 +112,32 @@ export async function initiatePayment({
             throw new Error(verification.message || 'The payment could not be verified.');
           }
 
-          const logged = await logUserActivity('purchase_complete', {
-            verifiedPayment: {
-              paymentId: response.razorpay_payment_id,
-              purchases: verification.purchases
+          try {
+            const logged = await logUserActivity('purchase_complete', {
+              verifiedPayment: {
+                paymentId: response.razorpay_payment_id,
+                purchases: verification.purchases
+              }
+            });
+            if (!logged) {
+              console.warn('Payment was verified, but the Firestore library update did not complete.');
             }
-          });
-          if (!logged) {
-            throw new Error('Payment was verified, but your library could not be updated. Please contact support with payment ID '
-              + response.razorpay_payment_id + '.');
+          } catch (error) {
+            console.error('Unable to update the Firestore library after verified payment:', error);
           }
 
-          await refreshUserProfile?.();
+          try {
+            await refreshUserProfile?.();
+          } catch (error) {
+            console.error('Unable to refresh the user profile after verified payment:', error);
+          }
           paymentCompleted = true;
           if (clearCart) clearCart();
           await onSuccess?.({
             ...response,
             items: verification.purchases,
+            pdfUrl: verification.pdfUrl || null,
+            pdfUrls: verification.pdfUrls || [],
             amount: order.amount / 100
           });
         } catch (error) {
