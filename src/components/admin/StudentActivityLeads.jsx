@@ -21,6 +21,8 @@ const LEAD_LABELS = {
   COLD: 'Cold'
 };
 
+const PAYMENT_DROP_ACTIONS = ['payment_dropped', 'payment_failed', 'payment_abandoned'];
+
 const formatDate = (value) => {
   if (!value) return '—';
   const date = new Date(value);
@@ -33,8 +35,18 @@ const timestampValue = (value) => {
 };
 
 const getWhatsAppNumber = (phone) => {
-  const digits = phone.replace(/\D/g, '');
+  const digits = String(phone || '').replace(/\D/g, '');
   return digits.length === 10 ? `91${digits}` : digits;
+};
+
+const getFirstName = (name) => name.trim().split(/\s+/)[0] || 'there';
+
+const getWhatsAppMessage = (student) => {
+  const name = getFirstName(student.name || '');
+  if (student.activeDrop) {
+    return `Namaste ${name} ji, humne dekha aap ${student.activeDrop.bookTitle || student.latestBook || 'is book'} order karne ki koshish kar rahe the lekin payment complete nahi ho paayi. Kya aapko checkout ya payment me koi samasya aayi? Aapki help ke liye hum yahan hain.`;
+  }
+  return `Namaste ${name} ji, aapne hamare portal par ${student.latestSampleBook || student.latestBook || 'hamari book'} ka sample dekha tha. Kya aapko book ki preparation ke baare me koi jankari chahiye?`;
 };
 
 const getStudentKey = (activity) => {
@@ -47,7 +59,7 @@ const getStudentKey = (activity) => {
 
 const getLeadStatus = (student) => {
   const latestDrop = [...student.activities].reverse()
-    .find(({ action }) => ['payment_dropped', 'payment_failed', 'payment_abandoned'].includes(action));
+    .find(({ action }) => PAYMENT_DROP_ACTIONS.includes(action));
   const latestPurchase = [...student.activities].reverse()
     .find(({ action }) => action === 'purchase_complete');
   if (latestDrop && (!latestPurchase
@@ -85,11 +97,27 @@ const groupActivitiesByStudent = (activities) => {
   return [...grouped.values()].map((student) => {
     student.activities.sort((a, b) => timestampValue(a.timestamp) - timestampValue(b.timestamp));
     const latestActivity = student.activities[student.activities.length - 1];
+    const purchaseActivities = student.activities.filter(({ action }) => action === 'purchase_complete');
+    const purchasedBookTitles = new Set(purchaseActivities
+      .map(({ bookTitle }) => bookTitle?.trim())
+      .filter(Boolean));
     const latestBookActivity = [...student.activities].reverse()
       .find((activity) => activity.bookTitle?.trim());
+    const latestSampleActivity = [...student.activities].reverse()
+      .find((activity) => activity.action === 'read_sample_pdf' && activity.bookTitle?.trim());
+    const activeDrop = latestActivity && PAYMENT_DROP_ACTIONS.includes(latestActivity.action)
+      ? latestActivity
+      : null;
+    const bookCount = purchasedBookTitles.size || purchaseActivities.length;
     return {
       ...student,
       leadStatus: getLeadStatus(student),
+      bookCount,
+      baseStatus: bookCount
+        ? `Customer (${bookCount} ${bookCount === 1 ? 'Book' : 'Books'} Owned)`
+        : 'Free Lead',
+      activeDrop,
+      latestSampleBook: latestSampleActivity?.bookTitle || '',
       latestBook: latestBookActivity?.bookTitle || '',
       lastActiveAt: latestActivity?.timestamp || ''
     };
@@ -105,10 +133,22 @@ export default function StudentActivityLeads() {
   const [activities, setActivities] = useState([]);
   const [activityType, setActivityType] = useState('all');
   const [leadTag, setLeadTag] = useState('all');
+  const [quickFilter, setQuickFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [expandedStudent, setExpandedStudent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [now, setNow] = useState(null);
+
+  useEffect(() => {
+    const updateNow = () => setNow(Date.now());
+    const initialUpdate = window.setTimeout(updateNow, 0);
+    const interval = window.setInterval(updateNow, 60_000);
+    return () => {
+      window.clearTimeout(initialUpdate);
+      window.clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -136,18 +176,23 @@ export default function StudentActivityLeads() {
     return groupActivitiesByStudent(activities).filter((student) => {
       if (leadTag !== 'all' && student.leadStatus !== leadTag) return false;
       if (activityType !== 'all' && !student.activities.some(({ action }) => action === activityType)) return false;
+      if (quickFilter === 'dropped' && !student.activeDrop) return false;
+      if (quickFilter === 'customers' && !student.bookCount) return false;
+      if (quickFilter === 'warm' && !student.activities.some(({ action }) => action === 'read_sample_pdf')) return false;
       return !normalizedSearch
         || [student.name, student.phone]
           .some((value) => value.toLocaleLowerCase().includes(normalizedSearch));
     });
-  }, [activities, activityType, leadTag, search]);
+  }, [activities, activityType, leadTag, quickFilter, search]);
 
   const downloadCsv = () => {
     const columns = [
       'Name',
       'Phone',
       'Email',
-      'Lead Status',
+      'Customer Status',
+      'Active Alert',
+      'Lead Score',
       'Total Coins',
       'Total Actions',
       'Latest Interested Book',
@@ -157,6 +202,8 @@ export default function StudentActivityLeads() {
       student.name,
       student.phone,
       student.email,
+      student.baseStatus,
+      student.activeDrop ? `Drop on ${student.activeDrop.bookTitle || student.latestBook || 'book'}` : '',
       LEAD_LABELS[student.leadStatus],
       student.totalCoins,
       student.activities.length,
@@ -183,6 +230,16 @@ export default function StudentActivityLeads() {
 
   return (
     <main style={{ padding: 24, height: '100%', overflow: 'auto' }}>
+      <style>{`
+        @keyframes lead-alert-pulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.12); }
+          50% { box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.22); }
+        }
+        .lead-hot-row > td {
+          border-top: 2px solid #fb923c !important;
+          border-bottom: 2px solid #fb923c !important;
+        }
+      `}</style>
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>Student Activity &amp; Leads</h1>
@@ -192,6 +249,32 @@ export default function StudentActivityLeads() {
           Download Leads (CSV)
         </button>
       </header>
+
+      <nav aria-label="Quick lead filters" style={{ display: 'flex', gap: 8, margin: '20px 0 12px', flexWrap: 'wrap' }}>
+        {[
+          ['all', 'All Leads'],
+          ['dropped', '🚨 Dropped Checkouts (Urgent)'],
+          ['customers', 'Existing Customers'],
+          ['warm', 'Warm Readers']
+        ].map(([filter, label]) => (
+          <button
+            key={filter}
+            type="button"
+            aria-pressed={quickFilter === filter}
+            onClick={() => setQuickFilter(filter)}
+            style={{
+              ...controlStyle,
+              cursor: 'pointer',
+              fontWeight: 700,
+              color: quickFilter === filter ? '#fff' : '#374151',
+              background: quickFilter === filter ? '#1d4ed8' : '#fff',
+              borderColor: quickFilter === filter ? '#1d4ed8' : '#d1d5db'
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
 
       <section aria-label="Student filters" style={{ display: 'flex', gap: 12, margin: '20px 0', flexWrap: 'wrap' }}>
         <label>
@@ -237,23 +320,32 @@ export default function StudentActivityLeads() {
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr>
-                {['Student Name', 'Phone Number', 'Email', 'Highest Lead Status', 'Total Coins', 'Total Activities', 'Latest Interested Book', 'Last Active', 'History']
+                {['Student Name', 'Phone Number', 'Email', 'Customer Status & Active Alert', 'Total Coins', 'Total Activities', 'Latest Interested Book', 'Last Active', 'History']
                   .map((heading) => <th key={heading} style={{ padding: 10, borderBottom: '1px solid #d1d5db' }}>{heading}</th>)}
               </tr>
             </thead>
             <tbody>
               {students.map((student) => {
                 const isExpanded = expandedStudent === student.key;
+                const elapsed = now !== null && timestampValue(student.lastActiveAt)
+                  ? Math.max(0, now - timestampValue(student.lastActiveAt))
+                  : null;
+                const isHot = elapsed !== null && elapsed <= 60 * 60 * 1000;
+                const isToday = elapsed !== null && elapsed <= 24 * 60 * 60 * 1000;
+                const recoveryMessage = encodeURIComponent(getWhatsAppMessage(student));
                 return (
                   <Fragment key={student.key}>
-                    <tr>
-                      <td style={cellStyle}>{student.name || 'Student'}</td>
+                    <tr className={isHot ? 'lead-hot-row' : undefined} style={{ background: isHot ? '#fff7ed' : undefined }}>
+                      <td style={cellStyle}>
+                        {student.name || 'Student'}
+                        {isHot && <div style={{ marginTop: 5, color: '#c2410c', fontSize: 12, fontWeight: 700 }}>⚡ Hot (Just Now)</div>}
+                      </td>
                       <td style={cellStyle}>
                         {student.phone ? (
                           <span style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                             <a href={`tel:${student.phone}`}>{student.phone}</a>
-                            <a href={`https://wa.me/${getWhatsAppNumber(student.phone)}`} target="_blank" rel="noopener noreferrer">
-                              WhatsApp
+                            <a href={`https://wa.me/${getWhatsAppNumber(student.phone)}?text=${recoveryMessage}`} target="_blank" rel="noopener noreferrer">
+                              WhatsApp Recovery
                             </a>
                           </span>
                         ) : '—'}
@@ -268,12 +360,31 @@ export default function StudentActivityLeads() {
                           fontSize: 12,
                           fontWeight: 700,
                           whiteSpace: 'nowrap',
-                          color: student.leadStatus === 'ULTRA_HOT' ? '#9a3412' : '#374151',
-                          background: student.leadStatus === 'ULTRA_HOT' ? '#ffedd5' : '#f3f4f6',
-                          border: student.leadStatus === 'ULTRA_HOT' ? '1px solid #fb923c' : '1px solid #d1d5db'
+                          color: student.bookCount ? '#166534' : '#374151',
+                          background: student.bookCount ? '#dcfce7' : '#f3f4f6',
+                          border: student.bookCount ? '1px solid #86efac' : '1px solid #d1d5db'
                         }}>
-                          {LEAD_LABELS[student.leadStatus]}
+                          {student.baseStatus}
                         </span>
+                        {student.activeDrop && (
+                          <div style={{
+                            display: 'table',
+                            marginTop: 6,
+                            borderRadius: 999,
+                            padding: '4px 9px',
+                            color: '#9a3412',
+                            background: '#ffedd5',
+                            border: '1px solid #fb923c',
+                            fontSize: 12,
+                            fontWeight: 700,
+                            animation: 'lead-alert-pulse 1.8s ease-in-out infinite'
+                          }}>
+                            🔥 Drop on {student.activeDrop.bookTitle || student.latestBook || 'Book'}
+                          </div>
+                        )}
+                        <div style={{ marginTop: 6, color: '#6b7280', fontSize: 12 }}>
+                          {LEAD_LABELS[student.leadStatus]}
+                        </div>
                       </td>
                       <td style={cellStyle}>{student.totalCoins}</td>
                       <td style={cellStyle}>{student.activities.length} activities</td>
@@ -284,7 +395,23 @@ export default function StudentActivityLeads() {
                       }}>
                         {student.latestBook || '—'}
                       </td>
-                      <td style={cellStyle}>{formatDate(student.lastActiveAt)}</td>
+                      <td style={cellStyle}>
+                        {formatDate(student.lastActiveAt)}
+                        {isToday && (
+                          <div style={{
+                            display: 'table',
+                            marginTop: 5,
+                            borderRadius: 999,
+                            padding: '3px 8px',
+                            color: isHot ? '#9a3412' : '#1d4ed8',
+                            background: isHot ? '#ffedd5' : '#dbeafe',
+                            fontSize: 11,
+                            fontWeight: 700
+                          }}>
+                            Today
+                          </div>
+                        )}
+                      </td>
                       <td style={cellStyle}>
                         <button
                           type="button"
