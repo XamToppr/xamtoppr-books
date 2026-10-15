@@ -7,10 +7,10 @@ const ACTIVITY_LABELS = {
   read_sample_pdf: 'Sample PDF / Flipbook Open',
   add_to_cart: 'Add to Cart',
   purchase_complete: 'Purchase Successful',
-  checkout_initiated: 'Checkout Initiated / High Intent',
+  checkout_initiated: 'Checkout Initiated',
   payment_failed: 'Payment Failed',
   payment_abandoned: 'Payment Modal Closed / Abandoned',
-  payment_dropped: 'Payment Attempt Failed / Modal Closed (High Intent)'
+  payment_dropped: 'Payment Modal Closed / Abandoned'
 };
 
 const LEAD_LABELS = {
@@ -115,7 +115,7 @@ export default function StudentActivityLeads() {
     sanityClient.withConfig({ useCdn: false }).fetch(
       `*[_type == "userActivity"] | order(timestamp desc) {
         _id, uid, student, studentName, phone, email, bookTitle, action,
-        coinsEarned, totalCoins, amount, context, leadStatus, timestamp
+        coinsEarned, totalCoins, amount, context, reason, leadStatus, timestamp
       }`
     ).then((rows) => {
       if (active) setActivities(rows);
@@ -306,16 +306,29 @@ export default function StudentActivityLeads() {
                               </tr>
                             </thead>
                             <tbody>
-                              {student.activities.map((activity) => (
-                                <tr key={activity._id}>
-                                  <td style={cellStyle}>{ACTIVITY_LABELS[activity.action] || activity.action}</td>
-                                  <td style={cellStyle}>{activity.bookTitle || '—'}</td>
-                                  <td style={cellStyle}>{activity.amount != null ? `₹${activity.amount}` : '—'}</td>
-                                  <td style={cellStyle}>+{Number(activity.coinsEarned) || 0}</td>
-                                  <td style={cellStyle}>{activity.context || '—'}</td>
-                                  <td style={cellStyle}>{formatDate(activity.timestamp)}</td>
-                                </tr>
-                              ))}
+                              {Array.isArray(student.activities) && student.activities.length > 0
+                                ? student.activities.map((activity, index) => {
+                                  const item = activity || {};
+                                  return (
+                                    <tr key={item._id || `${student.key}-activity-${index}`}>
+                                      <td style={cellStyle}>
+                                        {ACTIVITY_LABELS[item.action] || item.action || 'User Activity'}
+                                      </td>
+                                      <td style={cellStyle}>{item.bookTitle || '—'}</td>
+                                      <td style={cellStyle}>{item.amount ? `₹${item.amount}` : '—'}</td>
+                                      <td style={cellStyle}>{item.coinsEarned ? `+${item.coinsEarned}` : '—'}</td>
+                                      <td style={cellStyle}>{item.context || item.reason || '—'}</td>
+                                      <td style={cellStyle}>{formatDate(item.timestamp)}</td>
+                                    </tr>
+                                  );
+                                })
+                                : (
+                                  <tr>
+                                    <td colSpan={6} style={{ ...cellStyle, textAlign: 'center' }}>
+                                      No activity history available.
+                                    </td>
+                                  </tr>
+                                )}
                             </tbody>
                           </table>
                         </td>
