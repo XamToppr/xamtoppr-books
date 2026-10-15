@@ -1,47 +1,40 @@
 import React, { useEffect, useState } from "react";
-import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
-import { db } from "../../services/firebase";
 import { useAuth } from "../../context/AuthContext";
+import { fetchUserLibrary, formatPurchaseDate } from "../../services/userLibrary";
 
 export default function PurchaseHistoryModal({ isOpen, onClose }) {
   const { currentUser } = useAuth();
   const [purchases, setPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
-    if (!isOpen || !currentUser) return;
+    let isCurrentRequest = true;
 
     const fetchPurchases = async () => {
-      setLoading(true);
-      try {
-        // Query purchases matching current user's UID or Email
-        const purchasesRef = collection(db, "purchases");
-        const q = query(
-          purchasesRef,
-          where("userId", "==", currentUser.uid)
-        );
-        const querySnapshot = await getDocs(q);
-        const items = [];
-        querySnapshot.forEach((doc) => {
-          items.push({ id: doc.id, ...doc.data() });
-        });
-        
-        // Sort newest first
-        items.sort((a, b) => {
-          const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
-          const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
-          return dateB - dateA;
-        });
+      if (!isOpen || !currentUser) {
+        setPurchases([]);
+        setLoading(false);
+        return;
+      }
 
-        setPurchases(items);
+      setLoading(true);
+      setLoadError('');
+      try {
+        const libraryBooks = await fetchUserLibrary(currentUser);
+        if (isCurrentRequest) setPurchases(libraryBooks);
       } catch (err) {
         console.error("Error fetching purchases:", err);
+        if (isCurrentRequest) setLoadError('Your purchases could not be loaded. Please try again.');
       } finally {
-        setLoading(false);
+        if (isCurrentRequest) setLoading(false);
       }
     };
 
-    fetchPurchases();
+    void fetchPurchases();
+    return () => {
+      isCurrentRequest = false;
+    };
   }, [isOpen, currentUser]);
 
   if (!isOpen) return null;
@@ -100,6 +93,10 @@ export default function PurchaseHistoryModal({ isOpen, onClose }) {
             <div style={{ textAlign: "center", padding: "40px 0", color: "#6b7280", fontSize: "14px" }}>
               Loading your purchases...
             </div>
+          ) : loadError ? (
+            <div role="alert" style={{ textAlign: "center", padding: "40px 16px", color: "#b91c1c", fontSize: "14px" }}>
+              {loadError}
+            </div>
           ) : purchases.length === 0 ? (
             <div style={{ textAlign: "center", padding: "40px 16px" }}>
               <div style={{ fontSize: "40px", marginBottom: "8px" }}>📚</div>
@@ -113,9 +110,7 @@ export default function PurchaseHistoryModal({ isOpen, onClose }) {
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               {purchases.map((item) => {
-                const dateStr = item.createdAt?.toDate 
-                  ? item.createdAt.toDate().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
-                  : (item.purchaseDate || "Recent");
+                const pdfUrl = item.fullPdfFile?.asset?.url;
 
                 return (
                   <div
@@ -124,54 +119,50 @@ export default function PurchaseHistoryModal({ isOpen, onClose }) {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
+                      gap: "12px",
                       padding: "12px",
                       borderRadius: "10px",
                       border: "1px solid #e5e7eb",
                       background: "#f9fafb"
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
                       {item.coverImage ? (
                         <img
                           src={item.coverImage}
                           alt={item.title || "Book"}
-                          style={{ width: "45px", height: "60px", objectFit: "cover", borderRadius: "6px" }}
+                          style={{ width: "45px", height: "60px", objectFit: "cover", borderRadius: "6px", flexShrink: 0 }}
                         />
                       ) : (
                         <div style={{ width: "45px", height: "60px", background: "#e5e7eb", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>
                           📖
                         </div>
                       )}
-                      <div>
+                      <div style={{ minWidth: 0 }}>
                         <h4 style={{ fontSize: "14px", fontWeight: "600", color: "#111827", margin: "0 0 4px 0" }}>
-                          {item.title || item.bookTitle || "Study Material"}
+                          {item.title}
                         </h4>
                         <div style={{ fontSize: "12px", color: "#6b7280" }}>
-                          <span>Date: {dateStr}</span>
-                          {item.amount && <span style={{ marginLeft: "10px" }}>• ₹{item.amount}</span>}
+                          <span>Purchased {formatPurchaseDate(item.purchasedAt)}</span>
+                          {item.amountPaid != null && <span style={{ marginLeft: "10px" }}>• ₹{item.amountPaid}</span>}
                         </div>
                       </div>
                     </div>
 
-                    {(item.downloadUrl || item.viewUrl) && (
-                      <a
-                        href={item.downloadUrl || item.viewUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          padding: "8px 14px",
-                          borderRadius: "6px",
-                          background: "#2563eb",
-                          color: "#ffffff",
-                          fontSize: "12px",
-                          fontWeight: "600",
-                          textDecoration: "none",
-                          whiteSpace: "nowrap"
-                        }}
-                      >
-                        Read / View
-                      </a>
-                    )}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px", flexShrink: 0 }}>
+                      {pdfUrl ? (
+                        <>
+                          <a href={pdfUrl} target="_blank" rel="noopener noreferrer" style={{ padding: "7px 10px", borderRadius: "6px", background: "#1e3a8a", color: "#ffffff", fontSize: "11px", fontWeight: "600", textDecoration: "none", whiteSpace: "nowrap" }}>
+                            Read Full Book
+                          </a>
+                          <a href={pdfUrl} download style={{ padding: "7px 10px", borderRadius: "6px", border: "1px solid #bfdbfe", color: "#1e3a8a", fontSize: "11px", fontWeight: "600", textDecoration: "none", textAlign: "center", whiteSpace: "nowrap" }}>
+                            Download PDF
+                          </a>
+                        </>
+                      ) : (
+                        <span style={{ fontSize: "11px", color: "#6b7280" }}>PDF unavailable</span>
+                      )}
+                    </div>
                   </div>
                 );
               })}

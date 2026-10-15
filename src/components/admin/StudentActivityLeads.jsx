@@ -6,10 +6,16 @@ const ACTIVITY_LABELS = {
   view_book_detail: 'Book Detail Modal Open',
   read_sample_pdf: 'Sample PDF / Flipbook Open',
   add_to_cart: 'Add to Cart',
-  purchase_complete: 'Purchase Successful'
+  purchase_complete: 'Purchase Successful',
+  checkout_initiated: 'Checkout Initiated / High Intent',
+  payment_failed: 'Payment Failed',
+  payment_abandoned: 'Payment Modal Closed / Abandoned',
+  payment_dropped: 'Payment Attempt Failed / Modal Closed (High Intent)'
 };
 
 const LEAD_LABELS = {
+  ULTRA_HOT: '🔥 Ultra Hot Lead (Payment Dropped)',
+  CONVERTED: 'Customer / Converted',
   HOT: '🔥 Hot Lead',
   WARM: 'Warm Lead',
   COLD: 'Cold'
@@ -26,6 +32,11 @@ const timestampValue = (value) => {
   return Number.isNaN(parsed) ? 0 : parsed;
 };
 
+const getWhatsAppNumber = (phone) => {
+  const digits = phone.replace(/\D/g, '');
+  return digits.length === 10 ? `91${digits}` : digits;
+};
+
 const getStudentKey = (activity) => {
   const identity = activity.uid
     || activity.student?._ref
@@ -35,6 +46,13 @@ const getStudentKey = (activity) => {
 };
 
 const getLeadStatus = (student) => {
+  const latestDrop = [...student.activities].reverse()
+    .find(({ action }) => ['payment_dropped', 'payment_failed', 'payment_abandoned'].includes(action));
+  const latestPurchase = [...student.activities].reverse()
+    .find(({ action }) => action === 'purchase_complete');
+  if (latestDrop && (!latestPurchase
+    || timestampValue(latestDrop.timestamp) > timestampValue(latestPurchase.timestamp))) return 'ULTRA_HOT';
+  if (latestPurchase) return 'CONVERTED';
   if (student.totalCoins >= 100 || student.activities.some(({ action }) => action === 'add_to_cart')) {
     return 'HOT';
   }
@@ -75,7 +93,10 @@ const groupActivitiesByStudent = (activities) => {
       latestBook: latestBookActivity?.bookTitle || '',
       lastActiveAt: latestActivity?.timestamp || ''
     };
-  }).sort((a, b) => timestampValue(b.lastActiveAt) - timestampValue(a.lastActiveAt));
+  }).sort((a, b) => (
+    Number(b.leadStatus === 'ULTRA_HOT') - Number(a.leadStatus === 'ULTRA_HOT')
+      || timestampValue(b.lastActiveAt) - timestampValue(a.lastActiveAt)
+  ));
 };
 
 const escapeCsv = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
@@ -91,10 +112,10 @@ export default function StudentActivityLeads() {
 
   useEffect(() => {
     let active = true;
-    sanityClient.fetch(
+    sanityClient.withConfig({ useCdn: false }).fetch(
       `*[_type == "userActivity"] | order(timestamp desc) {
         _id, uid, student, studentName, phone, email, bookTitle, action,
-        coinsEarned, totalCoins, timestamp
+        coinsEarned, totalCoins, amount, context, leadStatus, timestamp
       }`
     ).then((rows) => {
       if (active) setActivities(rows);
@@ -181,12 +202,18 @@ export default function StudentActivityLeads() {
             <option value="read_sample_pdf">Read Sample</option>
             <option value="view_book_detail">Book Detail Modal Open</option>
             <option value="daily_login_visit">Daily Visit</option>
+            <option value="payment_failed">Payment Failed</option>
+            <option value="payment_abandoned">Payment Modal Closed / Abandoned</option>
+            <option value="checkout_initiated">Checkout Initiated</option>
+            <option value="payment_dropped">Payment Attempt Failed / Modal Closed</option>
           </select>
         </label>
         <label>
           Lead Tag{' '}
           <select value={leadTag} onChange={(event) => setLeadTag(event.target.value)} style={controlStyle}>
             <option value="all">All</option>
+            <option value="ULTRA_HOT">Ultra Hot Lead (Payment Dropped)</option>
+            <option value="CONVERTED">Customer / Converted</option>
             <option value="HOT">Hot Lead</option>
             <option value="WARM">Warm Lead</option>
             <option value="COLD">Cold</option>
@@ -221,12 +248,42 @@ export default function StudentActivityLeads() {
                   <Fragment key={student.key}>
                     <tr>
                       <td style={cellStyle}>{student.name || 'Student'}</td>
-                      <td style={cellStyle}>{student.phone || '—'}</td>
+                      <td style={cellStyle}>
+                        {student.phone ? (
+                          <span style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <a href={`tel:${student.phone}`}>{student.phone}</a>
+                            <a href={`https://wa.me/${getWhatsAppNumber(student.phone)}`} target="_blank" rel="noopener noreferrer">
+                              WhatsApp
+                            </a>
+                          </span>
+                        ) : '—'}
+                      </td>
                       <td style={cellStyle}>{student.email || '—'}</td>
-                      <td style={cellStyle}>{LEAD_LABELS[student.leadStatus]}</td>
+                      <td style={cellStyle}>
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          borderRadius: 999,
+                          padding: '4px 9px',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          whiteSpace: 'nowrap',
+                          color: student.leadStatus === 'ULTRA_HOT' ? '#9a3412' : '#374151',
+                          background: student.leadStatus === 'ULTRA_HOT' ? '#ffedd5' : '#f3f4f6',
+                          border: student.leadStatus === 'ULTRA_HOT' ? '1px solid #fb923c' : '1px solid #d1d5db'
+                        }}>
+                          {LEAD_LABELS[student.leadStatus]}
+                        </span>
+                      </td>
                       <td style={cellStyle}>{student.totalCoins}</td>
                       <td style={cellStyle}>{student.activities.length} activities</td>
-                      <td style={cellStyle}>{student.latestBook || '—'}</td>
+                      <td style={{
+                        ...cellStyle,
+                        fontWeight: student.leadStatus === 'ULTRA_HOT' ? 700 : 400,
+                        color: student.leadStatus === 'ULTRA_HOT' ? '#9a3412' : 'inherit'
+                      }}>
+                        {student.latestBook || '—'}
+                      </td>
                       <td style={cellStyle}>{formatDate(student.lastActiveAt)}</td>
                       <td style={cellStyle}>
                         <button
@@ -244,7 +301,7 @@ export default function StudentActivityLeads() {
                           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                             <thead>
                               <tr>
-                                {['Activity Type', 'Book Title', 'Coins Earned', 'Timestamp']
+                                {['Activity Type', 'Book Title', 'Amount', 'Coins Earned', 'Context / Reason', 'Timestamp']
                                   .map((heading) => <th key={heading} style={{ padding: 8, borderBottom: '1px solid #d1d5db' }}>{heading}</th>)}
                               </tr>
                             </thead>
@@ -253,7 +310,9 @@ export default function StudentActivityLeads() {
                                 <tr key={activity._id}>
                                   <td style={cellStyle}>{ACTIVITY_LABELS[activity.action] || activity.action}</td>
                                   <td style={cellStyle}>{activity.bookTitle || '—'}</td>
+                                  <td style={cellStyle}>{activity.amount != null ? `₹${activity.amount}` : '—'}</td>
                                   <td style={cellStyle}>+{Number(activity.coinsEarned) || 0}</td>
+                                  <td style={cellStyle}>{activity.context || '—'}</td>
                                   <td style={cellStyle}>{formatDate(activity.timestamp)}</td>
                                 </tr>
                               ))}

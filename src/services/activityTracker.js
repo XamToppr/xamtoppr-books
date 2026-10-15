@@ -13,7 +13,11 @@ export const ACTIVITY_COIN_VALUES = Object.freeze({
   view_book_detail: 5,
   read_sample_pdf: 15,
   add_to_cart: 20,
-  purchase_complete: 50
+  purchase_complete: 50,
+  checkout_initiated: 0,
+  payment_failed: 0,
+  payment_abandoned: 0,
+  payment_dropped: 0
 });
 
 const getLocalDate = () => new Date().toLocaleDateString('en-CA');
@@ -23,11 +27,53 @@ const getActivityDetails = (details) => ({
   bookTitle: typeof details.bookTitle === 'string' ? details.bookTitle : ''
 });
 
+export async function logCheckoutActivity({
+  user: currentUser = auth.currentUser,
+  action,
+  bookId,
+  bookTitle,
+  amount,
+  phone = '',
+  reason
+}) {
+  if (!currentUser) return false;
+
+  try {
+    const idToken = await currentUser.getIdToken();
+    const response = await fetch('/api/log-user-activity', {
+      method: 'POST',
+      keepalive: true,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${idToken}`
+      },
+      body: JSON.stringify({
+        uid: currentUser.uid,
+        action,
+        bookId,
+        bookTitle,
+        amount,
+        phone,
+        reason,
+        firebaseApiKey: auth.app.options.apiKey
+      })
+    });
+    const responseBody = await response.json();
+    if (!response.ok) {
+      throw new Error(responseBody.error || `Checkout activity logging failed with status ${response.status}.`);
+    }
+    return true;
+  } catch (error) {
+    console.error('Unable to log the checkout activity to Student Activity & Leads:', error);
+    return false;
+  }
+}
+
 export async function logUserActivity(actionType, details = {}) {
   const user = auth.currentUser;
   const coinsEarned = ACTIVITY_COIN_VALUES[actionType];
   const verifiedPayment = details.verifiedPayment;
-  if (!user || !coinsEarned
+  if (!user || coinsEarned == null
     || (actionType === 'purchase_complete'
       && (!verifiedPayment?.paymentId || !Array.isArray(verifiedPayment.purchases)
         || verifiedPayment.purchases.length === 0))) return false;
@@ -42,11 +88,12 @@ export async function logUserActivity(actionType, details = {}) {
       const profile = userSnapshot.data() || {};
       if (actionType === 'purchase_complete'
         && (profile.processedPaymentIds || []).includes(verifiedPayment.paymentId)) {
-        return { logged: true, alreadyProcessed: true, totalCoins: Number(profile.totalCoins) || 0 };
+        return { logged: true, totalCoins: Number(profile.totalCoins) || 0, phone: '' };
       }
+
       const visitDate = getLocalDate();
       if (actionType === 'daily_login_visit' && profile.lastDailyVisitDate === visitDate) {
-        return { logged: false, totalCoins: Number(profile.totalCoins) || 0 };
+        return { logged: false, totalCoins: Number(profile.totalCoins) || 0, phone: '' };
       }
 
       const totalCoins = (Number(profile.totalCoins) || 0) + coinsEarned;
@@ -66,7 +113,9 @@ export async function logUserActivity(actionType, details = {}) {
         activity.bookTitle = verifiedPayment.purchases.length === 1
           ? verifiedPayment.purchases[0].title
           : `${verifiedPayment.purchases.length} books`;
+        if (Number.isFinite(verifiedPayment.amount)) activity.amount = verifiedPayment.amount;
       }
+
       const userUpdates = {
         totalCoins: increment(coinsEarned),
         lastActiveAt: serverTimestamp()
@@ -97,7 +146,6 @@ export async function logUserActivity(actionType, details = {}) {
     });
 
     if (!result.logged) return false;
-
     if (actionType === 'purchase_complete') return true;
 
     try {

@@ -919,7 +919,29 @@ const studentUser = defineType({
     defineField({ name: 'phone', title: 'Phone', type: 'string' }),
     defineField({ name: 'firebaseUid', title: 'Firebase UID', type: 'string' }),
     defineField({ name: 'createdAt', title: 'Created At', type: 'datetime' }),
+    defineField({ name: 'latestActivityTimestamp', title: 'Latest Activity', type: 'datetime' }),
+    defineField({ name: 'latestDroppedBook', title: 'Latest Dropped Book', type: 'string' }),
+    defineField({
+      name: 'activities',
+      title: 'Activities',
+      type: 'array',
+      of: [defineArrayMember({ type: 'reference', to: [{ type: 'userActivity' }] })]
+    }),
     defineField({ name: 'totalCoins', title: 'Total Coins', type: 'number', initialValue: 0 }),
+    defineField({
+      name: 'leadStatus',
+      title: 'Lead Status',
+      type: 'string',
+      options: {
+        list: [
+          { title: 'Ultra Hot (Payment Dropped)', value: 'ULTRA_HOT' },
+          { title: 'Converted', value: 'CONVERTED' },
+          { title: 'Hot', value: 'HOT' },
+          { title: 'Warm', value: 'WARM' },
+          { title: 'Cold', value: 'COLD' }
+        ]
+      }
+    }),
     defineField({
       name: 'purchasedBooks',
       title: 'Purchased Books / Orders',
@@ -996,10 +1018,16 @@ const userActivity = defineType({
           { title: 'Book Detail Modal Open', value: 'view_book_detail' },
           { title: 'Sample PDF / Flipbook Open', value: 'read_sample_pdf' },
           { title: 'Add to Cart', value: 'add_to_cart' },
-          { title: 'Purchase Successful', value: 'purchase_complete' }
+          { title: 'Purchase Successful', value: 'purchase_complete' },
+          { title: 'Checkout Initiated', value: 'checkout_initiated' },
+          { title: 'Payment Failed', value: 'payment_failed' },
+          { title: 'Payment Modal Closed / Abandoned', value: 'payment_abandoned' },
+          { title: 'Payment Attempt Failed / Modal Closed (High Intent)', value: 'payment_dropped' }
         ]
       }
     }),
+    defineField({ name: 'amount', title: 'Amount Paid', type: 'number' }),
+    defineField({ name: 'context', title: 'Activity Context / Drop-off Reason', type: 'string' }),
     defineField({ name: 'coinsEarned', title: 'Coins Earned', type: 'number' }),
     defineField({ name: 'totalCoins', title: 'Total Coins After Activity', type: 'number' }),
     defineField({
@@ -1011,6 +1039,7 @@ const userActivity = defineType({
           { title: 'Hot', value: 'HOT' },
           { title: 'Warm', value: 'WARM' },
           { title: 'Converted', value: 'CONVERTED' },
+          { title: 'Ultra Hot (Payment Dropped)', value: 'ULTRA_HOT' },
           { title: 'Cold', value: 'COLD' }
         ]
       }

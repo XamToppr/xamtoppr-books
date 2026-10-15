@@ -1,4 +1,4 @@
-import { logUserActivity } from './activityTracker';
+import { logCheckoutActivity, logUserActivity } from './activityTracker';
 import loadRazorpay from '../utils/loadRazorpay';
 
 const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID;
@@ -47,6 +47,21 @@ export async function initiatePayment({
 }) {
   let failureNotified = false;
   let paymentCompleted = false;
+  const logPaymentDrop = async (action, reason) => {
+    if (paymentCompleted) return;
+    const logResults = await Promise.all(items.map((item) => logCheckoutActivity({
+      user,
+      action,
+      bookId: item.sanityId || item.id,
+      bookTitle: item.title,
+      amount: Number(item.finalAmount ?? item.amount ?? item.price ?? item.offerPrice),
+      phone: phone || user.phoneNumber || user.phone || '',
+      reason
+    })));
+    if (logResults.some((logged) => !logged)) {
+      console.error('One or more payment drop activities could not be logged.');
+    }
+  };
   const fail = (error) => {
     if (failureNotified || paymentCompleted) return;
     failureNotified = true;
@@ -62,6 +77,18 @@ export async function initiatePayment({
     }
     if (!Number.isFinite(Number(totalAmount)) || Number(totalAmount) <= 0) {
       throw new Error('The total purchase amount is invalid.');
+    }
+    const checkoutResults = await Promise.all(items.map((item) => logCheckoutActivity({
+      user,
+      action: 'checkout_initiated',
+      bookId: item.sanityId || item.id,
+      bookTitle: item.title,
+      amount: Number(item.finalAmount ?? item.amount ?? item.price ?? item.offerPrice),
+      phone: phone || user.phoneNumber || user.phone || '',
+      reason: 'User initiated checkout'
+    })));
+    if (checkoutResults.some((logged) => !logged)) {
+      console.error('One or more checkout initiation activities could not be logged.');
     }
     if (!RAZORPAY_KEY_ID) {
       throw new Error('Razorpay is not configured. Set VITE_RAZORPAY_KEY_ID and server payment credentials.');
@@ -116,7 +143,8 @@ export async function initiatePayment({
             const logged = await logUserActivity('purchase_complete', {
               verifiedPayment: {
                 paymentId: response.razorpay_payment_id,
-                purchases: verification.purchases
+                purchases: verification.purchases,
+                amount: order.amount / 100
               }
             });
             if (!logged) {
@@ -146,12 +174,19 @@ export async function initiatePayment({
         }
       },
       modal: {
-        ondismiss: () => fail(new Error('Payment was cancelled.'))
+        ondismiss: async () => {
+          await logPaymentDrop('payment_abandoned', 'Modal dismissed');
+          fail(new Error('Payment was cancelled.'));
+        }
       }
     });
 
-    razorpay.on('payment.failed', (event) => {
-      fail(new Error(event?.error?.description || 'Razorpay could not complete the payment.'));
+    razorpay.on('payment.failed', async (event) => {
+      const reason = event?.error?.description
+        || event?.error?.reason
+        || 'Bank/UPI declined';
+      await logPaymentDrop('payment_failed', reason);
+      fail(new Error(reason));
     });
     razorpay.open();
     return true;

@@ -124,16 +124,45 @@ const getHighDefinitionImageUrl = (assetUrl) => {
   }
 };
 
-const hasPurchasedBook = (profile, bookId) => {
+const hasPurchasedBook = (profile, book) => {
+  if (!book?._id) return false;
+
   const purchaseEntries = Array.isArray(profile?.purchasedBooks)
     ? profile.purchasedBooks
     : [];
-  return (Array.isArray(profile?.purchasedBookIds) && profile.purchasedBookIds.includes(bookId))
-    || purchaseEntries.some((entry) => (
-      typeof entry === 'string'
-        ? entry === bookId
-        : entry?.bookId === bookId || entry?.sanityId === bookId || entry?.id === bookId
-    ));
+  const bookId = String(book._id);
+  const bookIdWithoutDraftPrefix = bookId.replace(/^drafts\./, '');
+  const bookSlug = typeof book.slug === 'string' ? book.slug : book.slug?.current;
+  const bookTitle = typeof book.title === 'string' ? book.title.trim().toLocaleLowerCase() : '';
+  const matchesIdentifier = (value) => {
+    if (typeof value !== 'string' || !value.trim()) return false;
+    const identifier = value.trim();
+    const normalizedIdentifier = identifier.replace(/^drafts\./, '');
+    return identifier === bookId
+      || normalizedIdentifier === bookIdWithoutDraftPrefix
+      || (Boolean(bookSlug) && identifier === bookSlug)
+      || (Boolean(bookTitle) && identifier.toLocaleLowerCase() === bookTitle);
+  };
+  const matchesBook = (entry) => {
+    if (typeof entry === 'string') return matchesIdentifier(entry);
+    if (!entry || typeof entry !== 'object') return false;
+    return [
+      entry._ref,
+      entry.book?._ref,
+      entry.bookId,
+      entry.sanityId,
+      entry.id,
+      entry._id,
+      entry.slug,
+      entry.slug?.current,
+      entry.bookSlug,
+      entry.title,
+      entry.bookTitle
+    ].some(matchesIdentifier);
+  };
+  return (Array.isArray(profile?.purchasedBookIds)
+    && profile.purchasedBookIds.some(matchesBook))
+    || purchaseEntries.some(matchesBook);
 };
 
 function updateMetaTag(attribute, key, content, createdElements) {
@@ -217,7 +246,22 @@ export default function BookDetailPage() {
   const [purchasedPdfUrl, setPurchasedPdfUrl] = useState('');
   const paymentInProgressRef = useRef(false);
   const toastTimerRef = useRef(null);
+  const profileRefreshAttemptedForUserRef = useRef(null);
   const loading = loadedSlug !== slug;
+
+  useEffect(() => {
+    if (!currentUser?.uid) {
+      profileRefreshAttemptedForUserRef.current = null;
+      return;
+    }
+    if (userProfile?.purchasedBooks?.length
+      || profileRefreshAttemptedForUserRef.current === currentUser.uid) return;
+
+    profileRefreshAttemptedForUserRef.current = currentUser.uid;
+    refreshUserProfile().catch((error) => {
+      console.error('Unable to refresh the user profile before checking book ownership:', error);
+    });
+  }, [currentUser?.uid, refreshUserProfile, userProfile?.purchasedBooks]);
 
   useEffect(() => {
     let isCurrentRequest = true;
@@ -286,7 +330,7 @@ export default function BookDetailPage() {
   const price = Number(book?.discountPrice ?? book?.price) || 0;
   const originalPrice = Number(book?.price) || 0;
   const finalPrice = coupon?.finalAmount ?? price;
-  const alreadyPurchased = Boolean(book && hasPurchasedBook(userProfile, book._id));
+  const alreadyPurchased = Boolean(book && hasPurchasedBook(userProfile, book));
   const fullPdfUrl = book?.fullPdfFile?.asset?.url || '';
   const coverImageUrl = getHighDefinitionImageUrl(book?.coverImage);
   const category = useMemo(() => {
@@ -354,7 +398,7 @@ export default function BookDetailPage() {
   const shareUrl = encodeURIComponent(window.location.href);
 
   const handlePurchase = async () => {
-    if (paymentInProgressRef.current || !book) return;
+    if (alreadyPurchased || paymentInProgressRef.current || !book) return;
     if (!currentUser || !/^[6-9]\d{9}$/.test(userProfile?.phone?.trim() || '')) {
       setShowAuthModal(true);
       return;
@@ -367,7 +411,8 @@ export default function BookDetailPage() {
         id: book._id,
         sanityId: book._id,
         title: book.title,
-        offerPrice: price
+        offerPrice: price,
+        finalAmount: finalPrice
       }],
       totalAmount: finalPrice,
       couponCode: coupon?.code || '',
@@ -536,7 +581,7 @@ export default function BookDetailPage() {
                         </a>
                       )}
                       <Link to="/my-library" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-emerald-700 px-5 py-3 text-sm font-extrabold text-emerald-800 hover:bg-emerald-50">
-                        <Check className="h-4 w-4" /> Read in My Library
+                        <Check className="h-4 w-4" /> Already Purchased · Read in My Library
                       </Link>
                     </div>
                   ) : price > 0 ? (

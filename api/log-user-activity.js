@@ -43,11 +43,24 @@ export default async function handler(request, response) {
   const bookId = getString(body.bookId);
   const bookTitle = getString(body.bookTitle);
   const phone = getString(body.phone);
+  const reason = getString(body.reason);
+  const amount = body.amount;
+  console.log('Logging activity received:', {
+    uid,
+    action,
+    bookId,
+    bookTitle,
+    amount,
+    reason
+  });
   const firebaseApiKey = getString(body.firebaseApiKey)
     || process.env.VITE_FIREBASE_API_KEY
     || process.env.FIREBASE_WEB_API_KEY;
-  if (!uid || !USER_ACTIVITY_COIN_VALUES[action] || bookId.length > 200
-    || bookTitle.length > 300 || phone.length > 32) {
+  if (!uid || !Object.hasOwn(USER_ACTIVITY_COIN_VALUES, action) || bookId.length > 200
+    || bookTitle.length > 300 || phone.length > 32
+    || (['checkout_initiated', 'payment_dropped', 'payment_failed', 'payment_abandoned'].includes(action)
+      && (!bookId || !bookTitle || !reason || reason.length > 500
+        || !Number.isFinite(amount) || amount < 0))) {
     return response.status(400).json({ success: false, error: 'Activity details are invalid.' });
   }
   if (action === 'purchase_complete') {
@@ -87,13 +100,16 @@ export default async function handler(request, response) {
   });
 
   try {
-    const result = await createSanityUserActivity(client, firebaseUser, {
+    const { activityId } = await createSanityUserActivity(client, firebaseUser, {
       action,
       bookId,
       bookTitle,
-      phone
+      phone,
+      reason,
+      amount
     });
-    return response.status(200).json({ success: true, ...result });
+    console.log("Logged Activity Successfully:", request.body);
+    return response.status(200).json({ success: true, activityId });
   } catch (error) {
     console.error('Failed to write student activity to Sanity:', error);
     return response.status(500).json({ success: false, error: 'Unable to sync student activity to Sanity.' });

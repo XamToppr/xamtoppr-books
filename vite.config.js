@@ -262,13 +262,16 @@ const localUserActivityApi = (env) => {
           const bookId = getString(body.bookId)
           const bookTitle = getString(body.bookTitle)
           const phone = getString(body.phone)
+          const reason = getString(body.reason)
+          const amount = body.amount
           const firebaseApiKey = getString(body.firebaseApiKey)
             || env.VITE_FIREBASE_API_KEY
             || env.FIREBASE_WEB_API_KEY
-          const totalCoins = Number(body.totalCoins)
-          if (!uid || !USER_ACTIVITY_COIN_VALUES[action] || bookId.length > 200
+          if (!uid || !Object.hasOwn(USER_ACTIVITY_COIN_VALUES, action) || bookId.length > 200
             || bookTitle.length > 300 || phone.length > 32
-            || !Number.isSafeInteger(totalCoins) || totalCoins < 0) {
+            || (['checkout_initiated', 'payment_dropped', 'payment_failed', 'payment_abandoned'].includes(action)
+              && (!bookId || !bookTitle || !reason || reason.length > 500
+                || !Number.isFinite(amount) || amount < 0))) {
             response.statusCode = 400
             response.end(JSON.stringify({ success: false, error: 'Activity details are invalid.' }))
             return
@@ -298,8 +301,11 @@ const localUserActivityApi = (env) => {
             action,
             bookId,
             bookTitle,
-            phone
+            phone,
+            reason,
+            amount
           })
+          console.log("Logged Activity Successfully:", body)
           response.statusCode = 200
           response.end(JSON.stringify({ success: true, ...result }))
         } catch (error) {

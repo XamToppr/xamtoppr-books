@@ -273,6 +273,7 @@ async function recordSanityPurchase(client, firebaseUser, phone, paymentId, orde
       }
       : { bookTitle: `${orderPayload.items.length} books` }),
     action: 'purchase_complete',
+    amount: orderPayload.amount / 100,
     coinsEarned: PURCHASE_COINS,
     totalCoins,
     leadStatus: getLeadStatus('purchase_complete', totalCoins),
@@ -292,17 +293,23 @@ async function recordSanityPurchase(client, firebaseUser, phone, paymentId, orde
   await client.createIfNotExists(newStudent);
   try {
     await client.transaction()
-      .patch(studentId, {
-        set: {
+      .patch(studentId, (patch) => patch
+        .set({
           fullName: firebaseUser.displayName || 'Student',
           email: firebaseUser.email || '',
           phone,
-          firebaseUid: firebaseUser.localId
-        },
-        setIfMissing: { totalCoins: 0, purchasedBooks: [] },
-        append: { purchasedBooks: purchases },
-        inc: { totalCoins: PURCHASE_COINS }
-      })
+          firebaseUid: firebaseUser.localId,
+          leadStatus: 'CONVERTED',
+          latestActivityTimestamp: purchasedAt
+        })
+        .setIfMissing({ totalCoins: 0, purchasedBooks: [], activities: [] })
+        .append('purchasedBooks', purchases)
+        .append('activities', [{
+          _key: randomUUID(),
+          _type: 'reference',
+          _ref: activityId
+        }])
+        .inc({ totalCoins: PURCHASE_COINS }))
       .create(activity)
       .commit();
   } catch (error) {
@@ -398,8 +405,8 @@ export async function verifyRazorpayPayment({ body, authorization, env }) {
   }));
   let pdfUrls = [];
 
+  const sanity = getSanityClient(env);
   try {
-    const sanity = getSanityClient(env);
     const books = await sanity.fetch(
       '*[_type == "book" && _id in $bookIds]{_id, "pdfUrl": fullPdfFile.asset->url}',
       { bookIds: orderPayload.items.map((item) => item.bookId) }
@@ -409,16 +416,17 @@ export async function verifyRazorpayPayment({ body, authorization, env }) {
       bookId: item.bookId,
       pdfUrl: pdfUrlsByBookId.get(item.bookId) || null
     }));
-
-    try {
-      const profile = await sanity.getDocument(`student_${uid}`);
-      await recordSanityPurchase(sanity, firebaseUser, getString(profile?.phone), paymentId, orderPayload);
-    } catch (sanityErr) {
-      console.error('Sanity write error:', sanityErr);
-    }
   } catch (sanityErr) {
     console.error('Unable to resolve purchased PDF URLs from Sanity:', sanityErr);
   }
+  const profile = await sanity.getDocument(`student_${uid}`);
+  await recordSanityPurchase(
+    sanity,
+    firebaseUser,
+    getString(profile?.phone || firebaseUser.phoneNumber),
+    paymentId,
+    orderPayload
+  );
 
   return {
     success: true,

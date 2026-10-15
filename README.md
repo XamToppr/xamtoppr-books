@@ -81,7 +81,7 @@ The Razorpay key secret is server-only. A captured payment whose browser callbac
 
 ### My Library and cart
 
-The `/my-library` route reads `users/{uid}.purchasedBooks` and `users/{uid}.purchasedBookIds` from Firestore, then resolves matching book documents from the public Sanity catalog for titles, covers, and sample reading links. Only a verified purchase integration should populate those purchase fields. The page provides a Read Now action when the book has a sample PDF; unavailable reading links are shown as disabled rather than redirecting to a payment link.
+The `/my-library` route reads `users/{uid}.purchasedBooks` and `users/{uid}.purchasedBookIds` from Firestore through the shared `fetchUserLibrary` service, then resolves matching book documents from the public Sanity catalog for titles, covers, and PDF links. The **My Purchases** modal uses the same service and records, so both views show matching purchase dates, amounts, and full-book actions. Only a verified purchase integration should populate those purchase fields.
 
 `CartProvider` wraps the app and persists its `cartItems` in `localStorage` under `xamtoppr-books-cart`. Its `addToCart`, `removeFromCart`, and `clearCart` actions maintain a derived `cartTotal`. Paid book cards and detail views expose Add to Cart/Go to Cart actions, and the header cart drawer shows selected books, removes items, and calculates the total. Proceed to Checkout creates one Razorpay order for all selected books and clears the cart only after verified payment and successful Firestore library updates.
 
@@ -96,8 +96,9 @@ The `/my-library` route reads `users/{uid}.purchasedBooks` and `users/{uid}.purc
 | Sample PDF / Flipbook Open | `read_sample_pdf` | 15 |
 | Add to Cart | `add_to_cart` | 20 |
 | Book Purchase Successful | `purchase_complete` | 50 |
+| Payment Failed / Checkout Dismissed | `payment_dropped` | 0 |
 
-The first four events are logged from the app. `purchase_complete` is recorded only after the server verifies Razorpay's payment signature and confirms the payment is captured; the generic client activity endpoint rejects purchase events. Sanity `userActivity` documents contain student contact details, interested book, action, coins earned, cumulative coins, lead status, and timestamp. Lead status is `CONVERTED` for a verified purchase, `HOT` for add-to-cart or a cumulative balance of at least 100, `WARM` for sample reading, and otherwise `COLD`. Sanity student profiles also maintain `totalCoins`.
+The first four engagement events and payment-drop events are logged by the app. A Razorpay checkout dismissal or failed payment writes a `payment_dropped` Sanity event with student contact details, book, timestamp, and drop-off reason, and marks the student `ULTRA_HOT` unless they are already converted. `purchase_complete` is recorded only after the server verifies Razorpay's payment signature and confirms the payment is captured; the generic client activity endpoint rejects purchase events. Sanity purchase activity includes the paid amount and 50 coins, and sets the student status to `CONVERTED`. Sanity `userActivity` documents contain student contact details, interested book, action, coins earned, cumulative coins, lead status, and timestamp.
 
 The Sanity Studio tool **Student Activity & Leads** groups activity events into one row per unique student, using Firebase UID (or the Sanity student reference, email, or phone as a fallback identity). The summary row shows contact details, highest lead status, total coins, activity count, latest interested book, and last-active time. Expand a student row to view every event in chronological order. Search applies to student name/phone; lead filters use the student's highest status, and activity filters include students who performed that event at least once.
 

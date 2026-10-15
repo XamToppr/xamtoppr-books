@@ -100,6 +100,56 @@ const hasRealContent = (value) => {
 
 const isAbortError = (error) => error?.name === 'AbortError';
 
+const normalizeBookIdentifier = (value) => (
+  typeof value === 'string' ? value.trim().replace(/^drafts\./, '') : ''
+);
+
+const hasBookAlreadyBeenPurchased = (profile, book) => {
+  if (!profile || !book) return false;
+
+  const bookIdentifiers = new Set([
+    book.sanityId,
+    book.id
+  ].map(normalizeBookIdentifier).filter(Boolean));
+  const bookSlug = typeof book.slug === 'string' ? book.slug.trim() : '';
+  const bookTitle = typeof book.title === 'string' ? book.title.trim().toLocaleLowerCase() : '';
+  const matchesPurchase = (purchase) => {
+    if (typeof purchase === 'string') {
+      return bookIdentifiers.has(normalizeBookIdentifier(purchase))
+        || (Boolean(bookSlug) && purchase === bookSlug)
+        || (Boolean(bookTitle) && purchase.trim().toLocaleLowerCase() === bookTitle);
+    }
+    if (!purchase || typeof purchase !== 'object') return false;
+
+    const identifiers = [
+      purchase._ref,
+      purchase.book?._ref,
+      purchase.bookId,
+      purchase.id,
+      purchase.sanityId,
+      purchase._id
+    ];
+    if (identifiers.some((identifier) => (
+      bookIdentifiers.has(normalizeBookIdentifier(identifier))
+    ))) return true;
+
+    const slugs = [purchase.slug, purchase.bookSlug]
+      .map((value) => typeof value === 'string' ? value : value?.current)
+      .filter(Boolean);
+    if (bookSlug && slugs.includes(bookSlug)) return true;
+
+    const titles = [purchase.title, purchase.bookTitle]
+      .filter((value) => typeof value === 'string')
+      .map((value) => value.trim().toLocaleLowerCase());
+    return Boolean(bookTitle) && titles.includes(bookTitle);
+  };
+
+  return (Array.isArray(profile.purchasedBookIds)
+    && profile.purchasedBookIds.some(matchesPurchase))
+    || (Array.isArray(profile.purchasedBooks)
+      && profile.purchasedBooks.some(matchesPurchase));
+};
+
 const getHighDefinitionSanityImageUrl = (assetUrl) => {
   if (!assetUrl) return '';
   try {
@@ -682,7 +732,7 @@ function BookStoreApp() {
 
   const handlePaidBookPurchase = async (event, book, coupon = null) => {
     event.preventDefault();
-    if (paymentInProgressRef.current) return;
+    if (hasBookAlreadyBeenPurchased(userProfile, book) || paymentInProgressRef.current) return;
     const hasPhone = /^[6-9]\d{9}$/.test(userProfile?.phone?.trim() || '');
     if (!currentUser || !hasPhone) {
       setShowCheckoutAuthModal(true);
@@ -1626,6 +1676,7 @@ function BookStoreApp() {
               {filteredBooks.map((book) => {
                 const isSaved = savedBooks.includes(book.id);
                 const isPaid = !book.isFree;
+                const alreadyPurchased = hasBookAlreadyBeenPurchased(userProfile, book);
                 const isVisualNote = book.badge.toUpperCase().includes('NOTE') || book.samplePages.length > 0;
 
                 return (
@@ -1775,7 +1826,16 @@ function BookStoreApp() {
                           </Link>
                         )}
                         
-                        {isPaid ? (
+                        {isPaid && alreadyPurchased ? (
+                          <Link
+                            to="/my-library"
+                            onClick={(event) => event.stopPropagation()}
+                            className="relative z-10 cursor-pointer bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-2.5 rounded-xl transition font-bold text-xs shadow-sm flex items-center gap-1.5"
+                          >
+                            <BookOpen className="w-3.5 h-3.5" />
+                            <span>Read in Library</span>
+                          </Link>
+                        ) : isPaid ? (
                           <a
                             href={book.pdfUrl || '#'}
                             target="_blank"
@@ -3056,6 +3116,7 @@ function BookStoreApp() {
             : selectedBookForModal.badge?.toUpperCase().includes('PAID')
               || selectedBookForModal.badge?.toUpperCase().includes('PREMIUM')
               || selectedBookForModal.badge?.includes('₹'));
+        const alreadyPurchased = hasBookAlreadyBeenPurchased(userProfile, selectedBookForModal);
 
         const sampleUrl = selectedBookForModal.samplePdfUrl || selectedBookForModal.pdfUrl;
         const ratingSelection = ratingSelections[selectedBookForModal.sanityId] || 0;
@@ -3223,41 +3284,53 @@ function BookStoreApp() {
                         <span>Read Sample PDF</span>
                       </a>
 
-                      <CouponField
-                        key={`${selectedBookForModal.sanityId}:${selectedBookAmount}`}
-                        orderAmount={selectedBookAmount}
-                        onChange={(value) => setBookCoupon(value ? {
-                          bookId: selectedBookForModal.sanityId,
-                          orderAmount: selectedBookAmount,
-                          value
-                        } : null)}
-                        className="basis-full"
-                      />
-                      {/* Paid Book: Buy Now */}
-                      <button
-                        type="button"
-                        onClick={(event) => handlePaidBookPurchase(event, selectedBookForModal, selectedBookCoupon)}
-                        className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white text-xs sm:text-sm font-extrabold px-5 py-2.5 rounded-xl shadow-md transition flex items-center gap-2 transform active:scale-95"
-                      >
-                        <ShoppingCart className="w-4 h-4 text-white" />
-                        <span>
-                          {selectedBookCoupon ? `Pay • ₹${selectedBookCoupon.finalAmount.toLocaleString('en-IN')}` : `Buy Now (${selectedBookForModal.price || selectedBookForModal.badge})`}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const alreadyInCart = cartItems.some((item) => item.id === selectedBookForModal.sanityId);
-                          if (alreadyInCart) {
-                            setShowCartDrawer(true);
-                          } else {
-                            handleAddToCart(selectedBookForModal);
-                          }
-                        }}
-                        className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-xs font-bold text-blue-950 transition hover:bg-blue-100"
-                      >
-                        {cartItems.some((item) => item.id === selectedBookForModal.sanityId) ? 'Go to Cart' : 'Add to Cart'}
-                      </button>
+                      {alreadyPurchased ? (
+                        <Link
+                          to="/my-library"
+                          onClick={() => setSelectedBookForModal(null)}
+                          className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-xs font-extrabold text-white transition hover:bg-emerald-600 sm:text-sm"
+                        >
+                          <BookOpen className="h-4 w-4" />
+                          Read Full Book in My Library
+                        </Link>
+                      ) : (
+                        <>
+                          <CouponField
+                            key={`${selectedBookForModal.sanityId}:${selectedBookAmount}`}
+                            orderAmount={selectedBookAmount}
+                            onChange={(value) => setBookCoupon(value ? {
+                              bookId: selectedBookForModal.sanityId,
+                              orderAmount: selectedBookAmount,
+                              value
+                            } : null)}
+                            className="basis-full"
+                          />
+                          <button
+                            type="button"
+                            onClick={(event) => handlePaidBookPurchase(event, selectedBookForModal, selectedBookCoupon)}
+                            className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white text-xs sm:text-sm font-extrabold px-5 py-2.5 rounded-xl shadow-md transition flex items-center gap-2 transform active:scale-95"
+                          >
+                            <ShoppingCart className="w-4 h-4 text-white" />
+                            <span>
+                              {selectedBookCoupon ? `Pay • ₹${selectedBookCoupon.finalAmount.toLocaleString('en-IN')}` : `Buy Now (${selectedBookForModal.price || selectedBookForModal.badge})`}
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const alreadyInCart = cartItems.some((item) => item.id === selectedBookForModal.sanityId);
+                              if (alreadyInCart) {
+                                setShowCartDrawer(true);
+                              } else {
+                                handleAddToCart(selectedBookForModal);
+                              }
+                            }}
+                            className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-xs font-bold text-blue-950 transition hover:bg-blue-100"
+                          >
+                            {cartItems.some((item) => item.id === selectedBookForModal.sanityId) ? 'Go to Cart' : 'Add to Cart'}
+                          </button>
+                        </>
+                      )}
                     </>
                   ) : (
                     /* Free Material: Sample hatakar seedhe Poori PDF ka Single Button */
@@ -3554,6 +3627,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/book/:slug" element={<BookDetailPage />} />
+      <Route path="/my-library" element={<MyLibrary />} />
       <Route path="*" element={<LegacyAppRoutes />} />
     </Routes>
   );

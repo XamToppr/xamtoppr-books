@@ -1,23 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { BookOpen, ShoppingBag, ShoppingCart } from 'lucide-react';
-import { doc, getDoc } from 'firebase/firestore';
 import AuthModal from '../auth/AuthModal';
 import UserButton from '../auth/UserButton';
 import CartDrawer from '../cart/CartDrawer';
 import Footer from '../Footer';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
-import { db } from '../../services/firebase';
-import sanityClient from '../../sanityClient';
 import { initiatePayment } from '../../services/paymentService';
-
-const formatPurchaseDate = (value) => {
-  if (!value) return 'Date unavailable';
-  const date = typeof value.toDate === 'function' ? value.toDate() : new Date(value);
-  return Number.isNaN(date.getTime())
-    ? 'Date unavailable'
-    : date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-};
+import { fetchUserLibrary, formatPurchaseDate } from '../../services/userLibrary';
 
 export default function MyLibrary() {
   const { currentUser, userProfile, refreshUserProfile } = useAuth();
@@ -42,56 +32,7 @@ export default function MyLibrary() {
       setLoading(true);
       setLoadError('');
       try {
-        const profileSnapshot = await getDoc(doc(db, 'users', currentUser.uid));
-        const profile = profileSnapshot.exists() ? profileSnapshot.data() : {};
-        const purchaseEntries = Array.isArray(profile.purchasedBooks)
-          ? profile.purchasedBooks.map((entry) => (
-            typeof entry === 'string' ? { bookId: entry } : entry
-          ))
-          : [];
-        const bookIds = [...new Set([
-          ...(Array.isArray(profile.purchasedBookIds) ? profile.purchasedBookIds : []),
-          ...purchaseEntries.map((entry) => entry?.bookId || entry?.sanityId || entry?.id).filter(Boolean)
-        ])];
-
-        if (!bookIds.length) {
-          if (isCurrentRequest) setBooks([]);
-          return;
-        }
-
-        const catalogBooks = await sanityClient.fetch(
-          `*[_type == "book" && _id in $ids] {
-            _id,
-            title,
-            "coverImageUrl": coverImage.asset->url,
-            "samplePdfUrl": samplePdfFile.asset->url,
-            fullPdfFile {
-              asset-> {
-                url
-              }
-            }
-          }`,
-          { ids: bookIds }
-        );
-        const catalogById = new Map(catalogBooks.map((book) => [book._id, book]));
-        const entriesById = new Map(
-          purchaseEntries
-            .filter((entry) => entry?.bookId || entry?.sanityId || entry?.id)
-            .map((entry) => [entry.bookId || entry.sanityId || entry.id, entry])
-        );
-        const libraryBooks = bookIds.map((bookId) => {
-          const entry = entriesById.get(bookId) || {};
-          const catalogBook = catalogById.get(bookId) || {};
-          return {
-            id: bookId,
-            title: catalogBook.title || entry.title || entry.bookTitle || 'Purchased book',
-            coverImage: catalogBook.coverImageUrl || entry.coverImage || '',
-            fullPdfFile: catalogBook.fullPdfFile || null,
-            samplePdfUrl: catalogBook.samplePdfUrl || '',
-            purchasedAt: entry.purchasedAt || entry.purchaseDate || entry.createdAt || null
-          };
-        }).sort((left, right) => new Date(right.purchasedAt || 0) - new Date(left.purchasedAt || 0));
-
+        const libraryBooks = await fetchUserLibrary(currentUser);
         if (isCurrentRequest) setBooks(libraryBooks);
       } catch (error) {
         console.error('Unable to load the user library:', error);
