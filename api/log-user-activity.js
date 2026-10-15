@@ -1,11 +1,19 @@
 import { createClient } from '@sanity/client';
-import {
-  createSanityUserActivity,
-  USER_ACTIVITY_COIN_VALUES
-} from '../server/userActivitySync.js';
+import { createSanityUserActivity } from '../server/userActivitySync.js';
 import { verifyFirebaseIdToken } from '../server/studentProfileSync.js';
 
 const getString = (value) => (typeof value === 'string' ? value.trim() : '');
+const ALLOWED_ACTIVITY_ACTIONS = new Set([
+  'checkout_initiated',
+  'payment_failed',
+  'payment_abandoned',
+  'payment_dropped',
+  'read_sample_pdf',
+  'view_book_detail',
+  'daily_login_visit',
+  'add_to_cart',
+  'purchase_complete'
+]);
 
 export default async function handler(request, response) {
   if (request.method !== 'POST') {
@@ -44,7 +52,7 @@ export default async function handler(request, response) {
   const bookTitle = getString(body.bookTitle);
   const phone = getString(body.phone);
   const reason = getString(body.reason);
-  const amount = body.amount;
+  const amount = Number(body.amount) || 0;
   console.log('Logging activity received:', {
     uid,
     action,
@@ -56,11 +64,8 @@ export default async function handler(request, response) {
   const firebaseApiKey = getString(body.firebaseApiKey)
     || process.env.VITE_FIREBASE_API_KEY
     || process.env.FIREBASE_WEB_API_KEY;
-  if (!uid || !Object.hasOwn(USER_ACTIVITY_COIN_VALUES, action) || bookId.length > 200
-    || bookTitle.length > 300 || phone.length > 32
-    || (['checkout_initiated', 'payment_dropped', 'payment_failed', 'payment_abandoned'].includes(action)
-      && (!bookId || !bookTitle || !reason || reason.length > 500
-        || !Number.isFinite(amount) || amount < 0))) {
+  if (!uid || !ALLOWED_ACTIVITY_ACTIONS.has(action) || bookId.length > 200
+    || bookTitle.length > 300 || phone.length > 32 || reason.length > 500) {
     return response.status(400).json({ success: false, error: 'Activity details are invalid.' });
   }
   if (action === 'purchase_complete') {
@@ -100,16 +105,17 @@ export default async function handler(request, response) {
   });
 
   try {
-    const { activityId } = await createSanityUserActivity(client, firebaseUser, {
+    const payload = {
       action,
       bookId,
       bookTitle,
       phone,
       reason,
       amount
-    });
+    };
+    const result = await createSanityUserActivity(client, firebaseUser, payload);
     console.log("Logged Activity Successfully:", request.body);
-    return response.status(200).json({ success: true, activityId });
+    return response.status(200).json({ success: true, activityId: result.activityId });
   } catch (error) {
     console.error('Failed to write student activity to Sanity:', error);
     return response.status(500).json({ success: false, error: 'Unable to sync student activity to Sanity.' });
