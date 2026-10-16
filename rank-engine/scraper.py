@@ -37,10 +37,10 @@ def normalize_digialm_url(raw_url: str) -> str:
     return normalized
 
 
-def fetch_response_sheet_html(url: str, timeout: int = 20) -> str:
+def fetch_response_sheet_html(url: str, timeout: int = 30) -> str:
     """
-    Fetches response sheet HTML using curl_cffi with Chrome impersonation.
-    Handles TLS fingerprinting and header verification.
+    Fetches response sheet HTML using curl_cffi with enhanced Chrome impersonation
+    and bypass headers to avoid DigiALM/TCS firewall 400 Bad Request errors.
     """
     normalized_url = normalize_digialm_url(url)
 
@@ -48,24 +48,24 @@ def fetch_response_sheet_html(url: str, timeout: int = 20) -> str:
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/124.0.0.0 Safari/537.36"
+            "Chrome/122.0.0.0 Safari/537.36"
         ),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9,hi;q=0.8",
-        "Sec-Ch-Ua": '"Not-A.Brand";v="99", "Chromium";v="124", "Google Chrome";v="124"',
-        "Sec-Ch-Ua-Mobile": "?0",
-        "Sec-Ch-Ua-Platform": '"Windows"',
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
         "Sec-Fetch-Dest": "document",
         "Sec-Fetch-Mode": "navigate",
         "Sec-Fetch-Site": "none",
         "Sec-Fetch-User": "?1",
-        "Upgrade-Insecure-Requests": "1",
+        "Cache-Control": "max-age=0"
     }
 
     try:
         response = requests.get(
             normalized_url,
-            impersonate="chrome120",
+            impersonate="chrome110",
             headers=headers,
             timeout=timeout,
             allow_redirects=True,
@@ -173,7 +173,6 @@ def parse_digialm_html(html_content: str, base_url: str = "") -> Dict[str, Any]:
 
         for r_elem in right_elems:
             r_text = r_elem.get_text().strip()
-            # Match Option 1, Ans 1, 1., (1), Option A, etc.
             m = re.search(r"(?:Option\s*|Ans\s*|Q\.\d+\s*|^)\s*\(?([1-4A-D])\)?[\.\)]?", r_text, re.IGNORECASE)
             if m and m.group(1):
                 v = m.group(1).upper()
@@ -189,7 +188,6 @@ def parse_digialm_html(html_content: str, base_url: str = "") -> Dict[str, Any]:
                     correct = letter_map.get(v, v)
                     break
 
-        # Fallback for Correct Option: check for green tick image
         if correct == "N/A":
             tick_img = panel.find("img", src=re.compile(r"(?:tick|right|correct)", re.I))
             if tick_img:
@@ -200,7 +198,6 @@ def parse_digialm_html(html_content: str, base_url: str = "") -> Dict[str, Any]:
                         v = tm.group(1).upper()
                         correct = letter_map.get(v, v)
 
-        # Fallback: inspect each row in questionRowTbl sequentially
         if correct == "N/A":
             options_table = panel.find("table", class_="questionRowTbl") or panel
             option_row_idx = 0
@@ -208,7 +205,6 @@ def parse_digialm_html(html_content: str, base_url: str = "") -> Dict[str, Any]:
                 if r.find_parent("table", class_="menu-tbl"):
                     continue
                 r_txt = r.get_text().strip()
-                # Check if this row is marked right
                 is_right_row = (
                     r.find(lambda t: t.has_attr("class") and any("rightans" in c.lower() for c in t.get("class", [])))
                     or (r.has_attr("class") and any("rightans" in c.lower() for c in r.get("class", [])))
@@ -227,7 +223,6 @@ def parse_digialm_html(html_content: str, base_url: str = "") -> Dict[str, Any]:
                 if not is_right_row and ("Option" in r_txt or len(r_txt) > 0):
                     option_row_idx += 1
 
-        # Resolve any images to absolute URLs if base_url is present
         if base_url:
             for img in panel.find_all("img"):
                 if img.get("src") and not img["src"].startswith(("http://", "https://", "data:")):
@@ -237,7 +232,6 @@ def parse_digialm_html(html_content: str, base_url: str = "") -> Dict[str, Any]:
         stem = ""
         q_row = panel.find("table", class_="questionRowTbl") or panel
 
-        # Primary method: find td starting with Q.<number>
         q_num_td = q_row.find(lambda tag: tag.name == "td" and re.match(r"^Q\.\s*\d+", tag.get_text(strip=True)))
         if q_num_td:
             q_label = q_num_td.get_text(strip=True)
@@ -246,7 +240,6 @@ def parse_digialm_html(html_content: str, base_url: str = "") -> Dict[str, Any]:
                 content = "".join(str(c) for c in stem_td.contents).strip()
                 stem = content if re.match(r"^Q\.\s*\d+", content) else f"{q_label} {content}"
 
-        # Robust Fallback for non-standard sheets
         if not stem:
             for td in q_row.find_all("td"):
                 if td.find_parent("table", class_="menu-tbl"):
@@ -280,7 +273,6 @@ def parse_digialm_html(html_content: str, base_url: str = "") -> Dict[str, Any]:
                     cleaned_opt = re.sub(r"^(?:Option\s*)?[A-Da-d1-4][\.\)]\s*", "", opt_html).strip()
                     option_texts.append(cleaned_opt or opt_html)
 
-        # Fallback method: inspect all trs not in menu-tbl
         if len(option_texts) != 4:
             option_texts = []
             for tr in q_row.find_all("tr"):
