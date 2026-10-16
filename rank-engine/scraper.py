@@ -2,10 +2,11 @@
 scraper.py
 ==========
 DigiALM Response Sheet Fetcher & Parser for XamToppr.
-Uses curl_cffi for browser impersonation (bypassing TLS fingerprints and anti-bot blocks),
-normalizes URLs, and extracts structured candidate data and question lists.
+Uses curl_cffi for browser impersonation and proxy routing to bypass 
+TLS fingerprints, WAF blocks, and DigiALM 400 errors.
 """
 
+import os
 import re
 from typing import Dict, Any, List, Optional
 from urllib.parse import urlparse, urljoin
@@ -39,46 +40,67 @@ def normalize_digialm_url(raw_url: str) -> str:
 
 def fetch_response_sheet_html(url: str, timeout: int = 30) -> str:
     """
-    Fetches response sheet HTML using curl_cffi with enhanced Chrome impersonation
-    and bypass headers to avoid DigiALM/TCS firewall 400 Bad Request errors.
+    Fetches response sheet HTML using proxy routing or curl_cffi Chrome impersonation
+    to completely bypass DigiALM/TCS firewall 400 Bad Request errors.
     """
     normalized_url = normalize_digialm_url(url)
+
+    # Use a reliable public gateway/proxy to bypass cloud datacenter IP blocks (like Render)
+    proxy_gateway_url = f"https://api.allorigins.win/raw?url={normalized_url}"
 
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/122.0.0.0 Safari/537.36"
+            "Chrome/124.0.0.0 Safari/537.36"
         ),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1",
-        "Sec-Fetch-Dest": "document",
-        "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-Site": "none",
-        "Sec-Fetch-User": "?1",
-        "Cache-Control": "max-age=0"
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9,hi;q=0.8",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
     }
 
+    html = ""
+    status_code = 500
+
     try:
-        response = requests.get(
-            normalized_url,
-            impersonate="chrome110",
-            headers=headers,
-            timeout=timeout,
-            allow_redirects=True,
-        )
+        # Attempt 1: Fetch via proxy gateway to bypass cloud IP blacklisting
+        proxy_resp = requests.get(proxy_gateway_url, headers=headers, timeout=timeout)
+        if proxy_resp.status_code == 200 and len(proxy_resp.text) > 200:
+            html = proxy_resp.text
+            status_code = 200
+        else:
+            # Attempt 2: Fallback to direct curl_cffi with advanced chrome impersonation
+            response = requests.get(
+                normalized_url,
+                impersonate="chrome120",
+                headers=headers,
+                timeout=timeout,
+                allow_redirects=True,
+            )
+            status_code = response.status_code
+            if status_code == 200:
+                html = response.text
     except Exception as exc:
-        raise RuntimeError(f"Failed to connect to DigiALM server: {exc}") from exc
+        # Final fallback to direct request if gateway fails
+        try:
+            response = requests.get(
+                normalized_url,
+                impersonate="chrome110",
+                headers=headers,
+                timeout=timeout,
+                allow_redirects=True,
+            )
+            status_code = response.status_code
+            html = response.text
+        except Exception as inner_exc:
+            raise RuntimeError(f"Failed to connect to DigiALM server: {inner_exc}") from inner_exc
 
-    if response.status_code == 404:
+    if status_code == 404:
         raise RuntimeError("DigiALM response sheet not found (404). Link may be invalid or expired.")
-    elif response.status_code != 200:
-        raise RuntimeError(f"DigiALM server returned status {response.status_code}.")
+    elif status_code != 200 and not html:
+        raise RuntimeError(f"DigiALM server returned status {status_code}.")
 
-    html = response.text
     if not html or len(html) < 200:
         raise RuntimeError("Received empty or incomplete response from DigiALM.")
 
