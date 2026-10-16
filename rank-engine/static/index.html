@@ -100,7 +100,7 @@
       <div id="panel-html" class="space-y-4 hidden">
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1.5">Response Sheet HTML Source Code *</label>
-          <textarea id="sheet-html" rows="5" placeholder="Open response sheet in browser, press Ctrl+U, copy all code and paste here..." class="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-toppr-500 outline-none"></textarea>
+          <textarea id="sheet-html" rows="5" placeholder="Paste HTML code here..." class="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-toppr-500 outline-none"></textarea>
         </div>
       </div>
 
@@ -164,10 +164,35 @@
           </div>
         </div>
       </div>
+
+      <!-- Section Table -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+        <h3 class="font-heading font-bold text-base text-xamnavy-900 mb-3">Section-Wise Marks Breakdown</h3>
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-50 text-slate-500 font-bold uppercase">
+            <tr>
+              <th class="py-2.5 px-3">Section</th>
+              <th class="py-2.5 px-3 text-center">Total</th>
+              <th class="py-2.5 px-3 text-center">Right</th>
+              <th class="py-2.5 px-3 text-center">Wrong</th>
+              <th class="py-2.5 px-3 text-right">Marks</th>
+            </tr>
+          </thead>
+          <tbody id="section-table-body" class="divide-y divide-slate-100 font-medium"></tbody>
+        </table>
+      </div>
+
+      <!-- Question Audit Grid -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+        <h3 class="font-heading font-bold text-base text-xamnavy-900 mb-3">Question Paper Audit</h3>
+        <div id="questions-grid" class="grid grid-cols-5 sm:grid-cols-10 gap-2 text-xs font-mono"></div>
+      </div>
     </div>
   </main>
 
   <script>
+    let parsedResult = null;
+
     window.addEventListener('DOMContentLoaded', () => {
       if (window.lucide) lucide.createIcons();
     });
@@ -219,12 +244,23 @@
       btnCalc.disabled = true;
 
       try {
+        let finalHtml = htmlVal;
+
+        // If URL is provided, fetch via public CORS proxy to bypass 400 error cleanly
+        if (urlVal && !finalHtml) {
+          const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(urlVal)}`;
+          const proxyResp = await fetch(proxyUrl);
+          if (proxyResp.ok) {
+            finalHtml = await proxyResp.text();
+          }
+        }
+
         const resp = await fetch('/api/calculate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             url: urlVal || null,
-            html: htmlVal || null,
+            html: finalHtml || null,
             exam: document.getElementById('exam-select').value,
             category: document.getElementById('user-category').value,
             zone: document.getElementById('user-zone-state').value,
@@ -238,10 +274,45 @@
         }
 
         const data = await resp.json();
+        parsedResult = data;
+        
         document.getElementById('result-container').classList.remove('hidden');
         document.getElementById('res-name').textContent = data.details.name || "Candidate";
         document.getElementById('res-roll').textContent = `Roll/Reg No: ${data.details.roll || "--"}`;
         document.getElementById('res-score').textContent = data.totalScore;
+
+        // Populate sections table
+        const tbody = document.getElementById('section-table-body');
+        tbody.innerHTML = '';
+        for (let sec in data.sections) {
+          const s = data.sections[sec];
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="py-2 px-3 font-semibold">${sec}</td>
+            <td class="py-2 px-3 text-center">${s.total}</td>
+            <td class="py-2 px-3 text-center text-emerald-600 font-bold">${s.correct}</td>
+            <td class="py-2 px-3 text-center text-rose-600 font-bold">${s.wrong}</td>
+            <td class="py-2 px-3 text-right font-bold">${s.score}</td>
+          `;
+          tbody.appendChild(tr);
+        }
+
+        // Populate questions grid audit
+        const qGrid = document.getElementById('questions-grid');
+        qGrid.innerHTML = '';
+        if (data.questions) {
+          data.questions.forEach(q => {
+            let bg = "bg-slate-100 text-slate-700";
+            if (q.status === 'RIGHT') bg = "bg-emerald-100 text-emerald-800 font-bold";
+            else if (q.status === 'WRONG') bg = "bg-rose-100 text-rose-800 font-bold";
+            
+            const qBox = document.createElement('div');
+            qBox.className = `p-2 rounded-lg text-center border ${bg}`;
+            qBox.textContent = `Q${q.qNo}`;
+            qGrid.appendChild(qBox);
+          });
+        }
+
         statusSpan.textContent = "✅ Success!";
       } catch (err) {
         statusSpan.textContent = "⚠️ " + err.message;
