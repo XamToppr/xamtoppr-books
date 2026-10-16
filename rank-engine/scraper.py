@@ -2,11 +2,10 @@
 scraper.py
 ==========
 DigiALM Response Sheet Fetcher & Parser for XamToppr.
-Uses curl_cffi for browser impersonation and proxy routing to bypass 
+Uses curl_cffi and multi-gateway proxy fallback to completely bypass
 TLS fingerprints, WAF blocks, and DigiALM 400 errors.
 """
 
-import os
 import re
 from typing import Dict, Any, List, Optional
 from urllib.parse import urlparse, urljoin
@@ -25,9 +24,7 @@ def normalize_digialm_url(raw_url: str) -> str:
     if not url.startswith(("http://", "https://")):
         raise ValueError("Invalid URL: must start with http:// or https://")
 
-    # Split scheme from path
     proto, rest = url.split("://", 1)
-    # Deduplicate slashes in rest of URL
     cleaned_path = re.sub(r"/+", "/", rest)
     normalized = f"{proto}://{cleaned_path}"
 
@@ -40,13 +37,17 @@ def normalize_digialm_url(raw_url: str) -> str:
 
 def fetch_response_sheet_html(url: str, timeout: int = 30) -> str:
     """
-    Fetches response sheet HTML using proxy routing or curl_cffi Chrome impersonation
-    to completely bypass DigiALM/TCS firewall 400 Bad Request errors.
+    Fetches response sheet HTML using multi-gateway proxy routing and curl_cffi
+    Chrome impersonation to completely bypass DigiALM/TCS firewall 400 errors.
     """
     normalized_url = normalize_digialm_url(url)
 
-    # Use a reliable public gateway/proxy to bypass cloud datacenter IP blocks (like Render)
-    proxy_gateway_url = f"https://api.allorigins.win/raw?url={normalized_url}"
+    # Multi-gateway proxy rotators to bypass cloud datacenter IP blocks (like Render)
+    gateways = [
+        f"https://api.allorigins.win/raw?url={normalized_url}",
+        f"https://r.jina.ai/{normalized_url}",
+        normalized_url  # Direct fallback
+    ]
 
     headers = {
         "User-Agent": (
@@ -63,46 +64,38 @@ def fetch_response_sheet_html(url: str, timeout: int = 30) -> str:
     html = ""
     status_code = 500
 
-    try:
-        # Attempt 1: Fetch via proxy gateway to bypass cloud IP blacklisting
-        proxy_resp = requests.get(proxy_gateway_url, headers=headers, timeout=timeout)
-        if proxy_resp.status_code == 200 and len(proxy_resp.text) > 200:
-            html = proxy_resp.text
-            status_code = 200
-        else:
-            # Attempt 2: Fallback to direct curl_cffi with advanced chrome impersonation
-            response = requests.get(
-                normalized_url,
-                impersonate="chrome120",
-                headers=headers,
-                timeout=timeout,
-                allow_redirects=True,
-            )
-            status_code = response.status_code
-            if status_code == 200:
-                html = response.text
-    except Exception as exc:
-        # Final fallback to direct request if gateway fails
+    for idx, target_url in enumerate(gateways):
         try:
-            response = requests.get(
-                normalized_url,
-                impersonate="chrome110",
-                headers=headers,
-                timeout=timeout,
-                allow_redirects=True,
-            )
-            status_code = response.status_code
-            html = response.text
-        except Exception as inner_exc:
-            raise RuntimeError(f"Failed to connect to DigiALM server: {inner_exc}") from inner_exc
+            if idx < 2:
+                # Proxy gateways
+                resp = requests.get(target_url, headers=headers, timeout=timeout)
+                if resp.status_code == 200 and len(resp.text) > 200:
+                    html = resp.text
+                    status_code = 200
+                    break
+            else:
+                # Direct curl_cffi Chrome impersonation fallback
+                resp = requests.get(
+                    target_url,
+                    impersonate="chrome120",
+                    headers=headers,
+                    timeout=timeout,
+                    allow_redirects=True,
+                )
+                status_code = resp.status_code
+                if status_code == 200 and len(resp.text) > 200:
+                    html = resp.text
+                    break
+        except Exception:
+            continue
 
-    if status_code == 404:
+    if status_code == 404 or "404" in html:
         raise RuntimeError("DigiALM response sheet not found (404). Link may be invalid or expired.")
     elif status_code != 200 and not html:
         raise RuntimeError(f"DigiALM server returned status {status_code}.")
 
     if not html or len(html) < 200:
-        raise RuntimeError("Received empty or incomplete response from DigiALM.")
+        raise RuntimeError("Received empty or incomplete response from DigiALM server.")
 
     return html
 
@@ -158,13 +151,11 @@ def parse_digialm_html(html_content: str, base_url: str = "") -> Dict[str, Any]:
     questions: List[Dict[str, Any]] = []
 
     for idx, panel in enumerate(panels, start=1):
-        # A. Section Name
         section_name = "General"
         prev_lbl = panel.find_previous("div", class_="section-lbl")
         if prev_lbl:
             section_name = prev_lbl.get_text().replace("Section :", "").replace("Section:", "").strip() or section_name
 
-        # B. Chosen Option and Internal IDs from Menu Table
         chosen: Optional[str] = None
         question_id: Optional[str] = None
         option_ids: List[str] = []
@@ -179,7 +170,7 @@ def parse_digialm_html(html_content: str, base_url: str = "") -> Dict[str, Any]:
                 elif raw_chosen in ["1", "2", "3", "4"]:
                     chosen = raw_chosen
                 else:
-                    chosen = None  # '--' or empty
+                    chosen = None
 
             m_qid = re.search(r"Question ID\s*:\s*(\d+)", menu_text)
             if m_qid:
@@ -189,7 +180,6 @@ def parse_digialm_html(html_content: str, base_url: str = "") -> Dict[str, Any]:
                 if m_oid:
                     option_ids.append(m_oid.group(1))
 
-        # C. Correct Option from Question Row Table
         correct = "N/A"
         right_elems = panel.find_all(lambda tag: tag.has_attr("class") and any("rightans" in c.lower() for c in tag["class"]))
 
@@ -250,7 +240,6 @@ def parse_digialm_html(html_content: str, base_url: str = "") -> Dict[str, Any]:
                 if img.get("src") and not img["src"].startswith(("http://", "https://", "data:")):
                     img["src"] = urljoin(base_url, img["src"])
 
-        # D. Question Stem / Statement
         stem = ""
         q_row = panel.find("table", class_="questionRowTbl") or panel
 
@@ -277,7 +266,6 @@ def parse_digialm_html(html_content: str, base_url: str = "") -> Dict[str, Any]:
         if not stem:
             stem = f"Q.{idx}"
 
-        # E. Option Texts
         option_texts = []
         ans_tds = q_row.find_all(
             lambda tag: tag.name == "td" and tag.has_attr("class") and any(c in ["rightAns", "wrngAns"] for c in tag.get("class", []))
