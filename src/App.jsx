@@ -12,11 +12,10 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import HTMLFlipBook from 'react-pageflip';
 import { PortableText } from '@portabletext/react';
 import { Studio } from 'sanity';
-import { Link, Route, Routes, useLocation } from 'react-router-dom';
+import { Link, Route, Routes } from 'react-router-dom';
 import sanityConfig from '../sanity.config.js';
 import sanityClient from './sanityClient';
 import BookDetailPage from './pages/BookDetailPage';
-import RankCalculator from './pages/RankCalculator';
 import {
   BOOKS_FOR_STORE_QUERY,
   examNotificationDetailQuery,
@@ -230,7 +229,6 @@ const formatDownloadCount = (count) => (
 );
 
 function BookStoreApp() {
-  const location = useLocation();
   const { currentUser, userProfile, refreshUserProfile, logout } = useAuth();
   const { cartItems, addToCart, clearCart } = useCart();
   const [booksList, setBooksList] = useState([]);
@@ -1236,18 +1234,7 @@ function BookStoreApp() {
               <BookOpen className="h-4 w-4" />
               Study Notes & Books
             </button>
-            <Link
-              to="/rank-calculator"
-              className={`shrink-0 inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs sm:text-sm font-bold transition ${
-                location.pathname === '/rank-calculator'
-                  ? 'bg-gradient-to-r from-fuchsia-500 to-rose-500 text-white'
-                  : 'text-slate-200 hover:bg-white/10'
-              }`}
-              aria-current={location.pathname === '/rank-calculator' ? 'page' : undefined}
-            >
-              <Award className="h-4 w-4" />
-              Rank Calculator
-            </Link>
+            {/* Temporarily disabled; blogs hosted at xamtoppr.com. */}
           </div>
         </div>
 
@@ -3622,7 +3609,6 @@ export default function App() {
     <Routes>
       <Route path="/book/:slug" element={<BookDetailPage />} />
       <Route path="/my-library" element={<MyLibrary />} />
-      <Route path="/rank-calculator" element={<RankCalculator />} />
       <Route path="*" element={<LegacyAppRoutes />} />
     </Routes>
   );
