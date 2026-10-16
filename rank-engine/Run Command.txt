@@ -1,0 +1,13 @@
+cd "E:\Python Project\Rank for Web"
+agy
+
+
+
+Phir Antigravity ko bol dena:
+
+Continue the DigiALM Score & Rank Calculator project from the current state. Do not change existing functionality unless I specifically ask.
+
+localhost active karne ke liye VS Code Terminal/PowerShell me ye command chalao:
+
+cd "E:\Python Project\Rank for Web"
+python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
