@@ -26,7 +26,7 @@ The XamToppr Books web portal provides competitive-exam books, study notes, PDF 
 | `src/components/cart/CartDrawer.jsx` | Cart item list, removal, total, and checkout action |
 | `src/services/firebase.js` | Firebase app, Auth, Firestore, and local persistence initialization |
 | `src/sanityClient.js` | Public, read-only Sanity client |
-| `sanity/schemaTypes.js`, `sanity/schemas/coupon.js` | Sanity document and object schemas, including coupons |
+| `sanity/schemaTypes.js`, `sanity/masterSchemas.js`, `sanity/schemas/coupon.js` | Sanity document and object schemas, including the book taxonomy and coupons |
 | `sanity.config.js` | Embedded Studio configuration at `/admin` |
 | `api/sync-student.js` | Authenticated server-side student profile upsert |
 | `api/create-razorpay-order.js` | Creates authenticated Razorpay orders from current Sanity catalog prices |
@@ -60,6 +60,14 @@ Sanity Studio is available at `/admin`. Schemas in `sanity/schemaTypes.js` inclu
 - Supporting objects for dates, salary entries, selection stages, exam patterns, syllabus, document specifications, tables, rich notes, and guide blocks.
 
 The `studentUser` document uses a stable ID (`student_<Firebase UID>`) and fields `fullName`, `email`, `phone`, `firebaseUid`, `createdAt`, and `purchasedBooks`. Each login/profile sync updates profile fields without replacing existing orders. `purchasedBooks` contains a book reference, title snapshot, original amount, final amount paid, applied coupon code, order/payment ID, and purchase timestamp. `bookRequest` documents are also written through a server endpoint.
+
+### Book master taxonomy
+
+The **Master** section in Sanity Studio (`/admin`) manages Tracks, Platforms, Subjects, Modules, and Topics. Each document has a name, generated slug, and Active/Inactive status. Platforms reference Tracks, Subjects reference Platforms, Modules reference Subjects, and Topics reference Modules. Create parents first; a child’s parent is required.
+
+Books use optional `trackRef`, `platformRef`, `subjectRef`, `moduleRef`, and `topicRef` references. The available child references are filtered by the selected parent and inactive master documents are excluded, while leaving every book taxonomy reference optional so general books can remain uncategorized. The old free-text `exam`, `examCategory`, and `subject` fields are retained but hidden for compatibility with existing records. The storefront exposes filters for Track, Platform, Subject, and Topic, and book-detail breadcrumbs display the assigned hierarchy, falling back to legacy exam/subject metadata for older books.
+
+The repository uses Sanity rather than FastAPI: the embedded Studio provides the master CRUD interface and Sanity’s document APIs persist those records. No separate FastAPI endpoints or relational database migrations are needed for this project.
 
 Create coupon documents in Sanity Studio under **Coupon**. Coupon codes must be uppercase and may contain letters, numbers, hyphens, and underscores. Choose `percentage` or `flat`, set a positive discount value, and optionally set a minimum order amount and expiry. Toggle **Active** off to disable a coupon without deleting it. Percentage discounts are limited to 100%; a coupon must leave at least ₹0.01 payable.
 

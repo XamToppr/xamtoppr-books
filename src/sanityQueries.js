@@ -15,6 +15,17 @@ export const BOOKS_FOR_STORE_QUERY = `*[_type == "book"] | order(_createdAt desc
   exam,
   examCategory,
   subject,
+  "tracks": coalesce(
+    tracks[]->{_id, name, "slug": slug.current, isActive},
+    select(defined(trackRef) => [trackRef->{_id, name, "slug": slug.current, isActive}], [])
+  ),
+  "platforms": coalesce(
+    platforms[]->{_id, name, "slug": slug.current, isActive},
+    select(defined(platformRef) => [platformRef->{_id, name, "slug": slug.current, isActive}], [])
+  ),
+  "masterSubject": subjectRef->{_id, name, "slug": slug.current, isActive},
+  "module": moduleRef->{_id, name, "slug": slug.current, isActive},
+  "topic": topicRef->{_id, name, "slug": slug.current, isActive},
   "coverImageUrl": coverImage.asset->url,
   "samplePages": samplePages[].asset->url,
   sampleFlipbookUrl,
@@ -26,6 +37,7 @@ export const BOOKS_FOR_STORE_QUERY = `*[_type == "book"] | order(_createdAt desc
   offerPrice,
   buyUrl,
   amazonUrl,
+  flipkartUrl,
   isFeatured,
   description,
   tableOfContents[] { _key, chapterNo, title, pageRange }
@@ -46,10 +58,23 @@ export const BOOK_BY_SLUG_QUERY = `*[_type == "book" && slug.current == $slug][0
   exam,
   examCategory,
   subject,
+  "tracks": coalesce(
+    tracks[]->{name, "slug": slug.current},
+    select(defined(trackRef) => [trackRef->{name, "slug": slug.current}], [])
+  ),
+  "platforms": coalesce(
+    platforms[]->{name, "slug": slug.current},
+    select(defined(platformRef) => [platformRef->{name, "slug": slug.current}], [])
+  ),
+  "masterSubject": subjectRef->{name, "slug": slug.current},
+  "module": moduleRef->{name, "slug": slug.current},
+  "topic": topicRef->{name, "slug": slug.current},
   author,
   publisher,
   language,
   badge,
+  amazonUrl,
+  flipkartUrl,
   totalPages,
   fileSize,
   format

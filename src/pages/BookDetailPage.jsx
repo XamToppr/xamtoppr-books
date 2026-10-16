@@ -5,6 +5,7 @@ import {
   CalendarDays,
   Check,
   ChevronDown,
+  ChevronRight,
   Copy,
   ExternalLink,
   FileText,
@@ -231,6 +232,51 @@ function ChannelButton({ channel, children, className }) {
   );
 }
 
+function AffiliateMarketplaceBox({ amazonUrl, flipkartUrl, coverImage, title, badge }) {
+  if (!amazonUrl && !flipkartUrl) return null;
+
+  const marketplaces = [
+    { name: 'Amazon', url: amazonUrl, buttonLabel: '📦 Buy on Amazon', className: 'bg-amber-500 text-slate-950 hover:bg-amber-400' },
+    { name: 'Flipkart', url: flipkartUrl, buttonLabel: '🛒 Buy on Flipkart', className: 'bg-blue-700 text-white hover:bg-blue-600' }
+  ];
+
+  return (
+    <section aria-labelledby="marketplace-buy-title" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h2 id="marketplace-buy-title" className="text-base font-extrabold text-slate-950">Buy from a marketplace</h2>
+      <p className="mt-1 text-sm text-slate-600">Choose your preferred store to get this book.</p>
+      <div className="mt-4 space-y-3">
+        {marketplaces.filter((marketplace) => marketplace.url).map(({ name, url, buttonLabel, className }) => (
+          <article key={name} className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="flex min-w-0 gap-3">
+              <div className="flex h-20 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white ring-1 ring-slate-200">
+                {coverImage ? (
+                  <img src={coverImage} alt={`${title} cover`} loading="lazy" className="h-full w-full object-contain" />
+                ) : (
+                  <BookOpen className="h-8 w-8 text-slate-400" aria-hidden="true" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1 py-0.5">
+                <span className="inline-flex max-w-full truncate rounded-full bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600 ring-1 ring-slate-200">
+                  {badge || name}
+                </span>
+                <h3 className="mt-1.5 line-clamp-2 text-sm font-bold leading-snug text-slate-900">{title}</h3>
+              </div>
+            </div>
+            <a
+              href={url}
+              target="_blank"
+              rel="sponsored nofollow noopener noreferrer"
+              className={`mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-lg px-3 py-2 text-sm font-extrabold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-800 ${className}`}
+            >
+              {buttonLabel}
+            </a>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function BookDetailPage() {
   const { slug } = useParams();
   const { currentUser, userProfile, refreshUserProfile } = useAuth();
@@ -339,6 +385,14 @@ export default function BookDetailPage() {
     return categories.length ? categories.join(' · ') : exams.join(' · ');
   }, [book]);
   const categoryLabel = category || book?.subject || 'Exam Preparation';
+  const taxonomyBreadcrumbs = [
+    ...(Array.isArray(book?.tracks) ? book.tracks.map((track) => track?.name) : []),
+    ...(Array.isArray(book?.platforms) ? book.platforms.map((platform) => platform?.name) : []),
+    book?.masterSubject?.name,
+    book?.module?.name,
+    book?.topic?.name
+  ].filter(Boolean);
+  const breadcrumbItems = taxonomyBreadcrumbs.length ? taxonomyBreadcrumbs : [categoryLabel];
   const samplePdfUrl = book?.samplePdf || '';
   const relatedBooks = relatedBooksResult?.slug === slug ? relatedBooksResult.books : [];
   const relatedBooksError = relatedBooksResult?.slug === slug ? relatedBooksResult.error : '';
@@ -515,10 +569,18 @@ export default function BookDetailPage() {
               </section>
 
               <div className="order-2 min-w-0 lg:order-2">
-                <nav aria-label="Breadcrumb" className="flex min-w-0 flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
+                <nav aria-label="Breadcrumb" className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs font-semibold text-slate-500">
                   <Link to="/" className="min-h-11 inline-flex items-center text-blue-900 hover:underline">Home</Link>
-                  <span aria-hidden="true">/</span>
-                  <span className="truncate">{categoryLabel}</span>
+                  {breadcrumbItems.map((item, index) => (
+                    <span key={`${item}-${index}`} className="inline-flex min-w-0 items-center gap-1.5">
+                      <ChevronRight aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                      <span className={index === breadcrumbItems.length - 1
+                        ? 'truncate font-bold text-slate-800'
+                        : 'truncate text-slate-500'}>
+                        {item}
+                      </span>
+                    </span>
+                  ))}
                 </nav>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <span className="inline-flex min-h-7 items-center gap-1 rounded-full bg-rose-100 px-3 py-1 text-[11px] font-black tracking-wide text-rose-700">
@@ -703,6 +765,14 @@ export default function BookDetailPage() {
                     View Price &amp; Coupons
                   </a>
                 </section>
+
+                <AffiliateMarketplaceBox
+                  amazonUrl={book.amazonUrl}
+                  flipkartUrl={book.flipkartUrl}
+                  coverImage={book.coverImage}
+                  title={book.title}
+                  badge={book.badge}
+                />
 
                 <section className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
                   <h2 className="text-base font-extrabold text-slate-950">Join Our Community</h2>

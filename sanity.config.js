@@ -7,6 +7,7 @@ import { createCouponPublishAction } from './sanity/couponActions.js';
 
 const ADMIN_ROLE = 'administrator';
 const RESTRICTED_ACTIONS = new Set(['delete', 'discardChanges', 'unpublish']);
+const MASTER_TYPES = new Set(['track', 'platform', 'subject', 'module', 'topic']);
 
 export default defineConfig({
   name: 'default',
@@ -49,8 +50,24 @@ export default defineConfig({
             .title('Site Settings')
             .id('siteSettings')
             .child(S.document().schemaType('siteSettings').documentId('siteSettings')),
+          S.listItem()
+            .title('Master')
+            .id('master')
+            .child(
+              S.list()
+                .title('Master')
+                .items([
+                  S.documentTypeListItem('track').title('Track'),
+                  S.documentTypeListItem('platform').title('Platform'),
+                  S.documentTypeListItem('subject').title('Subject'),
+                  S.documentTypeListItem('module').title('Module'),
+                  S.documentTypeListItem('topic').title('Topics')
+                ])
+            ),
           S.divider(),
-          ...S.documentTypeListItems().filter((item) => item.getId() !== 'siteSettings')
+          ...S.documentTypeListItems().filter(
+            (item) => item.getId() !== 'siteSettings' && !MASTER_TYPES.has(item.getId())
+          )
         ])
     })
   ],

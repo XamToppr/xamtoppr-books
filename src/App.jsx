@@ -200,21 +200,17 @@ const SITE_CONTENT_PAGES = {
 
 const MEDIUM_OPTIONS = ['All Mediums', 'Bilingual (Hindi + English)', 'Hindi Medium', 'English Medium'];
 
-const SUBJECT_OPTIONS = [
-  'All Subjects',
-  'Quantitative Aptitude',
-  'General Studies',
-  'Reasoning Ability',
-  'General Awareness',
-  'English Language',
-  'General Science',
-  'Science',
-  'Banking Awareness',
-  'Static GK',
-  'Child Development & Pedagogy',
-  'History',
-  'Mathematics'
-];
+const getTaxonomyValues = (book, key) => {
+  const value = book[key];
+  return Array.isArray(value) ? value : value ? [value] : [];
+};
+
+const getActiveTaxonomyNames = (books, key) => [...new Set(
+  books
+    .flatMap((book) => getTaxonomyValues(book, key)
+      .map((taxonomy) => taxonomy?.isActive === false ? '' : taxonomy?.name || ''))
+    .filter(Boolean)
+)].sort((a, b) => a.localeCompare(b));
 
 const SORT_OPTIONS = [
   { label: 'Most Popular', value: 'popular' },
@@ -235,8 +231,11 @@ function BookStoreApp() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedExam, setSelectedExam] = useState('All Exams');
+  const [selectedTrack, setSelectedTrack] = useState('');
+  const [selectedPlatform, setSelectedPlatform] = useState('');
   const [selectedMedium, setSelectedMedium] = useState('All Mediums');
   const [selectedSubject, setSelectedSubject] = useState('All Subjects');
+  const [selectedTopic, setSelectedTopic] = useState('');
   const [sortBy, setSortBy] = useState('popular');
   const [savedBooks, setSavedBooks] = useState(['xt-bk-001']);
   const [selectedBookForModal, setSelectedBookForModal] = useState(null);
@@ -411,6 +410,11 @@ function BookStoreApp() {
                 ? book.examCategory.join(' / ') || 'All Competitive Exams'
                 : book.examCategory || 'All Competitive Exams',
               subject: book.subject || 'General Studies',
+              tracks: Array.isArray(book.tracks) ? book.tracks : [],
+              platforms: Array.isArray(book.platforms) ? book.platforms : [],
+              masterSubject: book.masterSubject || null,
+              module: book.module || null,
+              topic: book.topic || null,
               language,
               pages: Number(book.totalPages) || 0,
               fileSize: book.fileSize || '',
@@ -435,6 +439,7 @@ function BookStoreApp() {
               offerPrice,
               format: book.format || 'eBook (PDF)',
               amazonUrl: book.amazonUrl || '',
+              flipkartUrl: book.flipkartUrl || '',
               sampleFlipbookUrl: book.sampleFlipbookUrl || '',
               isFeatured: Boolean(book.isFeatured),
               publishedYear: new Date().getFullYear().toString(),
@@ -909,12 +914,52 @@ function BookStoreApp() {
   const handleResetFilters = () => {
     setSearchQuery('');
     setSelectedExam('All Exams');
+    setSelectedTrack('');
+    setSelectedPlatform('');
     setSelectedMedium('All Mediums');
     setSelectedSubject('All Subjects');
+    setSelectedTopic('');
     setQuickFilterBadge('ALL');
     setSortBy('popular');
     showToast('Filters cleared successfully');
   };
+
+  const scopedBooksForTaxonomy = useMemo(() => {
+    const byTrack = booksList.filter((book) => (
+      !selectedTrack || book.tracks.some((track) => track?.name === selectedTrack)
+    ));
+    const byPlatform = byTrack.filter((book) => (
+      !selectedPlatform || book.platforms.some((platform) => platform?.name === selectedPlatform)
+    ));
+    return byPlatform;
+  }, [booksList, selectedTrack, selectedPlatform]);
+
+  const taxonomyOptions = useMemo(() => {
+    const subjectBooks = scopedBooksForTaxonomy.filter((book) => (
+      selectedSubject === 'All Subjects'
+      || book.masterSubject?.name === selectedSubject
+      || book.subject === selectedSubject
+    ));
+    const subjects = [...new Set(
+      scopedBooksForTaxonomy
+        .flatMap((book) => [
+          book.masterSubject?.isActive === false ? '' : book.masterSubject?.name || '',
+          book.subject
+        ])
+        .filter(Boolean)
+    )].sort((a, b) => a.localeCompare(b));
+
+    return {
+      tracks: getActiveTaxonomyNames(booksList, 'tracks'),
+      platforms: getActiveTaxonomyNames(
+        booksList.filter((book) => !selectedTrack
+          || book.tracks.some((track) => track?.name === selectedTrack)),
+        'platforms'
+      ),
+      subjects,
+      topics: getActiveTaxonomyNames(subjectBooks, 'topic')
+    };
+  }, [booksList, scopedBooksForTaxonomy, selectedTrack, selectedSubject]);
 
   const filteredBooks = useMemo(() => {
     return booksList.filter((book) => {
@@ -923,9 +968,16 @@ function BookStoreApp() {
         const matchTitle = book.title.toLowerCase().includes(query);
         const matchSubject = book.subject.toLowerCase().includes(query);
         const matchExam = book.exam.toLowerCase().includes(query) || book.examCategory.toLowerCase().includes(query);
+        const matchTaxonomy = [
+          ...book.tracks.map((track) => track?.name),
+          ...book.platforms.map((platform) => platform?.name),
+          book.masterSubject?.name,
+          book.module?.name,
+          book.topic?.name
+        ].some((value) => value?.toLowerCase().includes(query));
         const matchAuthor = book.author.toLowerCase().includes(query);
         const matchDesc = book.descriptionText.toLowerCase().includes(query);
-        if (!matchTitle && !matchSubject && !matchExam && !matchAuthor && !matchDesc) {
+        if (!matchTitle && !matchSubject && !matchExam && !matchTaxonomy && !matchAuthor && !matchDesc) {
           return false;
         }
       }
@@ -944,6 +996,10 @@ function BookStoreApp() {
         }
       }
 
+      if (selectedTrack && !book.tracks.some((track) => track?.name === selectedTrack)) return false;
+      if (selectedPlatform && !book.platforms.some((platform) => platform?.name === selectedPlatform)) return false;
+      if (selectedTopic && book.topic?.name !== selectedTopic) return false;
+
       if (selectedMedium !== 'All Mediums') {
         if (!book.language.toLowerCase().includes(selectedMedium.toLowerCase().split(' ')[0])) {
           return false;
@@ -951,7 +1007,7 @@ function BookStoreApp() {
       }
 
       if (selectedSubject !== 'All Subjects') {
-        if (book.subject !== selectedSubject) return false;
+        if (book.masterSubject?.name !== selectedSubject && book.subject !== selectedSubject) return false;
       }
 
       if (quickFilterBadge === 'FREE' && !book.isFree) return false;
@@ -971,7 +1027,18 @@ function BookStoreApp() {
       }
       return 0;
     });
-  }, [booksList, searchQuery, selectedExam, selectedMedium, selectedSubject, quickFilterBadge, sortBy]);
+  }, [
+    booksList,
+    searchQuery,
+    selectedExam,
+    selectedTrack,
+    selectedPlatform,
+    selectedMedium,
+    selectedSubject,
+    selectedTopic,
+    quickFilterBadge,
+    sortBy
+  ]);
 
   const featuredBooks = useMemo(() => {
     const highlightedBooks = booksList.filter((book) =>
@@ -1496,8 +1563,11 @@ function BookStoreApp() {
                   <Layers className="w-4 h-4 text-blue-900" /> Select Exam Category
                 </span>
                 {(selectedExam !== 'All Exams' ||
+                  selectedTrack ||
+                  selectedPlatform ||
                   selectedMedium !== 'All Mediums' ||
                   selectedSubject !== 'All Subjects' ||
+                  selectedTopic ||
                   quickFilterBadge !== 'ALL' ||
                   searchQuery) && (
                   <button
@@ -1543,7 +1613,83 @@ function BookStoreApp() {
             </div>
 
             {/* Dropdown Filters */}
-            <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs sm:text-sm">
+            <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 text-xs sm:text-sm">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Track
+                </label>
+                <select
+                  value={selectedTrack}
+                  onChange={(e) => {
+                    setSelectedTrack(e.target.value);
+                    setSelectedPlatform('');
+                    setSelectedSubject('All Subjects');
+                    setSelectedTopic('');
+                  }}
+                  className="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs sm:text-sm rounded-lg py-2 pl-3 pr-8 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 cursor-pointer"
+                >
+                  <option value="">All Tracks</option>
+                  {taxonomyOptions.tracks.map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Platform
+                </label>
+                <select
+                  value={selectedPlatform}
+                  onChange={(e) => {
+                    setSelectedPlatform(e.target.value);
+                    setSelectedSubject('All Subjects');
+                    setSelectedTopic('');
+                  }}
+                  className="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs sm:text-sm rounded-lg py-2 pl-3 pr-8 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 cursor-pointer"
+                >
+                  <option value="">All Platforms</option>
+                  {taxonomyOptions.platforms.map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Subject
+                </label>
+                <select
+                  value={selectedSubject}
+                  onChange={(e) => {
+                    setSelectedSubject(e.target.value);
+                    setSelectedTopic('');
+                  }}
+                  className="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs sm:text-sm rounded-lg py-2 pl-3 pr-8 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 cursor-pointer"
+                >
+                  <option value="All Subjects">All Subjects</option>
+                  {taxonomyOptions.subjects.map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Topic
+                </label>
+                <select
+                  value={selectedTopic}
+                  onChange={(e) => setSelectedTopic(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs sm:text-sm rounded-lg py-2 pl-3 pr-8 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 cursor-pointer"
+                >
+                  <option value="">All Topics</option>
+                  {taxonomyOptions.topics.map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
                   Medium / Language
@@ -1553,23 +1699,8 @@ function BookStoreApp() {
                   onChange={(e) => setSelectedMedium(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs sm:text-sm rounded-lg py-2 pl-3 pr-8 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 cursor-pointer"
                 >
-                  {MEDIUM_OPTIONS.map((m) => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                  Subject / Topic
-                </label>
-                <select
-                  value={selectedSubject}
-                  onChange={(e) => setSelectedSubject(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs sm:text-sm rounded-lg py-2 pl-3 pr-8 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 cursor-pointer"
-                >
-                  {SUBJECT_OPTIONS.map((s) => (
-                    <option key={s} value={s}>{s}</option>
+                  {MEDIUM_OPTIONS.map((medium) => (
+                    <option key={medium} value={medium}>{medium}</option>
                   ))}
                 </select>
               </div>

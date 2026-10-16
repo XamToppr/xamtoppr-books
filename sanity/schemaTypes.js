@@ -1,6 +1,7 @@
 import { createElement } from 'react';
 import { defineArrayMember, defineField, defineType, PatchEvent, set } from 'sanity';
 import coupon from './schemas/coupon.js';
+import { masterTypes } from './masterSchemas.js';
 
 const examCategorySuggestions = ['SSC', 'Railway', 'Banking', 'Teaching', 'Defence', 'State Exams', 'UPSC'];
 
@@ -608,7 +609,7 @@ const book = defineType({
   type: 'document',
   groups: [
     { name: 'details', title: 'Book Details', default: true },
-    { name: 'taxonomy', title: 'Exam & Subject' },
+    { name: 'taxonomy', title: 'Exam & Taxonomy' },
     { name: 'media', title: 'Media & Specifications' },
     { name: 'pricing', title: 'Pricing & Links' },
     { name: 'metrics', title: 'Ratings & Activity' }
@@ -678,28 +679,127 @@ const book = defineType({
       initialValue: 'Hindi'
     }),
     defineField({
-      name: 'exam',
-      title: 'Exam / Conducting Body',
+      name: 'tracks',
+      title: 'Tracks',
       type: 'array',
       group: 'taxonomy',
-      of: [defineArrayMember({ type: 'string' })],
-      options: { layout: 'tags' },
-      description: 'Enter one or more conducting bodies. Common values: SSC, Railway (RRB), Banking (IBPS/SBI), Defense, Teaching, Bihar State, UP State, MP State, Rajasthan State, Haryana State, and Other State Exams. Custom values are supported.'
+      of: [
+        defineArrayMember({
+          type: 'reference',
+          to: [{ type: 'track' }],
+          options: {
+            filter: () => ({ filter: 'isActive == true' })
+          }
+        })
+      ]
+    }),
+    defineField({
+      name: 'platforms',
+      title: 'Platforms',
+      type: 'array',
+      group: 'taxonomy',
+      of: [
+        defineArrayMember({
+          type: 'reference',
+          to: [{ type: 'platform' }],
+          options: {
+            filter: ({ document }) => {
+              const trackIds = document?.tracks
+                ?.map((track) => track?._ref)
+                .filter(Boolean);
+              return trackIds?.length
+                ? { filter: 'isActive == true && track._ref in $trackIds', params: { trackIds } }
+                : { filter: 'isActive == true' };
+            }
+          }
+        })
+      ]
+    }),
+    defineField({
+      name: 'trackRef',
+      title: 'Legacy Track',
+      type: 'reference',
+      group: 'taxonomy',
+      to: [{ type: 'track' }],
+      hidden: true
+    }),
+    defineField({
+      name: 'platformRef',
+      title: 'Legacy Platform',
+      type: 'reference',
+      group: 'taxonomy',
+      to: [{ type: 'platform' }],
+      hidden: true
+    }),
+    defineField({
+      name: 'subjectRef',
+      title: 'Subject',
+      type: 'reference',
+      group: 'taxonomy',
+      to: [{ type: 'subject' }],
+      options: {
+        filter: ({ document }) => {
+          const platformIds = document?.platforms
+            ?.map((platform) => platform?._ref)
+            .filter(Boolean);
+          return platformIds?.length
+            ? { filter: 'isActive == true && platform._ref in $platformIds', params: { platformIds } }
+            : { filter: 'isActive == true' };
+        }
+      }
+    }),
+    defineField({
+      name: 'moduleRef',
+      title: 'Module',
+      type: 'reference',
+      group: 'taxonomy',
+      to: [{ type: 'module' }],
+      options: {
+        filter: ({ document }) => {
+          const subjectId = document?.subjectRef?._ref;
+          return subjectId
+            ? { filter: 'isActive == true && subject._ref == $subjectId', params: { subjectId } }
+            : { filter: 'isActive == true' };
+        }
+      }
+    }),
+    defineField({
+      name: 'topicRef',
+      title: 'Topic',
+      type: 'reference',
+      group: 'taxonomy',
+      to: [{ type: 'topic' }],
+      options: {
+        filter: ({ document }) => {
+          const moduleId = document?.moduleRef?._ref;
+          return moduleId
+            ? { filter: 'isActive == true && module._ref == $moduleId', params: { moduleId } }
+            : { filter: 'isActive == true' };
+        }
+      }
+    }),
+    defineField({
+      name: 'exam',
+      title: 'Legacy Exam / Conducting Body',
+      type: 'array',
+      group: 'taxonomy',
+      hidden: true,
+      of: [defineArrayMember({ type: 'string' })]
     }),
     defineField({
       name: 'examCategory',
-      title: 'Exam Categories',
+      title: 'Legacy Exam Categories',
       type: 'array',
       group: 'taxonomy',
-      of: [defineArrayMember({ type: 'string' })],
-      description: 'Add exams covered, such as CGL, CHSL, MTS, NTPC, Group D, Daroga/SI, or Constable.'
+      hidden: true,
+      of: [defineArrayMember({ type: 'string' })]
     }),
     defineField({
       name: 'subject',
-      title: 'Subject',
+      title: 'Legacy Subject',
       type: 'string',
       group: 'taxonomy',
-      description: 'Enter any subject, such as Maths, Reasoning, Static GK, History, Geography, or Computer.'
+      hidden: true
     }),
     defineField({
       name: 'coverImage',
@@ -758,6 +858,7 @@ const book = defineType({
     }),
     defineField({ name: 'buyUrl', title: 'Checkout / Payment URL', type: 'url', group: 'pricing' }),
     defineField({ name: 'amazonUrl', title: 'Amazon URL', type: 'url', group: 'pricing' }),
+    defineField({ name: 'flipkartUrl', title: 'Flipkart URL', type: 'url', group: 'pricing' }),
     defineField({
       name: 'isFeatured',
       title: 'Featured Book',
@@ -1115,6 +1216,7 @@ const siteSettings = defineType({
 });
 
 export const schemaTypes = [
+  ...masterTypes,
   book,
   dynamicTableRow,
   dynamicTable,
