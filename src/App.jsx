@@ -4,6 +4,7 @@ import CartDrawer from './components/cart/CartDrawer';
 import CouponField from './components/coupon/CouponField';
 import Footer from './components/Footer';
 import MyLibrary from './components/profile/MyLibrary';
+import VideoCoursesPage from './pages/VideoCoursesPage';
 import { useAuth } from './context/AuthContext';
 import { useCart } from './context/CartContext';
 import { logUserActivity } from './services/activityTracker';
@@ -12,7 +13,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import HTMLFlipBook from 'react-pageflip';
 import { PortableText } from '@portabletext/react';
 import { Studio } from 'sanity';
-import { Link, Route, Routes } from 'react-router-dom';
+import { Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import sanityConfig from '../sanity.config.js';
 import sanityClient from './sanityClient';
 import BookDetailPage from './pages/BookDetailPage';
@@ -53,7 +54,8 @@ import {
   CalendarDays,
   Bell,
   ClipboardList,
-  FileCheck2
+  FileCheck2,
+  PlayCircle
 } from 'lucide-react';
 
 const EXAM_CATEGORIES = [
@@ -225,6 +227,8 @@ const formatDownloadCount = (count) => (
 );
 
 function BookStoreApp() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const { currentUser, userProfile, refreshUserProfile, logout } = useAuth();
   const { cartItems, addToCart, clearCart } = useCart();
   const [booksList, setBooksList] = useState([]);
@@ -260,6 +264,7 @@ function BookStoreApp() {
   const [isMobileFullscreen, setIsMobileFullscreen] = useState(false);
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
   const [currentTab, setCurrentTab] = useState('books');
+  const visibleTab = location.pathname.startsWith('/video-courses') ? 'video' : currentTab;
   const [selectedBlog, setSelectedBlog] = useState(null);
   const [selectedBlogDetail, setSelectedBlogDetail] = useState(null);
   const [isLoadingBlogDetail, setIsLoadingBlogDetail] = useState(false);
@@ -1196,9 +1201,9 @@ function BookStoreApp() {
               <a href="https://www.xamtoppr.com/" className="whitespace-nowrap rounded-lg px-2 py-2 text-slate-200 transition hover:bg-white/5 hover:text-white">
                 Home
               </a>
-              <a href="https://xamtoppr.com/video" className="whitespace-nowrap rounded-lg px-2 py-2 text-slate-200 transition hover:bg-white/5 hover:text-white">
-                Courses
-              </a>
+              <Link to="/video-courses" className="whitespace-nowrap rounded-lg px-2 py-2 text-slate-200 transition hover:bg-white/5 hover:text-white">
+                Video Courses
+              </Link>
               <a href="https://xamtoppr.com/package/combo" className="whitespace-nowrap rounded-lg px-2 py-2 text-slate-200 transition hover:bg-white/5 hover:text-white">
                 Test Series
               </a>
@@ -1290,16 +1295,35 @@ function BookStoreApp() {
                 setMobileMenuOpen(false);
                 setCurrentTab('books');
                 setSelectedBlog(null);
+                navigate('/');
               }}
               className={`shrink-0 inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs sm:text-sm font-bold transition ${
-                currentTab === 'books'
+                visibleTab === 'books'
                   ? 'bg-amber-400 text-slate-950'
                   : 'text-slate-200 hover:bg-white/10'
               }`}
-              aria-pressed={currentTab === 'books'}
+              aria-pressed={visibleTab === 'books'}
             >
               <BookOpen className="h-4 w-4" />
               Study Notes & Books
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setCurrentTab('video');
+                setSelectedBlog(null);
+                navigate('/video-courses');
+              }}
+              className={`shrink-0 inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs sm:text-sm font-bold transition ${
+                visibleTab === 'video'
+                  ? 'bg-amber-400 text-slate-950'
+                  : 'text-slate-200 hover:bg-white/10'
+              }`}
+              aria-pressed={visibleTab === 'video'}
+            >
+              <PlayCircle className="h-4 w-4" />
+              Video Courses
             </button>
             {/* Temporarily disabled; blogs hosted at xamtoppr.com. */}
           </div>
@@ -1310,9 +1334,9 @@ function BookStoreApp() {
             <a href="https://www.xamtoppr.com/" onClick={() => setMobileMenuOpen(false)} className="block w-full text-left px-3 py-2.5 rounded-lg text-slate-200 hover:bg-blue-900/50">
               Home
             </a>
-            <a href="https://xamtoppr.com/video" onClick={() => setMobileMenuOpen(false)} className="block w-full text-left px-3 py-2.5 rounded-lg text-slate-200 hover:bg-blue-900/50">
-              Courses
-            </a>
+            <Link to="/video-courses" onClick={() => setMobileMenuOpen(false)} className="block w-full text-left px-3 py-2.5 rounded-lg text-slate-200 hover:bg-blue-900/50">
+              Video Courses
+            </Link>
             <a href="https://xamtoppr.com/package/combo" onClick={() => setMobileMenuOpen(false)} className="block w-full text-left px-3 py-2.5 rounded-lg text-slate-200 hover:bg-blue-900/50">
               Test Series
             </a>
@@ -1390,7 +1414,7 @@ function BookStoreApp() {
       </header>
 
       <main className="flex-1 pb-16">
-        {currentTab === 'books' ? (
+        {visibleTab === 'books' ? (
           <>
         {/* Featured Books Carousel */}
         <section
@@ -2717,6 +2741,8 @@ function BookStoreApp() {
               </article>
             );
           })()
+        ) : visibleTab === 'video' ? (
+          <VideoCoursesPage />
         ) : (
           <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
             <div className="rounded-3xl bg-gradient-to-br from-[#0c2356] via-indigo-900 to-fuchsia-900 p-6 sm:p-9 text-white shadow-xl">
@@ -3740,6 +3766,7 @@ export default function App() {
     <Routes>
       <Route path="/book/:slug" element={<BookDetailPage />} />
       <Route path="/my-library" element={<MyLibrary />} />
+      <Route path="/video-courses/*" element={<BookStoreApp />} />
       <Route path="*" element={<LegacyAppRoutes />} />
     </Routes>
   );

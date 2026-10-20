@@ -20,14 +20,16 @@ The XamToppr Books web portal provides competitive-exam books, study notes, PDF 
 | --- | --- |
 | `src/App.jsx` | Store UI, book viewer and flipbook, book-request form, routing, checkout, and Sanity content reads |
 | `src/pages/BookDetailPage.jsx` | `/book/:slug` book details, share metadata and links, coupons, and single-book checkout |
+| `src/pages/VideoCoursesPage.jsx` | Sanity-backed video course storefront, standalone class filtering, lesson navigation, and player |
+| `src/sanityQueries.js` | GROQ queries for books, video packs, standalone online classes, notifications, and site settings |
 | `src/context/AuthContext.jsx` | Firebase auth state, Firestore user profile, duplicate-phone check, and student sync request |
 | `src/context/CartContext.jsx` | Persistent cart state and cart actions |
 | `src/components/profile/MyLibrary.jsx` | `/my-library` page backed by the signed-in user's Firestore purchase fields and Sanity catalog |
 | `src/components/cart/CartDrawer.jsx` | Cart item list, removal, total, and checkout action |
 | `src/services/firebase.js` | Firebase app, Auth, Firestore, and local persistence initialization |
 | `src/sanityClient.js` | Public, read-only Sanity client |
-| `sanity/schemaTypes.js`, `sanity/masterSchemas.js`, `sanity/schemas/coupon.js` | Sanity document and object schemas, including the book taxonomy and coupons |
-| `sanity.config.js` | Embedded Studio configuration at `/admin` |
+| `sanity/schemaTypes.js`, `sanity/masterSchemas.js`, `sanity/schemas/coupon.js`, `sanity/schemas/videoCoursePack.js`, `sanity/schemas/onlineClass.js` | Sanity document and object schemas, including taxonomy, coupons, video packs, and standalone classes |
+| `sanity.config.js` | Embedded Studio configuration and taxonomy-filtered Online Course Classes desk at `/admin` |
 | `api/sync-student.js` | Authenticated server-side student profile upsert |
 | `api/create-razorpay-order.js` | Creates authenticated Razorpay orders from current Sanity catalog prices |
 | `api/verify-razorpay-payment.js` | Verifies Razorpay payment signature/capture and records the purchase |
@@ -68,6 +70,12 @@ The **Master** section in Sanity Studio (`/admin`) manages Tracks, Platforms, Su
 Books use optional `trackRef`, `platformRef`, `subjectRef`, `moduleRef`, and `topicRef` references. The available child references are filtered by the selected parent and inactive master documents are excluded, while leaving every book taxonomy reference optional so general books can remain uncategorized. The old free-text `exam`, `examCategory`, and `subject` fields are retained but hidden for compatibility with existing records. The storefront exposes filters for Track, Platform, Subject, and Topic, and book-detail breadcrumbs display the assigned hierarchy, falling back to legacy exam/subject metadata for older books.
 
 The repository uses Sanity rather than FastAPI: the embedded Studio provides the master CRUD interface and Sanity’s document APIs persist those records. No separate FastAPI endpoints or relational database migrations are needed for this project.
+
+The header's **Video Courses** tab opens a responsive storefront backed by Sanity `videoCoursePack` documents. Each pack maps Tracks, Platforms, Subjects, and an explicit `classes` array of references to centralized `onlineClass` documents. Each class maps through the Master Taxonomy hierarchy (Track → Platform → Subject → Module → Topic). Manage classes from the dedicated **Online Course Classes** section in Sanity Studio. Its **Browse by Master Taxonomy** list drills through Track, Platform, Subject, Module, and Topic to show matching classes; each reference field in a class document is filtered by its selected parent. New class videos are no longer edited inside course packs; the old embedded lesson field is hidden and retained only as a storefront compatibility fallback for existing content.
+
+**Explore** opens `/video-courses/:slug`, with Description, Time Table, Syllabus / Planner, Demo Videos, and a content tab titled by the admin-selected Live Class or Recorded Video mode. The content tab drills from subject through module and topic to the pack's explicitly referenced classes. Long-format videos play in a responsive 16:9 modal; short reels use a vertical 9:16 player. YouTube watch, share, Shorts, and embed links are normalized to privacy-enhanced embed URLs; Vimeo links and hosted MP4/WebM/OGG files are also supported. The player modal can show class PDF notes and a related book card.
+
+`VIDEO_COURSE_PACKS_QUERY` returns Instant packs and Scheduled packs whose publishing date has passed; Draft and future-scheduled packs stay out of the storefront. The query expands only the classes explicitly referenced by each pack and the storefront hides Inactive classes. Class playback links and PDF URLs are omitted for paid packs; paid lessons remain locked because course checkout/entitlements are not connected. Sanity documents must also be published for public queries to return them; the pack's Scheduled status controls storefront visibility but does not automatically publish the Sanity document. Sanity's public dataset and query endpoint are not an access-control boundary: do not store private paid playback URLs in published documents; use authenticated server-side entitlement checks and signed/private media URLs before enabling paid playback. Learner progress persistence is also not connected yet.
 
 Create coupon documents in Sanity Studio under **Coupon**. Coupon codes must be uppercase and may contain letters, numbers, hyphens, and underscores. Choose `percentage` or `flat`, set a positive discount value, and optionally set a minimum order amount and expiry. Toggle **Active** off to disable a coupon without deleting it. Percentage discounts are limited to 100%; a coupon must leave at least ₹0.01 payable.
 

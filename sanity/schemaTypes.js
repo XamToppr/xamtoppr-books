@@ -1,6 +1,13 @@
 import { createElement } from 'react';
 import { defineArrayMember, defineField, defineType, PatchEvent, set } from 'sanity';
 import coupon from './schemas/coupon.js';
+import videoCoursePack, {
+  videoCourseDemoVideo,
+  videoCourseLesson,
+  videoCoursePlannerItem,
+  videoCourseScheduleItem
+} from './schemas/videoCoursePack.js';
+import onlineClass from './schemas/onlineClass.js';
 import { masterTypes } from './masterSchemas.js';
 
 const examCategorySuggestions = ['SSC', 'Railway', 'Banking', 'Teaching', 'Defence', 'State Exams', 'UPSC'];
@@ -1218,6 +1225,12 @@ const siteSettings = defineType({
 export const schemaTypes = [
   ...masterTypes,
   book,
+  videoCoursePack,
+  onlineClass,
+  videoCourseLesson,
+  videoCourseScheduleItem,
+  videoCoursePlannerItem,
+  videoCourseDemoVideo,
   dynamicTableRow,
   dynamicTable,
   richNoteBlock,

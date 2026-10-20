@@ -80,6 +80,105 @@ export const BOOK_BY_SLUG_QUERY = `*[_type == "book" && slug.current == $slug][0
   format
 }`;
 
+const VIDEO_COURSE_PACK_PROJECTION = `{
+  _id,
+  title,
+  "slug": slug.current,
+  packPurpose,
+  packType,
+  deliveryMode,
+  price,
+  duration,
+  shortDescription,
+  description,
+  "thumbnailUrl": thumbnail.asset->url,
+  "tracks": tracks[]->{_id, name, "slug": slug.current},
+  "platforms": platforms[]->{_id, name, "slug": slug.current},
+  "subjectRefs": subjects[]->{_id, name, "slug": slug.current},
+  "classes": classes[]->{
+    _id,
+    title,
+    "slug": slug.current,
+    status,
+    videoType,
+    duration,
+    teacherName,
+    description,
+    "videoLink": select(^.packType == "Free" => videoLink, null),
+    "imageUrl": image.asset->url,
+    "classPdfUrl": select(^.packType == "Free" => classPdf.asset->url, null),
+    "mappedBook": mappedBook->{
+      _id,
+      title,
+      "slug": slug.current,
+      author,
+      "coverImageUrl": coverImage.asset->url,
+      offerPrice,
+      mrp,
+      buyUrl
+    },
+    "track": track->{_id, name, "slug": slug.current},
+    "platform": platform->{_id, name, "slug": slug.current},
+    "subject": subject->{_id, name, "slug": slug.current},
+    "module": module->{_id, name, "slug": slug.current},
+    "topic": topic->{_id, name, "slug": slug.current}
+  },
+  publishingStatus,
+  publishingDate,
+  timeTable[] { _key, sessionTitle, day, date, startTime, endTime, notes },
+  "syllabusPlanner": syllabusPlanner[]{
+    _key,
+    week,
+    title,
+    details,
+    "module": module->{_id, name, "slug": slug.current},
+    "topic": topic->{_id, name, "slug": slug.current}
+  },
+  "demoVideos": demoVideos[]{
+    _key,
+    videoTitle,
+    videoType,
+    videoUrl,
+    duration
+  },
+  "videos": videos[]{
+    _key,
+    videoTitle,
+    videoType,
+    "videoUrl": select(^.packType == "Free" => videoUrl, null),
+    duration,
+    "subject": subject->{_id, name, "slug": slug.current},
+    "topic": topic->{
+      _id,
+      name,
+      "slug": slug.current,
+      "module": module->{
+        _id,
+        name,
+        "slug": slug.current,
+        "subject": subject->{_id, name, "slug": slug.current}
+      }
+    }
+  }
+}`;
+
+export const VIDEO_COURSE_PACKS_QUERY = `*[
+  _type == "videoCoursePack"
+  && (
+    publishingStatus == "Instant"
+    || (publishingStatus == "Scheduled" && publishingDate <= now())
+  )
+] | order(_createdAt desc) ${VIDEO_COURSE_PACK_PROJECTION}`;
+
+export const VIDEO_COURSE_PACK_BY_SLUG_QUERY = `*[
+  _type == "videoCoursePack"
+  && slug.current == $slug
+  && (
+    publishingStatus == "Instant"
+    || (publishingStatus == "Scheduled" && publishingDate <= now())
+  )
+][0] ${VIDEO_COURSE_PACK_PROJECTION}`;
+
 export const siteSettingsQuery = `*[_type == "siteSettings" && _id == "siteSettings"][0] {
   supportHelpline,
   supportEmail,

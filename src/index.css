@@ -1,1 +1,26 @@
 @import "tailwindcss";
+
+@keyframes video-modal-backdrop-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes video-modal-panel-enter {
+  from { opacity: 0; transform: translateY(1rem) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.video-modal-backdrop {
+  animation: video-modal-backdrop-enter 180ms ease-out both;
+}
+
+.video-modal-panel {
+  animation: video-modal-panel-enter 220ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .video-modal-backdrop,
+  .video-modal-panel {
+    animation-duration: 1ms;
+  }
+}
