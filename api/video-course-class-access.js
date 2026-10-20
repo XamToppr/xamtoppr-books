@@ -3,6 +3,18 @@ import { verifyFirebaseIdToken } from '../server/studentProfileSync.js';
 import { isCourseEntitlementActive } from '../src/utils/courseValidity.js';
 
 const getString = (value) => (typeof value === 'string' ? value.trim() : '');
+const normalizeCourseId = (value) => getString(value).replace(/^drafts\./, '');
+const getEntitlementCourseId = (entry) => (
+  typeof entry === 'string'
+    ? entry
+    : entry?.course?._ref
+      || entry?.courseId
+      || entry?.course?._id
+      || entry?.course
+      || entry?._ref
+      || entry?._id
+      || entry?.id
+);
 
 class VideoCourseAccessError extends Error {
   constructor(status, message) {
@@ -51,13 +63,14 @@ export async function getVideoCourseClassAccess({ body, authorization, env }) {
     const [course, student] = await Promise.all([
       sanity.fetch(`*[
         _type == "videoCoursePack"
-        && _id == $courseId
+        && (_id == $courseId || slug.current == $courseId)
         && (
           publishingStatus == "Instant"
           || (publishingStatus == "Scheduled" && defined(publishingDate) && publishingDate <= now())
         )
       ][0]{
         _id,
+        "slug": slug.current,
         packType,
         duration,
         "classIds": classes[]->_id,
@@ -73,12 +86,17 @@ export async function getVideoCourseClassAccess({ body, authorization, env }) {
     if (!course || (!isMappedClass && !legacyLesson)) {
       throw new VideoCourseAccessError(404, 'The class is not part of this published course.');
     }
-    const entitlements = course.packType === 'Free'
-      ? (student?.enrolledCourses || [])
-      : (student?.purchasedCourses || []);
-    const courseEntitlements = entitlements.filter((entry) => entry?.course?._ref === courseId);
+    const courseIdentifiers = new Set(
+      [course._id, course.slug].map(normalizeCourseId).filter(Boolean)
+    );
+    const courseEntitlements = [
+      ...(Array.isArray(student?.purchasedCourses) ? student.purchasedCourses : []),
+      ...(Array.isArray(student?.enrolledCourses) ? student.enrolledCourses : []),
+      ...(Array.isArray(student?.purchasedCourseIds) ? student.purchasedCourseIds : []),
+      ...(Array.isArray(student?.enrolledCourseIds) ? student.enrolledCourseIds : [])
+    ].filter((entry) => courseIdentifiers.has(normalizeCourseId(getEntitlementCourseId(entry))));
     if (!courseEntitlements.length) {
-      throw new VideoCourseAccessError(403, 'Enroll in this course to access the class.');
+      throw new VideoCourseAccessError(403, 'Purchase or enroll in this course to access the class.');
     }
     if (!courseEntitlements.some((entry) => isCourseEntitlementActive(entry, course.duration))) {
       throw new VideoCourseAccessError(410, 'Course validity has expired. Renew the course to continue learning.');
