@@ -6,6 +6,7 @@ import {
   PaymentRequestError,
   verifyRazorpayPayment
 } from './server/razorpayPayments.js'
+import { getVideoCourseClassAccess } from './api/video-course-class-access.js'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -261,6 +262,9 @@ const localUserActivityApi = (env) => {
           const action = getString(body.action)
           const bookId = getString(body.bookId)
           const bookTitle = getString(body.bookTitle)
+          const productType = getString(body.productType) || 'book'
+          const courseId = getString(body.courseId)
+          const courseTitle = getString(body.courseTitle)
           const phone = getString(body.phone)
           const reason = getString(body.reason)
           const amount = body.amount
@@ -268,9 +272,11 @@ const localUserActivityApi = (env) => {
             || env.VITE_FIREBASE_API_KEY
             || env.FIREBASE_WEB_API_KEY
           if (!uid || !Object.hasOwn(USER_ACTIVITY_COIN_VALUES, action) || bookId.length > 200
-            || bookTitle.length > 300 || phone.length > 32
+            || bookTitle.length > 300 || courseId.length > 200 || courseTitle.length > 300
+            || phone.length > 32 || !['book', 'videoCoursePack'].includes(productType)
             || (['checkout_initiated', 'payment_dropped', 'payment_failed', 'payment_abandoned'].includes(action)
-              && (!bookId || !bookTitle || !reason || reason.length > 500
+              && (!(productType === 'videoCoursePack' ? courseId && courseTitle : bookId && bookTitle)
+                || !reason || reason.length > 500
                 || !Number.isFinite(amount) || amount < 0))) {
             response.statusCode = 400
             response.end(JSON.stringify({ success: false, error: 'Activity details are invalid.' }))
@@ -301,6 +307,9 @@ const localUserActivityApi = (env) => {
             action,
             bookId,
             bookTitle,
+            productType,
+            courseId,
+            courseTitle,
             phone,
             reason,
             amount
@@ -319,6 +328,11 @@ const localUserActivityApi = (env) => {
             response.end(JSON.stringify({ success: false, error: 'Authentication is invalid or expired.' }))
             return
           }
+          if (error.code === 'COURSE_NOT_ENROLLABLE') {
+            response.statusCode = 409
+            response.end(JSON.stringify({ success: false, error: error.message }))
+            return
+          }
           console.error('Failed to sync local student activity to Sanity:', error)
           response.statusCode = 500
           response.end(JSON.stringify({ success: false, error: 'Unable to sync student activity to Sanity.' }))
@@ -334,7 +348,8 @@ const localRazorpayApi = (env) => ({
   configureServer(server) {
     const endpoints = {
       '/api/create-razorpay-order': createRazorpayOrder,
-      '/api/verify-razorpay-payment': verifyRazorpayPayment
+      '/api/verify-razorpay-payment': verifyRazorpayPayment,
+      '/api/video-course-class-access': getVideoCourseClassAccess
     }
 
     Object.entries(endpoints).forEach(([path, endpoint]) => {
@@ -374,6 +389,11 @@ const localRazorpayApi = (env) => ({
           response.end(JSON.stringify({ success: true, ...result }))
         } catch (error) {
           if (error instanceof PaymentRequestError) {
+            response.statusCode = error.status
+            response.end(JSON.stringify({ success: false, error: error.message }))
+            return
+          }
+          if (Number.isInteger(error.status)) {
             response.statusCode = error.status
             response.end(JSON.stringify({ success: false, error: error.message }))
             return

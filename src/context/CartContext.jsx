@@ -29,29 +29,31 @@ export function CartProvider({ children }) {
     }
   }, [cartItems]);
 
-  const addToCart = (book) => {
-    const bookId = book?.sanityId || book?.id;
-    if (!bookId || !book?.title) {
-      throw new Error('A valid book is required to add it to the cart.');
+  const addToCart = (product) => {
+    const productId = product?.sanityId || product?.id;
+    if (!productId || !product?.title) {
+      throw new Error('A valid product is required to add it to the cart.');
     }
-    if (cartItemsRef.current.some((item) => item.id === bookId)) return;
+    if (cartItemsRef.current.some((item) => item.id === productId)) return;
 
     const nextItems = [...cartItemsRef.current, {
-      id: bookId,
-      sanityId: book.sanityId || bookId,
-      title: book.title,
-      price: Number(book.offerPrice) || 0,
-      displayPrice: book.price || '',
-      coverImage: book.coverImage || '',
-      pdfUrl: book.pdfUrl || '',
-      samplePdfUrl: book.samplePdfUrl || ''
+      id: productId,
+      sanityId: product.sanityId || productId,
+      productType: product.productType || 'book',
+      packPurpose: product.packPurpose || '',
+      slug: product.slug || '',
+      title: product.title,
+      price: Number(product.offerPrice ?? product.price) || 0,
+      displayPrice: product.displayPrice || '',
+      coverImage: product.coverImage || '',
+      pdfUrl: product.pdfUrl || '',
+      samplePdfUrl: product.samplePdfUrl || ''
     }];
     cartItemsRef.current = nextItems;
     setCartItems(nextItems);
-    void logUserActivity('add_to_cart', {
-      bookId,
-      bookTitle: book.title
-    });
+    void logUserActivity('add_to_cart', product.productType === 'videoCoursePack'
+      ? { courseId: productId, courseTitle: product.title, productType: 'videoCoursePack' }
+      : { bookId: productId, bookTitle: product.title, productType: 'book' });
   };
 
   const removeFromCart = (bookId) => {

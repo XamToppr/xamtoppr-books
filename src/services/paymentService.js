@@ -3,6 +3,11 @@ import loadRazorpay from '../utils/loadRazorpay';
 
 const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID;
 
+const getPaymentItem = (item) => ({
+  productType: item.productType || 'book',
+  productId: item.sanityId || item.id
+});
+
 async function postPaymentRequest(path, body, user) {
   const idToken = await user.getIdToken();
   const response = await fetch(path, {
@@ -52,8 +57,11 @@ export async function initiatePayment({
     const logResults = await Promise.all(items.map((item) => logCheckoutActivity({
       user,
       action,
-      bookId: item.sanityId || item.id,
-      bookTitle: item.title,
+      bookId: item.productType === 'videoCoursePack' ? '' : item.sanityId || item.id,
+      bookTitle: item.productType === 'videoCoursePack' ? '' : item.title,
+      courseId: item.productType === 'videoCoursePack' ? item.sanityId || item.id : '',
+      courseTitle: item.productType === 'videoCoursePack' ? item.title : '',
+      productType: item.productType || 'book',
       amount: Number(item.finalAmount ?? item.amount ?? item.price ?? item.offerPrice),
       phone: phone || user.phoneNumber || user.phone || '',
       reason
@@ -70,10 +78,10 @@ export async function initiatePayment({
 
   try {
     if (!user?.uid || typeof user.getIdToken !== 'function') {
-      throw new Error('Sign in before purchasing books.');
+      throw new Error('Sign in before completing checkout.');
     }
     if (!Array.isArray(items) || items.length === 0) {
-      throw new Error('Add at least one book before checkout.');
+      throw new Error('Add at least one item before checkout.');
     }
     if (!Number.isFinite(Number(totalAmount)) || Number(totalAmount) <= 0) {
       throw new Error('The total purchase amount is invalid.');
@@ -81,8 +89,11 @@ export async function initiatePayment({
     const checkoutResults = await Promise.all(items.map((item) => logCheckoutActivity({
       user,
       action: 'checkout_initiated',
-      bookId: item.sanityId || item.id,
-      bookTitle: item.title,
+      bookId: item.productType === 'videoCoursePack' ? '' : item.sanityId || item.id,
+      bookTitle: item.productType === 'videoCoursePack' ? '' : item.title,
+      courseId: item.productType === 'videoCoursePack' ? item.sanityId || item.id : '',
+      courseTitle: item.productType === 'videoCoursePack' ? item.title : '',
+      productType: item.productType || 'book',
       amount: Number(item.finalAmount ?? item.amount ?? item.price ?? item.offerPrice),
       phone: phone || user.phoneNumber || user.phone || '',
       reason: 'User initiated checkout'
@@ -97,7 +108,7 @@ export async function initiatePayment({
     if (!loaded) throw new Error('Unable to load the Razorpay payment window. Please try again.');
 
     const order = await postPaymentRequest('/api/create-razorpay-order', {
-      items: items.map((item) => ({ bookId: item.sanityId || item.id })),
+      items: items.map(getPaymentItem),
       expectedAmount: Math.round(Number(totalAmount) * 100),
       couponCode
     }, user);
@@ -111,7 +122,7 @@ export async function initiatePayment({
       name: 'XamToppr',
       description: order.items.length === 1
         ? order.items[0].title
-        : `Purchase of ${order.items.length} Books`,
+        : `Purchase of ${order.items.length} Items`,
       prefill: {
         name: user.displayName || '',
         email: user.email || '',

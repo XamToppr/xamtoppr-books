@@ -774,11 +774,13 @@ function BookStoreApp() {
       if (cartItems.some((item) => item.id === (book.sanityId || book.id))) {
         setShowCartDrawer(true);
       } else {
-        showToast(`Added "${book.title}" to your cart.`);
+        showToast(book.productType === 'videoCoursePack'
+          ? `Added video course "${book.title}" to your cart.`
+          : `Added "${book.title}" to your cart.`);
       }
     } catch (error) {
-      console.error('Unable to add this book to the cart:', error);
-      showToast('This book could not be added to your cart.');
+      console.error('Unable to add this product to the cart:', error);
+      showToast('This item could not be added to your cart.');
     }
   };
 
@@ -806,7 +808,17 @@ function BookStoreApp() {
       clearCart,
       onSuccess: () => {
         paymentInProgressRef.current = false;
-        window.location.assign('/my-library');
+        if (items.length === 1 && items[0].productType === 'videoCoursePack' && items[0].slug) {
+          navigate(`/video-courses/${encodeURIComponent(items[0].slug)}`);
+        } else {
+          const containsCourse = items.some((item) => item.productType === 'videoCoursePack');
+          if (containsCourse) {
+            navigate('/video-courses');
+            showToast('Payment successful. Your video course is now available.');
+          } else {
+            window.location.assign('/my-library');
+          }
+        }
       },
       onFailure: (error) => {
         paymentInProgressRef.current = false;
@@ -814,6 +826,46 @@ function BookStoreApp() {
       }
     });
   };
+
+  const handleBuyVideoCourse = (course) => {
+    handleAddToCart({
+      ...course,
+      id: course.id,
+      sanityId: course.id,
+      productType: 'videoCoursePack',
+      offerPrice: course.price,
+      displayPrice: `₹${Number(course.price).toLocaleString('en-IN')}`,
+      coverImage: course.thumbnailUrl || '',
+      packPurpose: course.packPurpose || 'Individual'
+    });
+    setShowCartDrawer(true);
+  };
+
+  const handleEnrollVideoCourse = async (course) => {
+    if (!currentUser) {
+      setShowCheckoutAuthModal(true);
+      return false;
+    }
+    return logUserActivity('enroll_free_course', {
+      courseId: course.id,
+      courseTitle: course.title,
+      productType: 'videoCoursePack',
+      phone: userProfile?.phone || ''
+    });
+  };
+
+  const enrolledCourseIds = [
+    ...(Array.isArray(userProfile?.enrolledCourseIds) ? userProfile.enrolledCourseIds : []),
+    ...(Array.isArray(userProfile?.enrolledCourses)
+      ? userProfile.enrolledCourses.map((course) => course.courseId).filter(Boolean)
+      : [])
+  ];
+  const purchasedCourseIds = [
+    ...(Array.isArray(userProfile?.purchasedCourseIds) ? userProfile.purchasedCourseIds : []),
+    ...(Array.isArray(userProfile?.purchasedCourses)
+      ? userProfile.purchasedCourses.map((course) => course.courseId).filter(Boolean)
+      : [])
+  ];
 
   const handleBookRating = (book, userStar) => {
     if (!book.sanityId) return false;
@@ -2742,7 +2794,13 @@ function BookStoreApp() {
             );
           })()
         ) : visibleTab === 'video' ? (
-          <VideoCoursesPage />
+          <VideoCoursesPage
+            onBuyCourse={handleBuyVideoCourse}
+            onEnrollCourse={handleEnrollVideoCourse}
+            onRequireAuth={() => setShowCheckoutAuthModal(true)}
+            enrolledCourseIds={enrolledCourseIds}
+            purchasedCourseIds={purchasedCourseIds}
+          />
         ) : (
           <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
             <div className="rounded-3xl bg-gradient-to-br from-[#0c2356] via-indigo-900 to-fuchsia-900 p-6 sm:p-9 text-white shadow-xl">

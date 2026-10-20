@@ -11,6 +11,7 @@ const ALLOWED_ACTIVITY_ACTIONS = new Set([
   'read_sample_pdf',
   'view_book_detail',
   'daily_login_visit',
+  'enroll_free_course',
   'add_to_cart',
   'purchase_complete'
 ]);
@@ -50,6 +51,9 @@ export default async function handler(request, response) {
   const action = getString(body.action);
   const bookId = getString(body.bookId);
   const bookTitle = getString(body.bookTitle);
+  const productType = getString(body.productType) || 'book';
+  const courseId = getString(body.courseId);
+  const courseTitle = getString(body.courseTitle);
   const phone = getString(body.phone);
   const reason = getString(body.reason);
   const amount = Number(body.amount) || 0;
@@ -65,7 +69,9 @@ export default async function handler(request, response) {
     || process.env.VITE_FIREBASE_API_KEY
     || process.env.FIREBASE_WEB_API_KEY;
   if (!uid || !ALLOWED_ACTIVITY_ACTIONS.has(action) || bookId.length > 200
-    || bookTitle.length > 300 || phone.length > 32 || reason.length > 500) {
+    || bookTitle.length > 300 || courseId.length > 200 || courseTitle.length > 300
+    || phone.length > 32 || reason.length > 500
+    || !['book', 'videoCoursePack'].includes(productType)) {
     return response.status(400).json({ success: false, error: 'Activity details are invalid.' });
   }
   if (action === 'purchase_complete') {
@@ -109,6 +115,9 @@ export default async function handler(request, response) {
       action,
       bookId,
       bookTitle,
+      productType,
+      courseId,
+      courseTitle,
       phone,
       reason,
       amount
@@ -117,6 +126,9 @@ export default async function handler(request, response) {
     console.log("Logged Activity Successfully:", request.body);
     return response.status(200).json({ success: true, activityId: result.activityId });
   } catch (error) {
+    if (error.code === 'COURSE_NOT_ENROLLABLE') {
+      return response.status(409).json({ success: false, error: error.message });
+    }
     console.error('Failed to write student activity to Sanity:', error);
     return response.status(500).json({ success: false, error: 'Unable to sync student activity to Sanity.' });
   }

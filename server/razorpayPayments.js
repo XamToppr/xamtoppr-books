@@ -157,31 +157,69 @@ export async function createRazorpayOrder({ body, authorization, env }) {
   const firebaseApiKey = getString(body.firebaseApiKey)
     || env.VITE_FIREBASE_API_KEY
     || env.FIREBASE_WEB_API_KEY;
-  await authenticate(authorization, uid, firebaseApiKey);
+  const firebaseUser = await authenticate(authorization, uid, firebaseApiKey);
 
   const requestedItems = Array.isArray(body.items) ? body.items : [];
   const expectedAmount = Number(body.expectedAmount);
-  const bookIds = requestedItems.map((item) => getString(item?.bookId));
-  if (bookIds.length === 0 || bookIds.length > 20
-    || bookIds.some((id) => !id || id.length > 200)
-    || new Set(bookIds).size !== bookIds.length
+  const products = requestedItems.map((item) => ({
+    productType: getString(item?.productType) || 'book',
+    productId: getString(item?.productId || item?.bookId)
+  }));
+  const productIds = products.map((item) => item.productId);
+  if (products.length === 0 || products.length > 20
+    || products.some((item) => !['book', 'videoCoursePack'].includes(item.productType)
+      || !item.productId || item.productId.length > 200)
+    || new Set(productIds).size !== productIds.length
     || !Number.isSafeInteger(expectedAmount) || expectedAmount <= 0) {
-    throw new PaymentRequestError(400, 'The selected books are invalid.');
+    throw new PaymentRequestError(400, 'The selected products are invalid.');
   }
 
   const sanity = getSanityClient(env);
   const catalog = await sanity.fetch(
-    '*[_type == "book" && _id in $bookIds]{_id, title, offerPrice}',
-    { bookIds }
+    `*[_id in $productIds && (
+      _type == "book"
+      || (
+        _type == "videoCoursePack"
+        && packType == "Paid"
+        && publishingStatus in ["Instant", "Scheduled"]
+        && (
+          publishingStatus == "Instant"
+          || (defined(publishingDate) && publishingDate <= now())
+        )
+      )
+    )]{
+      _id,
+      _type,
+      title,
+      offerPrice,
+      price,
+      packPurpose
+    }`,
+    { productIds }
   );
-  const catalogById = new Map(catalog.map((book) => [book._id, book]));
-  const items = bookIds.map((bookId) => {
-    const book = catalogById.get(bookId);
-    const amount = Number(book?.offerPrice);
-    if (!book || !Number.isFinite(amount) || amount <= 0) {
-      throw new PaymentRequestError(400, 'A selected book is unavailable or has no valid price.');
+  const catalogById = new Map(catalog.map((product) => [product._id, product]));
+  const requestedCourseIds = products
+    .filter((item) => item.productType === 'videoCoursePack')
+    .map((item) => item.productId);
+  if (requestedCourseIds.length) {
+    const student = await sanity.getDocument(`student_${firebaseUser.localId}`);
+    const purchasedCourseIds = new Set((student?.purchasedCourses || [])
+      .map((purchase) => purchase?.course?._ref)
+      .filter(Boolean));
+    if (requestedCourseIds.some((courseId) => purchasedCourseIds.has(courseId))) {
+      throw new PaymentRequestError(409, 'You already own one of the selected video courses.');
     }
-    return { bookId, title: book.title || 'Book', amount };
+  }
+  const items = products.map(({ productType, productId }) => {
+    const product = catalogById.get(productId);
+    const amount = Number(productType === 'book' ? product?.offerPrice : product?.price);
+    if (product?._type !== productType) {
+      throw new PaymentRequestError(400, 'A selected product is unavailable for purchase.');
+    }
+    if (!product || !Number.isFinite(amount) || amount <= 0) {
+      throw new PaymentRequestError(400, 'A selected product is unavailable or has no valid price.');
+    }
+    return { productType, productId, title: product.title || 'Product', packPurpose: product.packPurpose || '', amount };
   });
 
   const subtotalPaise = Math.round(items.reduce((sum, item) => sum + item.amount, 0) * 100);
@@ -204,7 +242,7 @@ export async function createRazorpayOrder({ body, authorization, env }) {
     throw new PaymentRequestError(400, 'The order amount is invalid.');
   }
   if (amountPaise !== expectedAmount) {
-    throw new PaymentRequestError(409, 'The catalog price changed. Refresh the book list and try again.');
+    throw new PaymentRequestError(409, 'The catalog price changed. Refresh the catalog and try again.');
   }
 
   const config = getPaymentConfig(env);
@@ -244,17 +282,31 @@ async function recordSanityPurchase(client, firebaseUser, phone, paymentId, orde
   }
 
   const purchasedAt = new Date().toISOString();
-  const purchases = orderPayload.items.map((item) => ({
-    _key: randomUUID(),
-    _type: 'object',
-    book: { _type: 'reference', _ref: item.bookId },
-    bookTitle: item.title,
-    amount: item.amount,
-    finalAmount: item.finalAmount,
-    appliedCoupon: orderPayload.coupon?.code || '',
-    orderId: paymentId,
-    purchasedAt
-  }));
+  const bookPurchases = orderPayload.items.filter((item) => item.productType === 'book')
+    .map((item) => ({
+      _key: randomUUID(),
+      _type: 'object',
+      book: { _type: 'reference', _ref: item.productId },
+      bookTitle: item.title,
+      amount: item.amount,
+      finalAmount: item.finalAmount,
+      appliedCoupon: orderPayload.coupon?.code || '',
+      orderId: paymentId,
+      purchasedAt
+    }));
+  const coursePurchases = orderPayload.items.filter((item) => item.productType === 'videoCoursePack')
+    .map((item) => ({
+      _key: randomUUID(),
+      _type: 'object',
+      course: { _type: 'reference', _ref: item.productId },
+      courseTitle: item.title,
+      amount: item.amount,
+      finalAmount: item.finalAmount,
+      appliedCoupon: orderPayload.coupon?.code || '',
+      orderId: paymentId,
+      purchasedAt
+    }));
+  const singleItem = orderPayload.items.length === 1 ? orderPayload.items[0] : null;
   const student = await client.getDocument(studentId);
   const totalCoins = (Number(student?.totalCoins) || 0) + PURCHASE_COINS;
   const activity = {
@@ -265,13 +317,25 @@ async function recordSanityPurchase(client, firebaseUser, phone, paymentId, orde
     studentName: firebaseUser.displayName || 'Student',
     phone,
     email: firebaseUser.email || '',
-    ...(orderPayload.items.length === 1
+    ...(singleItem?.productType === 'book'
       ? {
-        book: { _type: 'reference', _ref: orderPayload.items[0].bookId },
-        bookId: orderPayload.items[0].bookId,
-        bookTitle: orderPayload.items[0].title
+        book: { _type: 'reference', _ref: singleItem.productId },
+        bookId: singleItem.productId,
+        bookTitle: singleItem.title,
+        productType: 'book'
       }
-      : { bookTitle: `${orderPayload.items.length} books` }),
+      : {}),
+    ...(singleItem?.productType === 'videoCoursePack'
+      ? {
+        videoCoursePack: { _type: 'reference', _ref: singleItem.productId },
+        courseId: singleItem.productId,
+        bookTitle: singleItem.title,
+        productType: 'videoCoursePack'
+      }
+      : {}),
+    ...(orderPayload.items.length > 1
+      ? { bookTitle: `${orderPayload.items.length} products`, productType: 'mixed' }
+      : {}),
     action: 'purchase_complete',
     amount: orderPayload.amount / 100,
     coinsEarned: PURCHASE_COINS,
@@ -288,28 +352,33 @@ async function recordSanityPurchase(client, firebaseUser, phone, paymentId, orde
     firebaseUid: firebaseUser.localId,
     createdAt: new Date().toISOString(),
     totalCoins: 0,
-    purchasedBooks: []
+    purchasedBooks: [],
+    purchasedCourses: []
   };
   await client.createIfNotExists(newStudent);
   try {
     await client.transaction()
-      .patch(studentId, (patch) => patch
-        .set({
-          fullName: firebaseUser.displayName || 'Student',
-          email: firebaseUser.email || '',
-          phone,
-          firebaseUid: firebaseUser.localId,
-          leadStatus: 'CONVERTED',
-          latestActivityTimestamp: purchasedAt
-        })
-        .setIfMissing({ totalCoins: 0, purchasedBooks: [], activities: [] })
-        .append('purchasedBooks', purchases)
-        .append('activities', [{
-          _key: randomUUID(),
-          _type: 'reference',
-          _ref: activityId
-        }])
-        .inc({ totalCoins: PURCHASE_COINS }))
+      .patch(studentId, (patch) => {
+        let updatedPatch = patch
+          .set({
+            fullName: firebaseUser.displayName || 'Student',
+            email: firebaseUser.email || '',
+            phone,
+            firebaseUid: firebaseUser.localId,
+            leadStatus: 'CONVERTED',
+            latestActivityTimestamp: purchasedAt
+          })
+          .setIfMissing({ totalCoins: 0, purchasedBooks: [], purchasedCourses: [], activities: [] });
+        if (bookPurchases.length) updatedPatch = updatedPatch.append('purchasedBooks', bookPurchases);
+        if (coursePurchases.length) updatedPatch = updatedPatch.append('purchasedCourses', coursePurchases);
+        return updatedPatch
+          .append('activities', [{
+            _key: randomUUID(),
+            _type: 'reference',
+            _ref: activityId
+          }])
+          .inc({ totalCoins: PURCHASE_COINS });
+      })
       .create(activity)
       .commit();
   } catch (error) {
@@ -395,7 +464,9 @@ export async function verifyRazorpayPayment({ body, authorization, env }) {
 
   const purchasedAt = new Date().toISOString();
   const purchases = orderPayload.items.map((item) => ({
-    bookId: item.bookId,
+    productType: item.productType,
+    productId: item.productId,
+    ...(item.productType === 'book' ? { bookId: item.productId } : { courseId: item.productId }),
     title: item.title,
     amount: item.amount,
     finalAmount: item.finalAmount,
@@ -407,14 +478,17 @@ export async function verifyRazorpayPayment({ body, authorization, env }) {
 
   const sanity = getSanityClient(env);
   try {
+    const purchasedBookIds = orderPayload.items
+      .filter((item) => item.productType === 'book')
+      .map((item) => item.productId);
     const books = await sanity.fetch(
       '*[_type == "book" && _id in $bookIds]{_id, "pdfUrl": fullPdfFile.asset->url}',
-      { bookIds: orderPayload.items.map((item) => item.bookId) }
+      { bookIds: purchasedBookIds }
     );
     const pdfUrlsByBookId = new Map(books.map((book) => [book._id, book.pdfUrl || null]));
-    pdfUrls = orderPayload.items.map((item) => ({
-      bookId: item.bookId,
-      pdfUrl: pdfUrlsByBookId.get(item.bookId) || null
+    pdfUrls = purchasedBookIds.map((bookId) => ({
+      bookId,
+      pdfUrl: pdfUrlsByBookId.get(bookId) || null
     }));
   } catch (sanityErr) {
     console.error('Unable to resolve purchased PDF URLs from Sanity:', sanityErr);

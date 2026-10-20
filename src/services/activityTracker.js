@@ -12,6 +12,7 @@ export const ACTIVITY_COIN_VALUES = Object.freeze({
   daily_login_visit: 10,
   view_book_detail: 5,
   read_sample_pdf: 15,
+  enroll_free_course: 0,
   add_to_cart: 20,
   purchase_complete: 50,
   checkout_initiated: 0,
@@ -24,7 +25,10 @@ const getLocalDate = () => new Date().toLocaleDateString('en-CA');
 
 const getActivityDetails = (details) => ({
   bookId: typeof details.bookId === 'string' ? details.bookId : '',
-  bookTitle: typeof details.bookTitle === 'string' ? details.bookTitle : ''
+  bookTitle: typeof details.bookTitle === 'string' ? details.bookTitle : '',
+  productType: typeof details.productType === 'string' ? details.productType : 'book',
+  courseId: typeof details.courseId === 'string' ? details.courseId : '',
+  courseTitle: typeof details.courseTitle === 'string' ? details.courseTitle : ''
 });
 
 export async function logCheckoutActivity({
@@ -34,7 +38,10 @@ export async function logCheckoutActivity({
   bookTitle,
   amount,
   phone = '',
-  reason
+  reason,
+  productType = 'book',
+  courseId = '',
+  courseTitle = ''
 }) {
   if (!currentUser) return false;
 
@@ -50,8 +57,11 @@ export async function logCheckoutActivity({
       body: JSON.stringify({
         uid: currentUser.uid,
         action,
-        bookId,
-        bookTitle,
+        bookId: productType === 'videoCoursePack' ? '' : bookId,
+        bookTitle: productType === 'videoCoursePack' ? '' : bookTitle,
+        courseId: courseId || (productType === 'videoCoursePack' ? bookId : ''),
+        courseTitle: courseTitle || (productType === 'videoCoursePack' ? bookTitle : ''),
+        productType,
         amount,
         phone,
         reason,
@@ -78,9 +88,37 @@ export async function logUserActivity(actionType, details = {}) {
       && (!verifiedPayment?.paymentId || !Array.isArray(verifiedPayment.purchases)
         || verifiedPayment.purchases.length === 0))) return false;
 
+  const activityDetails = getActivityDetails(details);
+  if (actionType === 'enroll_free_course') {
+    try {
+      const idToken = await user.getIdToken();
+      const response = await fetch('/api/log-user-activity', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`
+        },
+        body: JSON.stringify({
+          uid: user.uid,
+          action: actionType,
+          ...activityDetails,
+          productType: activityDetails.productType,
+          phone: typeof details.phone === 'string' ? details.phone : '',
+          firebaseApiKey: auth.app.options.apiKey
+        })
+      });
+      const responseBody = await response.json();
+      if (!response.ok) {
+        throw new Error(responseBody.error || `Course enrollment failed with status ${response.status}.`);
+      }
+    } catch (error) {
+      console.error('Unable to validate and save the free course enrollment:', error);
+      return false;
+    }
+  }
+
   const userRef = doc(db, 'users', user.uid);
   const activityRef = doc(collection(db, 'userActivities'));
-  const activityDetails = getActivityDetails(details);
 
   try {
     const result = await runTransaction(db, async (transaction) => {
@@ -122,11 +160,11 @@ export async function logUserActivity(actionType, details = {}) {
       };
       if (actionType === 'daily_login_visit') userUpdates.lastDailyVisitDate = visitDate;
       if (actionType === 'purchase_complete') {
-        userUpdates.purchasedBookIds = arrayUnion(
-          ...verifiedPayment.purchases.map((purchase) => purchase.bookId)
-        );
-        userUpdates.purchasedBooks = arrayUnion(
-          ...verifiedPayment.purchases.map((purchase) => ({
+        const bookPurchases = verifiedPayment.purchases.filter((purchase) => (purchase.productType || 'book') === 'book');
+        const coursePurchases = verifiedPayment.purchases.filter((purchase) => purchase.productType === 'videoCoursePack');
+        if (bookPurchases.length) {
+          userUpdates.purchasedBookIds = arrayUnion(...bookPurchases.map((purchase) => purchase.productId || purchase.bookId));
+          userUpdates.purchasedBooks = arrayUnion(...bookPurchases.map((purchase) => ({
             bookId: purchase.bookId,
             bookTitle: purchase.title,
             price: purchase.finalAmount ?? purchase.amount,
@@ -135,9 +173,25 @@ export async function logUserActivity(actionType, details = {}) {
             appliedCoupon: purchase.appliedCoupon || '',
             paymentId: verifiedPayment.paymentId,
             purchasedAt: purchase.purchasedAt
-          }))
-        );
+          })));
+        }
+        if (coursePurchases.length) {
+          userUpdates.purchasedCourseIds = arrayUnion(...coursePurchases.map((purchase) => purchase.productId || purchase.courseId));
+          userUpdates.purchasedCourses = arrayUnion(...coursePurchases.map((purchase) => ({
+            courseId: purchase.productId || purchase.courseId,
+            courseTitle: purchase.title,
+            price: purchase.finalAmount ?? purchase.amount,
+            amount: purchase.amount,
+            finalAmount: purchase.finalAmount ?? purchase.amount,
+            appliedCoupon: purchase.appliedCoupon || '',
+            paymentId: verifiedPayment.paymentId,
+            purchasedAt: purchase.purchasedAt
+          })));
+        }
         userUpdates.processedPaymentIds = arrayUnion(verifiedPayment.paymentId);
+      }
+      if (actionType === 'enroll_free_course' && activityDetails.courseId) {
+        userUpdates.enrolledCourseIds = arrayUnion(activityDetails.courseId);
       }
 
       transaction.set(activityRef, activity);
@@ -146,7 +200,7 @@ export async function logUserActivity(actionType, details = {}) {
     });
 
     if (!result.logged) return false;
-    if (actionType === 'purchase_complete') return true;
+    if (actionType === 'purchase_complete' || actionType === 'enroll_free_course') return true;
 
     try {
       const idToken = await user.getIdToken();

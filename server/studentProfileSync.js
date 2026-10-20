@@ -36,7 +36,9 @@ export function syncStudentDocument(client, firebaseUser, phone, profile = {}) {
     phone,
     firebaseUid: firebaseUser.localId,
     createdAt,
-    purchasedBooks: []
+    purchasedBooks: [],
+    purchasedCourses: [],
+    enrolledCourses: []
   }).then(() => client.patch(documentId)
     .set({
       fullName: profile.fullName || firebaseUser.displayName || 'Student',
@@ -44,7 +46,12 @@ export function syncStudentDocument(client, firebaseUser, phone, profile = {}) {
       phone,
       firebaseUid: firebaseUser.localId
     })
-    .setIfMissing({ createdAt, purchasedBooks: [] })
+    .setIfMissing({
+      createdAt,
+      purchasedBooks: [],
+      purchasedCourses: [],
+      enrolledCourses: []
+    })
     .commit());
 }
 

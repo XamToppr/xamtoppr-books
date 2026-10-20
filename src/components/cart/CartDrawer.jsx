@@ -44,9 +44,9 @@ export default function CartDrawer({ isOpen, onClose, onProceedCheckout }) {
           <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
             <ShoppingCart className="h-12 w-12 text-slate-300" />
             <p className="mt-4 font-bold text-slate-800">Your cart is empty</p>
-            <p className="mt-1 text-sm text-slate-500">Add a book to get started.</p>
+            <p className="mt-1 text-sm text-slate-500">Add a book or video course to get started.</p>
             <a href="/" onClick={onClose} className="mt-5 rounded-lg bg-blue-950 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-900">
-              Explore Books
+              Explore Catalog
             </a>
           </div>
         ) : (
@@ -62,6 +62,11 @@ export default function CartDrawer({ isOpen, onClose, onProceedCheckout }) {
                   <div className="min-w-0 flex-1">
                     <h3 className="line-clamp-2 text-sm font-bold text-slate-900">{book.title}</h3>
                     <p className="mt-1 text-sm font-extrabold text-emerald-700">{formatPrice(book.price)}</p>
+                    {book.productType === 'videoCoursePack' && (
+                      <p className="mt-1 text-xs font-medium text-slate-500">
+                        Video course{book.packPurpose ? ` · ${book.packPurpose}` : ''}
+                      </p>
+                    )}
                   </div>
                   <button
                     type="button"

@@ -6,6 +6,7 @@ import {
   CalendarDays,
   ChevronDown,
   ChevronLeft,
+  Check,
   Clock3,
   ListChecks,
   Play,
@@ -14,6 +15,7 @@ import {
   X
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import sanityClient from '../sanityClient';
 import {
   VIDEO_COURSE_PACKS_QUERY
@@ -36,6 +38,7 @@ const uniqueValues = (items) => [...new Set(items.filter(Boolean))]
 
 const mapVideo = (video, pack, kind = 'lesson') => ({
   id: `${pack._id}-${kind}-${video._key || video.videoTitle}`,
+  lessonKey: kind === 'lesson' ? video._key : '',
   title: video.videoTitle,
   type: video.videoType,
   url: video.videoUrl,
@@ -46,6 +49,8 @@ const mapVideo = (video, pack, kind = 'lesson') => ({
   module: video.topic?.module?.name || '',
   topicId: video.topic?._id || '',
   topic: video.topic?.name || '',
+  courseId: pack._id,
+  packType: pack.packType,
   packTitle: pack.title,
   tracks: pack.tracks || [],
   platforms: pack.platforms || []
@@ -54,6 +59,7 @@ const mapVideo = (video, pack, kind = 'lesson') => ({
 const mapOnlineClass = (onlineClass, pack) => ({
   id: onlineClass._id,
   classId: onlineClass._id,
+  courseId: pack._id,
   title: onlineClass.title,
   type: onlineClass.videoType,
   url: onlineClass.videoLink || '',
@@ -80,7 +86,10 @@ const mapPack = (pack, index) => {
     .map((video) => mapVideo(video, pack));
   const onlineClasses = (pack.classes || [])
     .filter((onlineClass) => onlineClass?.status === 'Active' && onlineClass?._id && onlineClass?.title)
-    .map((onlineClass) => mapOnlineClass(onlineClass, pack));
+    .map((onlineClass) => ({
+      ...mapOnlineClass(onlineClass, pack),
+      packType: pack.packType || 'Free'
+    }));
   const demoVideos = (pack.demoVideos || []).filter((video) => video?.videoTitle)
     .map((video) => mapVideo(video, pack, 'demo'));
   const courseVideos = onlineClasses.length ? onlineClasses : videos;
@@ -210,9 +219,16 @@ function VideoPlayer({ video }) {
   );
 }
 
-function VideoCoursesPage() {
+function VideoCoursesPage({
+  onBuyCourse,
+  onEnrollCourse,
+  onRequireAuth,
+  enrolledCourseIds = [],
+  purchasedCourseIds = []
+}) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
   const [courses, setCourses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -223,6 +239,12 @@ function VideoCoursesPage() {
   const [topic, setTopic] = useState('');
   const [search, setSearch] = useState('');
   const [activeVideo, setActiveVideo] = useState(null);
+  const [isPlayerLoading, setIsPlayerLoading] = useState(false);
+  const [playerError, setPlayerError] = useState('');
+  const [enrollingCourseId, setEnrollingCourseId] = useState('');
+  const [enrollmentError, setEnrollmentError] = useState('');
+  const [localEnrolledCourseIds, setLocalEnrolledCourseIds] = useState([]);
+  const playerRequestId = React.useRef(0);
   const [detailNavigation, setDetailNavigation] = useState(null);
   const courseSlug = useMemo(() => {
     const match = location.pathname.match(/^\/video-courses\/([^/]+)\/?$/);
@@ -244,6 +266,12 @@ function VideoCoursesPage() {
     ...updates
   }));
   const detailCourse = courses.find((course) => course.slug === courseSlug);
+  const accessibleCourseIds = new Set([
+    ...enrolledCourseIds,
+    ...purchasedCourseIds,
+    ...localEnrolledCourseIds
+  ]);
+  const isDetailCourseAccessible = detailCourse && accessibleCourseIds.has(detailCourse.id);
 
   useEffect(() => {
     let isCurrentRequest = true;
@@ -343,7 +371,10 @@ function VideoCoursesPage() {
   ];
 
   function closePlayer() {
+    playerRequestId.current += 1;
     setActiveVideo(null);
+    setIsPlayerLoading(false);
+    setPlayerError('');
   }
 
   useEffect(() => {
@@ -362,9 +393,79 @@ function VideoCoursesPage() {
     };
   }, [activeVideo]);
 
-  const openVideo = (video) => {
-    if (video.classId && video.packType !== 'Free') return;
+  const openVideo = async (video) => {
+    if (video.packType !== 'Free' && !accessibleCourseIds.has(video.courseId)) return;
+    const requestId = playerRequestId.current + 1;
+    playerRequestId.current = requestId;
     setActiveVideo(video);
+    setPlayerError('');
+    setIsPlayerLoading(Boolean((video.classId || video.lessonKey) && !video.url));
+    if ((!video.classId && !video.lessonKey) || video.url) return;
+    if (!currentUser) {
+      closePlayer();
+      onRequireAuth?.();
+      return;
+    }
+
+    try {
+      const idToken = await currentUser.getIdToken();
+      const response = await fetch('/api/video-course-class-access', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`
+        },
+        body: JSON.stringify({
+          uid: currentUser.uid,
+          courseId: video.courseId,
+          classId: video.classId,
+          lessonKey: video.lessonKey || '',
+          firebaseApiKey: import.meta.env.VITE_FIREBASE_API_KEY
+        })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'This class could not be loaded.');
+      if (requestId !== playerRequestId.current) return;
+      setActiveVideo((current) => (
+        current?.id === video.id
+          ? {
+            ...current,
+            url: result.videoLink || '',
+            type: result.videoType || current.type,
+            classPdfUrl: result.classPdfUrl || current.classPdfUrl
+          }
+          : current
+      ));
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+      console.error(`Failed to load entitled course class "${video.title}":`, error);
+      if (requestId === playerRequestId.current) {
+        setPlayerError(error.message || 'This video could not be loaded. Please try again.');
+      }
+    } finally {
+      if (requestId === playerRequestId.current) setIsPlayerLoading(false);
+    }
+  };
+
+  const enrollFreeCourse = async (course) => {
+    if (!currentUser) {
+      onRequireAuth?.();
+      return;
+    }
+    setEnrollmentError('');
+    setEnrollingCourseId(course.id);
+    try {
+      const enrolled = await onEnrollCourse?.(course);
+      if (enrolled === false) throw new Error('Enrollment could not be saved. Please try again.');
+      setLocalEnrolledCourseIds((current) => (
+        current.includes(course.id) ? current : [...current, course.id]
+      ));
+    } catch (error) {
+      console.error(`Failed to enroll in video course "${course.title}":`, error);
+      setEnrollmentError(error.message || 'Enrollment could not be saved. Please try again.');
+    } finally {
+      setEnrollingCourseId('');
+    }
   };
 
   const resetFilters = () => {
@@ -657,12 +758,26 @@ function VideoCoursesPage() {
                                 </div>
                                 <button
                                   type="button"
-                                  onClick={() => openVideo({ ...video, packType: detailCourse.packType })}
-                                  disabled={detailCourse.packType !== 'Free' || (!video.classId && !video.url)}
+                                  onClick={() => {
+                                    if (!isDetailCourseAccessible && detailCourse.packType === 'Free') {
+                                      void enrollFreeCourse(detailCourse);
+                                    } else {
+                                      void openVideo({ ...video, packType: detailCourse.packType });
+                                    }
+                                  }}
+                                  disabled={
+                                    (!isDetailCourseAccessible && detailCourse.packType !== 'Free')
+                                    || (!isDetailCourseAccessible && detailCourse.packType === 'Free' && enrollingCourseId === detailCourse.id)
+                                    || (!video.classId && !video.lessonKey && !video.url)
+                                  }
                                   className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0c2356] px-4 py-2 text-xs font-extrabold text-white transition hover:bg-blue-900 disabled:cursor-not-allowed disabled:bg-slate-300"
                                 >
                                   <Play className="h-3.5 w-3.5 fill-current" />
-                                  {detailCourse.packType !== 'Free' || (!video.classId && !video.url) ? 'Enrollment required' : 'Watch Now'}
+                                  {!isDetailCourseAccessible && detailCourse.packType === 'Free'
+                                    ? 'Enroll Free'
+                                    : !isDetailCourseAccessible
+                                      ? 'Purchase required'
+                                      : 'Watch Now'}
                                 </button>
                               </article>
                             ))}
@@ -728,7 +843,7 @@ function VideoCoursesPage() {
             </button>
           </div>
           <p className="mt-4 text-xs leading-5 text-slate-500">
-            Showing published video packs with their mapped lessons. Course progress and pack checkout are not connected yet.
+            Buy paid packs through the secure cart and coupon checkout, or enroll in a free course to save access to your account.
           </p>
         </section>
 
@@ -748,72 +863,80 @@ function VideoCoursesPage() {
           ) : loadError ? (
             <p role="alert" className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm font-medium text-rose-800">{loadError}</p>
           ) : filteredCourses.length ? (
-            <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filteredCourses.map((course) => (
-                <article key={course.id} className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
-                  <div className={`relative flex h-44 items-end overflow-hidden bg-gradient-to-br ${course.accent} p-5 text-white`}>
+                <article key={course.id} className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-200 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl">
+                  <div className={`relative aspect-video overflow-hidden bg-gradient-to-br ${course.accent}`}>
                     {course.thumbnailUrl && (
-                      <img src={course.thumbnailUrl} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+                      <img src={course.thumbnailUrl} alt="" className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]" loading="lazy" />
                     )}
-                    <div className="absolute -right-5 -top-8 h-40 w-40 rounded-full border-[20px] border-white/10" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-slate-950/15 to-transparent" />
-                    <div className="relative">
-                      <span className="rounded-full border border-white/30 bg-slate-950/30 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider">
-                        {course.platforms.map((item) => item.name).filter(Boolean).join(' · ') || course.packPurpose}
-                      </span>
-                      <h3 className="mt-3 text-xl font-black leading-tight">{course.title}</h3>
-                    </div>
-                    <span className={`absolute right-4 top-4 rounded-full px-3 py-1.5 text-xs font-extrabold shadow ${course.packType === 'Free' ? 'bg-emerald-300 text-emerald-950' : 'bg-amber-300 text-amber-950'}`}>
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/35 via-transparent to-transparent" />
+                    <span className={`absolute right-3 top-3 rounded-full px-3 py-1 text-[11px] font-extrabold shadow ${course.packType === 'Free' ? 'bg-emerald-300 text-emerald-950' : 'bg-amber-300 text-amber-950'}`}>
                       {course.packType}
                     </span>
-                  </div>
-                  <div className="flex flex-1 flex-col p-5">
-                    <p className="text-sm leading-6 text-slate-600">{course.description}</p>
-                    {course.richDescription.length > 0 && (
-                      <div className="prose prose-sm mt-3 max-w-none text-slate-600">
-                        <PortableText value={course.richDescription} />
-                      </div>
+                    {course.platforms[0]?.name && (
+                      <span className="absolute bottom-3 left-3 rounded-full border border-white/30 bg-slate-950/50 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur">
+                        {course.platforms[0].name}
+                      </span>
                     )}
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {uniqueValues([...course.tracks.map((item) => item.name), ...course.subjects, course.packPurpose, course.packType]).map((tag) => (
-                        <span key={tag} className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">{tag}</span>
+                  </div>
+                  <div className="flex flex-1 flex-col p-4">
+                    <h3 className="line-clamp-2 min-h-12 text-base font-extrabold leading-6 text-slate-950">{course.title}</h3>
+                    <div className="mt-2 flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-slate-500">
+                      {course.duration && <span className="inline-flex items-center gap-1"><Clock3 className="h-3.5 w-3.5 text-blue-700" />{course.duration}</span>}
+                      {course.lessons > 0 && <span className="inline-flex items-center gap-1"><BookOpen className="h-3.5 w-3.5 text-blue-700" />{course.lessons} lessons</span>}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {uniqueValues([
+                        ...course.tracks.map((item) => item.name),
+                        ...course.platforms.map((item) => item.name),
+                        course.packPurpose
+                      ]).map((tag) => (
+                        <span key={tag} className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-600">{tag}</span>
                       ))}
                     </div>
-                    <p className="mt-3 text-sm font-extrabold text-blue-950">
+                    <div className="mt-auto border-t border-slate-100 pt-4">
+                      <p className="text-lg font-black text-blue-950">
                       {course.packType === 'Free'
                         ? 'Free'
                         : new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(course.price)}
-                    </p>
-                    <div className="mt-4 flex items-center gap-4 border-y border-slate-100 py-3 text-xs font-semibold text-slate-500">
-                      <span className="inline-flex items-center gap-1.5"><BookOpen className="h-4 w-4 text-blue-700" />{course.lessons} lessons</span>
-                      {course.duration && <span className="inline-flex items-center gap-1.5"><Clock3 className="h-4 w-4 text-blue-700" />{course.duration} access</span>}
-                    </div>
-                    <details className="group mt-4 rounded-xl bg-slate-50">
-                      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-3 text-xs font-bold text-slate-700">
-                        View mapped lessons <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
-                      </summary>
-                      <div className="space-y-3 px-3 pb-3">
-                        {course.modules.map((courseModule) => (
-                          <div key={courseModule.name}>
-                            <h4 className="text-xs font-extrabold text-blue-950">{courseModule.name}</h4>
-                            <ul className="mt-1 flex flex-wrap gap-1.5">
-                              {courseModule.topics.map((courseTopic) => (
-                                <li key={courseTopic} className="rounded-full bg-white px-2 py-1 text-[10px] font-medium text-slate-600">{courseTopic}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        ))}
-                        {!course.modules.length && <p className="text-xs text-slate-500">Taxonomy modules have not been assigned to these videos yet.</p>}
+                      </p>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/video-courses/${encodeURIComponent(course.slug)}`)}
+                          className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-white px-2.5 py-2 text-xs font-extrabold text-blue-950 transition hover:bg-blue-50"
+                        >
+                          Explore <ArrowRight className="h-3.5 w-3.5" />
+                        </button>
+                        {course.packType === 'Free' ? (
+                          <button
+                            type="button"
+                            onClick={() => accessibleCourseIds.has(course.id)
+                              ? navigate(`/video-courses/${encodeURIComponent(course.slug)}`)
+                              : void enrollFreeCourse(course)}
+                            disabled={enrollingCourseId === course.id}
+                            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-2 text-xs font-extrabold text-white transition hover:bg-emerald-500 disabled:cursor-wait disabled:opacity-60"
+                          >
+                            {enrollingCourseId === course.id
+                              ? 'Enrolling…'
+                              : accessibleCourseIds.has(course.id)
+                                ? <><Check className="h-3.5 w-3.5" /> Enrolled</>
+                                : 'Enroll Free'}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => accessibleCourseIds.has(course.id)
+                              ? navigate(`/video-courses/${encodeURIComponent(course.slug)}`)
+                              : onBuyCourse?.(course)}
+                            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-2 text-xs font-extrabold text-white transition hover:bg-emerald-500"
+                          >
+                            {accessibleCourseIds.has(course.id) ? 'Continue' : 'Buy Now'}
+                          </button>
+                        )}
                       </div>
-                    </details>
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/video-courses/${encodeURIComponent(course.slug)}`)}
-                      className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0c2356] px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-blue-900"
-                    >
-                      Explore
-                      <ArrowRight className="h-4 w-4" />
-                    </button>
+                    </div>
                   </div>
                 </article>
               ))}
@@ -823,6 +946,7 @@ function VideoCoursesPage() {
               No published video packs match these filters. Publish a pack in Sanity Studio or try another topic.
             </p>
           )}
+          {enrollmentError && <p role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-medium text-rose-800">{enrollmentError}</p>}
         </section>
 
         <section aria-labelledby="reels-heading" className="mt-12 rounded-3xl bg-slate-950 px-4 py-7 text-white sm:mt-16 sm:px-7 sm:py-9">
@@ -873,7 +997,7 @@ function VideoCoursesPage() {
               No published short reels match these filters.
             </p>
           )}
-          <p className="mt-3 text-xs text-slate-400">Swipe sideways to browse on mobile. Reels are mapped to course pack lessons in Sanity.</p>
+          <p className="mt-3 text-xs text-slate-400">Swipe sideways to browse on mobile. Reels are published free class previews.</p>
         </section>
           </>
         )}
@@ -914,7 +1038,17 @@ function VideoCoursesPage() {
                 ? { maxWidth: 'min(100%, calc((92vh - 9rem) * 9 / 16))' }
                 : undefined}
             >
-              <VideoPlayer video={activeVideo} />
+              {isPlayerLoading ? (
+                <p role="status" className={`flex ${activeVideo.type === 'shortReel' ? 'aspect-[9/16]' : 'aspect-video'} items-center justify-center bg-slate-950 p-6 text-sm font-semibold text-white`}>
+                  Loading video…
+                </p>
+              ) : playerError ? (
+                <p role="alert" className={`flex ${activeVideo.type === 'shortReel' ? 'aspect-[9/16]' : 'aspect-video'} items-center justify-center bg-slate-950 p-6 text-center text-sm font-semibold text-rose-100`}>
+                  {playerError}
+                </p>
+              ) : (
+                <VideoPlayer video={activeVideo} />
+              )}
             </div>
             {activeVideo.description?.length > 0 && (
               <div className="prose prose-slate max-w-none border-t border-slate-200 px-5 py-4 sm:px-6">

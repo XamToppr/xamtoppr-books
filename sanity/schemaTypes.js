@@ -1064,6 +1064,50 @@ const studentUser = defineType({
               type: 'reference',
               to: [{ type: 'book' }]
             }),
+            defineField({
+              name: 'purchasedCourses',
+              title: 'Purchased Video Courses',
+              type: 'array',
+              of: [
+                defineArrayMember({
+                  type: 'object',
+                  fields: [
+                    defineField({
+                      name: 'course',
+                      title: 'Video Course Pack',
+                      type: 'reference',
+                      to: [{ type: 'videoCoursePack' }]
+                    }),
+                    defineField({ name: 'courseTitle', title: 'Course Title', type: 'string' }),
+                    defineField({ name: 'amount', title: 'Amount', type: 'number' }),
+                    defineField({ name: 'finalAmount', title: 'Amount Paid', type: 'number' }),
+                    defineField({ name: 'appliedCoupon', title: 'Applied Coupon', type: 'string' }),
+                    defineField({ name: 'orderId', title: 'Payment ID', type: 'string' }),
+                    defineField({ name: 'purchasedAt', title: 'Purchase Date', type: 'datetime' })
+                  ]
+                })
+              ]
+            }),
+            defineField({
+              name: 'enrolledCourses',
+              title: 'Free Course Enrollments',
+              type: 'array',
+              of: [
+                defineArrayMember({
+                  type: 'object',
+                  fields: [
+                    defineField({
+                      name: 'course',
+                      title: 'Video Course Pack',
+                      type: 'reference',
+                      to: [{ type: 'videoCoursePack' }]
+                    }),
+                    defineField({ name: 'courseTitle', title: 'Course Title', type: 'string' }),
+                    defineField({ name: 'enrolledAt', title: 'Enrollment Date', type: 'datetime' })
+                  ]
+                })
+              ]
+            }),
             defineField({ name: 'bookTitle', title: 'Book Title', type: 'string' }),
             defineField({ name: 'amount', title: 'Amount Paid', type: 'number' }),
             defineField({ name: 'finalAmount', title: 'Final Amount Paid', type: 'number' }),
@@ -1114,8 +1158,16 @@ const userActivity = defineType({
       type: 'reference',
       to: [{ type: 'book' }]
     }),
+    defineField({
+      name: 'videoCoursePack',
+      title: 'Video Course Pack',
+      type: 'reference',
+      to: [{ type: 'videoCoursePack' }]
+    }),
     defineField({ name: 'bookId', title: 'Book ID', type: 'string' }),
+    defineField({ name: 'courseId', title: 'Course ID', type: 'string' }),
     defineField({ name: 'bookTitle', title: 'Interested Book Title', type: 'string' }),
+    defineField({ name: 'productType', title: 'Product Type', type: 'string' }),
     defineField({
       name: 'action',
       title: 'Activity',

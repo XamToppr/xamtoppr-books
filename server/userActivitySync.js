@@ -4,6 +4,7 @@ export const USER_ACTIVITY_COIN_VALUES = Object.freeze({
   daily_login_visit: 10,
   view_book_detail: 5,
   read_sample_pdf: 15,
+  enroll_free_course: 0,
   add_to_cart: 20,
   purchase_complete: 50,
   checkout_initiated: 0,
@@ -29,6 +30,9 @@ export async function createSanityUserActivity(client, firebaseUser, {
   action,
   bookId = '',
   bookTitle = '',
+  productType = 'book',
+  courseId = '',
+  courseTitle = '',
   phone = '',
   reason = '',
   amount
@@ -41,6 +45,18 @@ export async function createSanityUserActivity(client, firebaseUser, {
   }
 
   const studentId = `student_${firebaseUser.localId}`;
+  let course = null;
+  if (action === 'enroll_free_course') {
+    course = await client.getDocument(courseId);
+    if (!course || course._type !== 'videoCoursePack' || course.packType !== 'Free'
+      || !['Instant', 'Scheduled'].includes(course.publishingStatus)
+      || (course.publishingStatus === 'Scheduled'
+        && (!course.publishingDate || new Date(course.publishingDate).getTime() > Date.now()))) {
+      const error = new Error('This free course is not available for enrollment.');
+      error.code = 'COURSE_NOT_ENROLLABLE';
+      throw error;
+    }
+  }
   await client.createIfNotExists({
     _id: studentId,
     _type: 'studentUser',
@@ -70,12 +86,15 @@ export async function createSanityUserActivity(client, firebaseUser, {
     _type: 'userActivity',
     uid: firebaseUser.localId,
     student: { _type: 'reference', _ref: studentId },
-    ...(bookId ? { book: { _type: 'reference', _ref: bookId } } : {}),
+    ...(productType === 'book' && bookId ? { book: { _type: 'reference', _ref: bookId } } : {}),
+    ...(courseId ? { videoCoursePack: { _type: 'reference', _ref: courseId } } : {}),
     studentName: firebaseUser.displayName || 'Student',
     phone: studentPhone,
     email: firebaseUser.email || '',
     bookId,
-    bookTitle,
+    courseId,
+    bookTitle: courseTitle || bookTitle,
+    productType,
     action,
     ...(isCheckoutEvent(action) ? { context: reason, amount } : {}),
     coinsEarned,
@@ -83,26 +102,42 @@ export async function createSanityUserActivity(client, firebaseUser, {
     leadStatus,
     timestamp
   };
+  const enrolledCourseIds = (currentStudent?.enrolledCourses || [])
+    .map((entry) => entry?.course?._ref)
+    .filter(Boolean);
   const transaction = client.transaction()
     .create(activityDocument)
-    .patch(studentId, (patch) => patch
-      .set({
-        fullName: firebaseUser.displayName || 'Student',
-        email: firebaseUser.email || '',
-        phone: studentPhone,
-        firebaseUid: firebaseUser.localId,
-        latestActivityTimestamp: timestamp,
-        ...(action === 'purchase_complete' || isPaymentDrop(action) ? { leadStatus } : {}),
-        ...(isPaymentDrop(action) ? { latestDroppedBook: bookTitle } : {})
-      })
-      .setIfMissing({ totalCoins: 0, activities: [] })
-      .append('activities', [{
-        _key: randomUUID(),
-        _type: 'reference',
-        _ref: activityId
-      }])
-      .inc({ totalCoins: coinsEarned })
-    );
+    .patch(studentId, (patch) => {
+      let updatedPatch = patch
+        .set({
+          fullName: firebaseUser.displayName || 'Student',
+          email: firebaseUser.email || '',
+          phone: studentPhone,
+          firebaseUid: firebaseUser.localId,
+          latestActivityTimestamp: timestamp,
+          ...(action === 'purchase_complete' || isPaymentDrop(action) ? { leadStatus } : {}),
+          ...(isPaymentDrop(action) ? { latestDroppedBook: bookTitle } : {})
+        })
+        .setIfMissing({ totalCoins: 0, activities: [] })
+        .append('activities', [{
+          _key: randomUUID(),
+          _type: 'reference',
+          _ref: activityId
+        }])
+        .inc({ totalCoins: coinsEarned });
+      if (action === 'enroll_free_course' && !enrolledCourseIds.includes(course._id)) {
+        updatedPatch = updatedPatch
+          .setIfMissing({ enrolledCourses: [] })
+          .append('enrolledCourses', [{
+            _key: randomUUID(),
+            _type: 'object',
+            course: { _type: 'reference', _ref: course._id },
+            courseTitle: course.title || courseTitle,
+            enrolledAt: timestamp
+          }]);
+      }
+      return updatedPatch;
+    });
   try {
     await transaction.commit();
     console.log('Sanity transaction committed successfully for action:', action);
