@@ -9,6 +9,7 @@ import { useAuth } from './context/AuthContext';
 import { useCart } from './context/CartContext';
 import { logUserActivity } from './services/activityTracker';
 import { initiatePayment } from './services/paymentService';
+import { calculateCourseExpiryDate, getCourseValidity } from './utils/courseValidity';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import HTMLFlipBook from 'react-pageflip';
 import { PortableText } from '@portabletext/react';
@@ -846,26 +847,52 @@ function BookStoreApp() {
       setShowCheckoutAuthModal(true);
       return false;
     }
-    return logUserActivity('enroll_free_course', {
+    const enrolled = await logUserActivity('enroll_free_course', {
       courseId: course.id,
       courseTitle: course.title,
       productType: 'videoCoursePack',
       phone: userProfile?.phone || ''
     });
+    if (enrolled) await refreshUserProfile();
+    return enrolled;
   };
 
-  const enrolledCourseIds = [
-    ...(Array.isArray(userProfile?.enrolledCourseIds) ? userProfile.enrolledCourseIds : []),
-    ...(Array.isArray(userProfile?.enrolledCourses)
-      ? userProfile.enrolledCourses.map((course) => course.courseId).filter(Boolean)
-      : [])
+  const courseEntitlements = [
+    ...(Array.isArray(userProfile?.enrolledCourses) ? userProfile.enrolledCourses : []),
+    ...(Array.isArray(userProfile?.purchasedCourses) ? userProfile.purchasedCourses : [])
   ];
-  const purchasedCourseIds = [
-    ...(Array.isArray(userProfile?.purchasedCourseIds) ? userProfile.purchasedCourseIds : []),
-    ...(Array.isArray(userProfile?.purchasedCourses)
-      ? userProfile.purchasedCourses.map((course) => course.courseId).filter(Boolean)
+  const courseEntitlementsById = new Map();
+  for (const entitlement of courseEntitlements) {
+    const courseId = typeof entitlement === 'string'
+      ? entitlement
+      : entitlement?.courseId || entitlement?.course?._ref || entitlement?._ref;
+    if (courseId) courseEntitlementsById.set(courseId, entitlement);
+  }
+  const courseExpiryById = Object.fromEntries([...courseEntitlementsById].map(([courseId, entitlement]) => {
+    const startDate = entitlement?.purchasedAt || entitlement?.enrolledAt || entitlement?.purchaseDate;
+    const expiry = entitlement?.expiresAt || calculateCourseExpiryDate(startDate, entitlement?.duration);
+    return [courseId, expiry || null];
+  }));
+  const getCourseIds = (idField, entryField) => [...new Set([
+    ...(Array.isArray(userProfile?.[idField]) ? userProfile[idField] : []),
+    ...(Array.isArray(userProfile?.[entryField])
+      ? userProfile[entryField].map((entry) => (
+        typeof entry === 'string'
+          ? entry
+          : entry?.courseId || entry?.course?._ref || entry?._ref
+      )).filter(Boolean)
       : [])
-  ];
+  ])];
+  const getActiveCourseIds = (ids) => ids.filter((courseId) => (
+    !courseExpiryById[courseId] || getCourseValidity(courseExpiryById[courseId]).isActive
+  ));
+  const allEnrolledCourseIds = getCourseIds('enrolledCourseIds', 'enrolledCourses');
+  const allPurchasedCourseIds = getCourseIds('purchasedCourseIds', 'purchasedCourses');
+  const enrolledCourseIds = getActiveCourseIds(allEnrolledCourseIds);
+  const purchasedCourseIds = getActiveCourseIds(allPurchasedCourseIds);
+  const expiredCourseIds = [...new Set([...allEnrolledCourseIds, ...allPurchasedCourseIds])].filter((courseId) => (
+    Boolean(courseExpiryById[courseId]) && getCourseValidity(courseExpiryById[courseId]).isExpired
+  ));
 
   const handleBookRating = (book, userStar) => {
     if (!book.sanityId) return false;
@@ -2800,6 +2827,8 @@ function BookStoreApp() {
             onRequireAuth={() => setShowCheckoutAuthModal(true)}
             enrolledCourseIds={enrolledCourseIds}
             purchasedCourseIds={purchasedCourseIds}
+            expiredCourseIds={expiredCourseIds}
+            courseExpiryById={courseExpiryById}
           />
         ) : (
           <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">

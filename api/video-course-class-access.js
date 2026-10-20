@@ -1,5 +1,6 @@
 import { createClient } from '@sanity/client';
 import { verifyFirebaseIdToken } from '../server/studentProfileSync.js';
+import { isCourseEntitlementActive } from '../src/utils/courseValidity.js';
 
 const getString = (value) => (typeof value === 'string' ? value.trim() : '');
 
@@ -58,6 +59,7 @@ export async function getVideoCourseClassAccess({ body, authorization, env }) {
       ][0]{
         _id,
         packType,
+        duration,
         "classIds": classes[]->_id,
         "legacyLessons": videos[]{_key, videoTitle, videoType, duration, videoUrl}
       }`, { courseId }),
@@ -71,11 +73,15 @@ export async function getVideoCourseClassAccess({ body, authorization, env }) {
     if (!course || (!isMappedClass && !legacyLesson)) {
       throw new VideoCourseAccessError(404, 'The class is not part of this published course.');
     }
-    const hasAccess = course.packType === 'Free'
-      ? student?.enrolledCourses?.some((entry) => entry?.course?._ref === courseId)
-      : student?.purchasedCourses?.some((entry) => entry?.course?._ref === courseId);
-    if (!hasAccess) {
+    const entitlements = course.packType === 'Free'
+      ? (student?.enrolledCourses || [])
+      : (student?.purchasedCourses || []);
+    const courseEntitlements = entitlements.filter((entry) => entry?.course?._ref === courseId);
+    if (!courseEntitlements.length) {
       throw new VideoCourseAccessError(403, 'Enroll in this course to access the class.');
+    }
+    if (!courseEntitlements.some((entry) => isCourseEntitlementActive(entry, course.duration))) {
+      throw new VideoCourseAccessError(410, 'Course validity has expired. Renew the course to continue learning.');
     }
 
     const onlineClass = classId

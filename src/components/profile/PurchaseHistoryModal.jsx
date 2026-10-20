@@ -70,7 +70,7 @@ export default function PurchaseHistoryModal({ isOpen, onClose }) {
               My Purchases
             </h2>
             <p style={{ fontSize: "12px", color: "#6b7280", margin: "2px 0 0 0" }}>
-              All your purchased books and materials
+              Your ebooks and video course packs
             </p>
           </div>
           <button
@@ -104,12 +104,51 @@ export default function PurchaseHistoryModal({ isOpen, onClose }) {
                 No purchases yet
               </h3>
               <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>
-                Books you purchase will automatically show up here with direct access.
+                Books and video courses you purchase or enroll in will show up here with direct access.
               </p>
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               {purchases.map((item) => {
+                if (item.itemType === 'course') {
+                  return (
+                    <div
+                      key={`course-${item.id}`}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: "12px",
+                        padding: "12px",
+                        borderRadius: "10px",
+                        border: "1px solid #e5e7eb",
+                        background: "#f9fafb"
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
+                        {item.coverImage ? (
+                          <img src={item.coverImage} alt="" style={{ width: "72px", height: "48px", objectFit: "cover", borderRadius: "6px", flexShrink: 0 }} />
+                        ) : (
+                          <div style={{ width: "72px", height: "48px", background: "#e5e7eb", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>▶</div>
+                        )}
+                        <div style={{ minWidth: 0 }}>
+                          <h4 style={{ fontSize: "14px", fontWeight: "600", color: "#111827", margin: "0 0 4px 0" }}>{item.title}</h4>
+                          <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                            <span>{item.purchasedAt ? 'Purchased' : 'Enrolled'} {formatPurchaseDate(item.purchasedAt || item.enrolledAt)}</span>
+                            <span style={{ display: "block" }}>Access period: {item.duration || 'Not specified'}</span>
+                            <span style={{ display: "block", fontWeight: 700, color: item.isExpired ? "#b91c1c" : "#047857" }}>
+                              {item.isExpired ? 'Validity Expired' : item.remainingValidity}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <a href={item.isExpired ? item.courseUrl.replace('?play=1', '?renew=1') : item.courseUrl} style={{ padding: "8px 10px", borderRadius: "6px", background: item.isExpired ? "#d97706" : "#1e3a8a", color: "#ffffff", fontSize: "11px", fontWeight: "600", textDecoration: "none", whiteSpace: "nowrap" }}>
+                        {item.isExpired ? 'Renew Course' : 'Access Course'}
+                      </a>
+                    </div>
+                  );
+                }
+
                 const pdfUrl = item.fullPdfFile?.asset?.url;
 
                 return (

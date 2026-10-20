@@ -124,7 +124,11 @@ export default async function handler(request, response) {
     };
     const result = await createSanityUserActivity(client, firebaseUser, payload);
     console.log("Logged Activity Successfully:", request.body);
-    return response.status(200).json({ success: true, activityId: result.activityId });
+    return response.status(200).json({
+      success: true,
+      activityId: result.activityId,
+      ...(result.courseEnrollment ? { courseEnrollment: result.courseEnrollment } : {})
+    });
   } catch (error) {
     if (error.code === 'COURSE_NOT_ENROLLABLE') {
       return response.status(409).json({ success: false, error: error.message });

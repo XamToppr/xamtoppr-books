@@ -104,7 +104,7 @@ const VIDEO_COURSE_PACK_PROJECTION = `{
     duration,
     teacherName,
     description,
-    "videoLink": select(^.packType == "Free" => videoLink, null),
+    "videoLink": select(^.packType == "Free" && videoType == "shortReel" => videoLink, null),
     "imageUrl": image.asset->url,
     "classPdfUrl": select(^.packType == "Free" => classPdf.asset->url, null),
     "mappedBook": mappedBook->{
@@ -145,7 +145,7 @@ const VIDEO_COURSE_PACK_PROJECTION = `{
     _key,
     videoTitle,
     videoType,
-    "videoUrl": select(^.packType == "Free" => videoUrl, null),
+    "videoUrl": select(^.packType == "Free" && videoType == "shortReel" => videoUrl, null),
     duration,
     "subject": subject->{_id, name, "slug": slug.current},
     "topic": topic->{

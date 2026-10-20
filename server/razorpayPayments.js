@@ -2,6 +2,7 @@ import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto
 import { createClient } from '@sanity/client';
 import { verifyFirebaseIdToken } from './studentProfileSync.js';
 import { getLeadStatus } from './userActivitySync.js';
+import { calculateCourseExpiryDate, isCourseEntitlementActive } from '../src/utils/courseValidity.js';
 
 const API_BASE = 'https://api.razorpay.com/v1';
 const PURCHASE_COINS = 50;
@@ -193,6 +194,7 @@ export async function createRazorpayOrder({ body, authorization, env }) {
       title,
       offerPrice,
       price,
+      duration,
       packPurpose
     }`,
     { productIds }
@@ -203,10 +205,13 @@ export async function createRazorpayOrder({ body, authorization, env }) {
     .map((item) => item.productId);
   if (requestedCourseIds.length) {
     const student = await sanity.getDocument(`student_${firebaseUser.localId}`);
-    const purchasedCourseIds = new Set((student?.purchasedCourses || [])
-      .map((purchase) => purchase?.course?._ref)
-      .filter(Boolean));
-    if (requestedCourseIds.some((courseId) => purchasedCourseIds.has(courseId))) {
+    const existingPurchases = (student?.purchasedCourses || []).filter((purchase) => (
+      requestedCourseIds.includes(purchase?.course?._ref)
+    ));
+    if (existingPurchases.some((purchase) => {
+      const course = catalogById.get(purchase.course?._ref);
+      return isCourseEntitlementActive(purchase, course?.duration);
+    })) {
       throw new PaymentRequestError(409, 'You already own one of the selected video courses.');
     }
   }
@@ -219,7 +224,14 @@ export async function createRazorpayOrder({ body, authorization, env }) {
     if (!product || !Number.isFinite(amount) || amount <= 0) {
       throw new PaymentRequestError(400, 'A selected product is unavailable or has no valid price.');
     }
-    return { productType, productId, title: product.title || 'Product', packPurpose: product.packPurpose || '', amount };
+    return {
+      productType,
+      productId,
+      title: product.title || 'Product',
+      packPurpose: product.packPurpose || '',
+      ...(productType === 'videoCoursePack' ? { duration: product.duration || '' } : {}),
+      amount
+    };
   });
 
   const subtotalPaise = Math.round(items.reduce((sum, item) => sum + item.amount, 0) * 100);
@@ -273,7 +285,7 @@ export async function createRazorpayOrder({ body, authorization, env }) {
   };
 }
 
-async function recordSanityPurchase(client, firebaseUser, phone, paymentId, orderPayload) {
+async function recordSanityPurchase(client, firebaseUser, phone, paymentId, orderPayload, purchasedAt) {
   const studentId = `student_${firebaseUser.localId}`;
   const activityId = `purchase_${createHash('sha256').update(paymentId).digest('hex')}`;
   const existingActivity = await client.getDocument(activityId);
@@ -281,7 +293,6 @@ async function recordSanityPurchase(client, firebaseUser, phone, paymentId, orde
     return { activityId, alreadyRecorded: true };
   }
 
-  const purchasedAt = new Date().toISOString();
   const bookPurchases = orderPayload.items.filter((item) => item.productType === 'book')
     .map((item) => ({
       _key: randomUUID(),
@@ -302,6 +313,8 @@ async function recordSanityPurchase(client, firebaseUser, phone, paymentId, orde
       courseTitle: item.title,
       amount: item.amount,
       finalAmount: item.finalAmount,
+      duration: item.duration || '',
+      expiresAt: calculateCourseExpiryDate(purchasedAt, item.duration),
       appliedCoupon: orderPayload.coupon?.code || '',
       orderId: paymentId,
       purchasedAt
@@ -462,7 +475,10 @@ export async function verifyRazorpayPayment({ body, authorization, env }) {
     throw new PaymentRequestError(409, 'The payment has not been captured for this order.');
   }
 
-  const purchasedAt = new Date().toISOString();
+  const paymentTimestamp = Number(payment.captured_at || payment.created_at);
+  const purchasedAt = Number.isFinite(paymentTimestamp) && paymentTimestamp > 0
+    ? new Date(paymentTimestamp * 1000).toISOString()
+    : new Date().toISOString();
   const purchases = orderPayload.items.map((item) => ({
     productType: item.productType,
     productId: item.productId,
@@ -470,6 +486,12 @@ export async function verifyRazorpayPayment({ body, authorization, env }) {
     title: item.title,
     amount: item.amount,
     finalAmount: item.finalAmount,
+    ...(item.productType === 'videoCoursePack'
+      ? {
+        duration: item.duration || '',
+        expiresAt: calculateCourseExpiryDate(purchasedAt, item.duration)
+      }
+      : {}),
     appliedCoupon: orderPayload.coupon?.code || '',
     orderId: paymentId,
     purchasedAt
@@ -499,7 +521,8 @@ export async function verifyRazorpayPayment({ body, authorization, env }) {
     firebaseUser,
     getString(profile?.phone || firebaseUser.phoneNumber),
     paymentId,
-    orderPayload
+    orderPayload,
+    purchasedAt
   );
 
   return {

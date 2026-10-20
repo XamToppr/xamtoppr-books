@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { PortableText } from '@portabletext/react';
 import {
   ArrowRight,
@@ -17,6 +17,7 @@ import {
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import sanityClient from '../sanityClient';
+import { getCourseValidity } from '../utils/courseValidity';
 import {
   VIDEO_COURSE_PACKS_QUERY
 } from '../sanityQueries';
@@ -224,7 +225,9 @@ function VideoCoursesPage({
   onEnrollCourse,
   onRequireAuth,
   enrolledCourseIds = [],
-  purchasedCourseIds = []
+  purchasedCourseIds = [],
+  expiredCourseIds = [],
+  courseExpiryById = {}
 }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -265,13 +268,22 @@ function VideoCoursesPage({
       : { slug: courseSlug, tab: 'description', subjectId: '', moduleId: '', topicId: '' }),
     ...updates
   }));
-  const detailCourse = courses.find((course) => course.slug === courseSlug);
-  const accessibleCourseIds = new Set([
+  const detailCourse = courses.find((course) => course.slug === courseSlug || course.id === courseSlug);
+  const accessibleCourseIds = useMemo(() => new Set([
     ...enrolledCourseIds,
     ...purchasedCourseIds,
     ...localEnrolledCourseIds
+  ].filter((courseId) => !expiredCourseIds.includes(courseId))), [
+    enrolledCourseIds,
+    expiredCourseIds,
+    localEnrolledCourseIds,
+    purchasedCourseIds
   ]);
   const isDetailCourseAccessible = detailCourse && accessibleCourseIds.has(detailCourse.id);
+  const isDetailCourseExpired = Boolean(detailCourse && expiredCourseIds.includes(detailCourse.id));
+  const detailCourseValidity = detailCourse
+    ? getCourseValidity(courseExpiryById[detailCourse.id])
+    : null;
 
   useEffect(() => {
     let isCurrentRequest = true;
@@ -347,9 +359,11 @@ function VideoCoursesPage({
     .filter((video) => (!subject || video.subject === subject) && (!module || video.module === module))
     .map((video) => video.topic));
   const tracks = uniqueValues(courses.flatMap((course) => course.tracks.map((item) => item.name)));
-  const detailVideos = detailCourse
-    ? (detailCourse.onlineClasses.length ? detailCourse.onlineClasses : detailCourse.videos)
-    : [];
+  const detailVideos = useMemo(() => (
+    detailCourse
+      ? (detailCourse.onlineClasses.length ? detailCourse.onlineClasses : detailCourse.videos)
+      : []
+  ), [detailCourse]);
   const detailSubjects = [...new Map(detailVideos
     .filter((video) => video.subjectId)
     .map((video) => [video.subjectId, { id: video.subjectId, name: video.subject }])).values()];
@@ -393,7 +407,8 @@ function VideoCoursesPage({
     };
   }, [activeVideo]);
 
-  const openVideo = async (video) => {
+  const openVideo = useCallback(async (video) => {
+    if (expiredCourseIds.includes(video.courseId)) return;
     if (video.packType !== 'Free' && !accessibleCourseIds.has(video.courseId)) return;
     const requestId = playerRequestId.current + 1;
     playerRequestId.current = requestId;
@@ -445,7 +460,21 @@ function VideoCoursesPage({
     } finally {
       if (requestId === playerRequestId.current) setIsPlayerLoading(false);
     }
-  };
+  }, [accessibleCourseIds, currentUser, expiredCourseIds, onRequireAuth]);
+
+  const autoOpenedCourseId = React.useRef('');
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('play') !== '1'
+      || !detailCourse
+      || !isDetailCourseAccessible
+      || autoOpenedCourseId.current === detailCourse.id) return;
+    const firstPlayableVideo = detailVideos.find((video) => video.classId || video.lessonKey || video.url);
+    if (!firstPlayableVideo) return;
+    autoOpenedCourseId.current = detailCourse.id;
+    void Promise.resolve().then(() => (
+      openVideo({ ...firstPlayableVideo, packType: detailCourse.packType })
+    ));
+  }, [location.search, detailCourse, isDetailCourseAccessible, detailVideos, openVideo]);
 
   const enrollFreeCourse = async (course) => {
     if (!currentUser) {
@@ -553,6 +582,25 @@ function VideoCoursesPage({
                         : new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(detailCourse.price)}
                       {detailCourse.duration && <span className="ml-3 font-medium text-blue-100">{detailCourse.duration} access</span>}
                     </p>
+                    {isDetailCourseExpired ? (
+                      <div className="mt-4 flex flex-wrap items-center gap-3">
+                        <span className="rounded-full bg-rose-100 px-3 py-1.5 text-xs font-extrabold text-rose-800">
+                          Validity Expired
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => detailCourse.packType === 'Free'
+                            ? void enrollFreeCourse(detailCourse)
+                            : onBuyCourse?.(detailCourse)}
+                          disabled={enrollingCourseId === detailCourse.id}
+                          className="rounded-xl bg-amber-400 px-4 py-2.5 text-sm font-extrabold text-slate-950 hover:bg-amber-300 disabled:cursor-wait disabled:opacity-60"
+                        >
+                          {detailCourse.packType === 'Free' ? 'Renew Free Enrollment' : 'Renew Course'}
+                        </button>
+                      </div>
+                    ) : isDetailCourseAccessible && courseExpiryById[detailCourse.id] ? (
+                      <p className="mt-3 text-sm font-bold text-emerald-200">{detailCourseValidity.remaining}</p>
+                    ) : null}
                   </div>
                 </div>
 
@@ -864,7 +912,10 @@ function VideoCoursesPage({
             <p role="alert" className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm font-medium text-rose-800">{loadError}</p>
           ) : filteredCourses.length ? (
             <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {filteredCourses.map((course) => (
+              {filteredCourses.map((course) => {
+                const courseIsExpired = expiredCourseIds.includes(course.id);
+                const courseValidity = getCourseValidity(courseExpiryById[course.id]);
+                return (
                 <article key={course.id} className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-200 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl">
                   <div className={`relative aspect-video overflow-hidden bg-gradient-to-br ${course.accent}`}>
                     {course.thumbnailUrl && (
@@ -874,6 +925,11 @@ function VideoCoursesPage({
                     <span className={`absolute right-3 top-3 rounded-full px-3 py-1 text-[11px] font-extrabold shadow ${course.packType === 'Free' ? 'bg-emerald-300 text-emerald-950' : 'bg-amber-300 text-amber-950'}`}>
                       {course.packType}
                     </span>
+                    {courseIsExpired && (
+                      <span className="absolute bottom-3 right-3 rounded-full bg-rose-100 px-2.5 py-1 text-[10px] font-extrabold text-rose-800">
+                        Validity Expired
+                      </span>
+                    )}
                     {course.platforms[0]?.name && (
                       <span className="absolute bottom-3 left-3 rounded-full border border-white/30 bg-slate-950/50 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur">
                         {course.platforms[0].name}
@@ -884,6 +940,9 @@ function VideoCoursesPage({
                     <h3 className="line-clamp-2 min-h-12 text-base font-extrabold leading-6 text-slate-950">{course.title}</h3>
                     <div className="mt-2 flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-slate-500">
                       {course.duration && <span className="inline-flex items-center gap-1"><Clock3 className="h-3.5 w-3.5 text-blue-700" />{course.duration}</span>}
+                      {accessibleCourseIds.has(course.id) && courseExpiryById[course.id] && (
+                        <span className="font-bold text-emerald-700">{courseValidity.remaining}</span>
+                      )}
                       {course.lessons > 0 && <span className="inline-flex items-center gap-1"><BookOpen className="h-3.5 w-3.5 text-blue-700" />{course.lessons} lessons</span>}
                     </div>
                     <div className="mt-3 flex flex-wrap gap-1.5">
@@ -912,7 +971,7 @@ function VideoCoursesPage({
                         {course.packType === 'Free' ? (
                           <button
                             type="button"
-                            onClick={() => accessibleCourseIds.has(course.id)
+                            onClick={() => accessibleCourseIds.has(course.id) && !courseIsExpired
                               ? navigate(`/video-courses/${encodeURIComponent(course.slug)}`)
                               : void enrollFreeCourse(course)}
                             disabled={enrollingCourseId === course.id}
@@ -920,26 +979,26 @@ function VideoCoursesPage({
                           >
                             {enrollingCourseId === course.id
                               ? 'Enrolling…'
-                              : accessibleCourseIds.has(course.id)
+                              : accessibleCourseIds.has(course.id) && !courseIsExpired
                                 ? <><Check className="h-3.5 w-3.5" /> Enrolled</>
-                                : 'Enroll Free'}
+                                : courseIsExpired ? 'Renew Free' : 'Enroll Free'}
                           </button>
                         ) : (
                           <button
                             type="button"
-                            onClick={() => accessibleCourseIds.has(course.id)
+                            onClick={() => accessibleCourseIds.has(course.id) && !courseIsExpired
                               ? navigate(`/video-courses/${encodeURIComponent(course.slug)}`)
                               : onBuyCourse?.(course)}
                             className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-2 text-xs font-extrabold text-white transition hover:bg-emerald-500"
                           >
-                            {accessibleCourseIds.has(course.id) ? 'Continue' : 'Buy Now'}
+                            {courseIsExpired ? 'Renew Course' : accessibleCourseIds.has(course.id) ? 'Continue' : 'Buy Now'}
                           </button>
                         )}
                       </div>
                     </div>
                   </div>
                 </article>
-              ))}
+              )})}
             </div>
           ) : (
             <p className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-600">

@@ -1,4 +1,8 @@
 import { randomUUID } from 'node:crypto';
+import {
+  calculateCourseExpiryDate,
+  isCourseEntitlementActive
+} from '../src/utils/courseValidity.js';
 
 export const USER_ACTIVITY_COIN_VALUES = Object.freeze({
   daily_login_visit: 10,
@@ -80,6 +84,26 @@ export async function createSanityUserActivity(client, firebaseUser, {
         ? 'CONVERTED'
         : getLeadStatus(action, totalCoins);
   const timestamp = new Date().toISOString();
+  const previousEnrollments = action === 'enroll_free_course'
+    ? (currentStudent?.enrolledCourses || []).filter((entry) => entry?.course?._ref === course._id)
+    : [];
+  const latestEnrollment = previousEnrollments[previousEnrollments.length - 1];
+  const existingEnrollment = latestEnrollment
+    && isCourseEntitlementActive(latestEnrollment, course?.duration)
+    ? latestEnrollment
+    : null;
+  const enrollmentDate = existingEnrollment?.enrolledAt || timestamp;
+  const enrollmentExpiry = existingEnrollment?.expiresAt
+    || calculateCourseExpiryDate(enrollmentDate, course?.duration);
+  const courseEnrollment = action === 'enroll_free_course'
+    ? {
+      courseId: course._id,
+      courseTitle: course.title || courseTitle,
+      duration: course.duration || '',
+      enrolledAt: enrollmentDate,
+      expiresAt: enrollmentExpiry
+    }
+    : null;
   const activityId = `activity_${randomUUID()}`;
   const activityDocument = {
     _id: activityId,
@@ -102,9 +126,6 @@ export async function createSanityUserActivity(client, firebaseUser, {
     leadStatus,
     timestamp
   };
-  const enrolledCourseIds = (currentStudent?.enrolledCourses || [])
-    .map((entry) => entry?.course?._ref)
-    .filter(Boolean);
   const transaction = client.transaction()
     .create(activityDocument)
     .patch(studentId, (patch) => {
@@ -125,7 +146,7 @@ export async function createSanityUserActivity(client, firebaseUser, {
           _ref: activityId
         }])
         .inc({ totalCoins: coinsEarned });
-      if (action === 'enroll_free_course' && !enrolledCourseIds.includes(course._id)) {
+      if (action === 'enroll_free_course' && !existingEnrollment) {
         updatedPatch = updatedPatch
           .setIfMissing({ enrolledCourses: [] })
           .append('enrolledCourses', [{
@@ -133,7 +154,9 @@ export async function createSanityUserActivity(client, firebaseUser, {
             _type: 'object',
             course: { _type: 'reference', _ref: course._id },
             courseTitle: course.title || courseTitle,
-            enrolledAt: timestamp
+            duration: course.duration || '',
+            enrolledAt: timestamp,
+            expiresAt: calculateCourseExpiryDate(timestamp, course.duration)
           }]);
       }
       return updatedPatch;
@@ -146,5 +169,5 @@ export async function createSanityUserActivity(client, firebaseUser, {
     throw error;
   }
 
-  return { activityId, totalCoins };
+  return { activityId, totalCoins, courseEnrollment };
 }

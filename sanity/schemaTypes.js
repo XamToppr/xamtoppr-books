@@ -1081,6 +1081,8 @@ const studentUser = defineType({
                     defineField({ name: 'courseTitle', title: 'Course Title', type: 'string' }),
                     defineField({ name: 'amount', title: 'Amount', type: 'number' }),
                     defineField({ name: 'finalAmount', title: 'Amount Paid', type: 'number' }),
+                    defineField({ name: 'duration', title: 'Access Duration', type: 'string' }),
+                    defineField({ name: 'expiresAt', title: 'Access Expiry', type: 'datetime' }),
                     defineField({ name: 'appliedCoupon', title: 'Applied Coupon', type: 'string' }),
                     defineField({ name: 'orderId', title: 'Payment ID', type: 'string' }),
                     defineField({ name: 'purchasedAt', title: 'Purchase Date', type: 'datetime' })
@@ -1103,7 +1105,9 @@ const studentUser = defineType({
                       to: [{ type: 'videoCoursePack' }]
                     }),
                     defineField({ name: 'courseTitle', title: 'Course Title', type: 'string' }),
-                    defineField({ name: 'enrolledAt', title: 'Enrollment Date', type: 'datetime' })
+                    defineField({ name: 'duration', title: 'Access Duration', type: 'string' }),
+                    defineField({ name: 'enrolledAt', title: 'Enrollment Date', type: 'datetime' }),
+                    defineField({ name: 'expiresAt', title: 'Access Expiry', type: 'datetime' })
                   ]
                 })
               ]

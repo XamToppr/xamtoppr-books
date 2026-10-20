@@ -89,6 +89,7 @@ export async function logUserActivity(actionType, details = {}) {
         || verifiedPayment.purchases.length === 0))) return false;
 
   const activityDetails = getActivityDetails(details);
+  let courseEnrollment = null;
   if (actionType === 'enroll_free_course') {
     try {
       const idToken = await user.getIdToken();
@@ -111,6 +112,7 @@ export async function logUserActivity(actionType, details = {}) {
       if (!response.ok) {
         throw new Error(responseBody.error || `Course enrollment failed with status ${response.status}.`);
       }
+      courseEnrollment = responseBody.courseEnrollment || null;
     } catch (error) {
       console.error('Unable to validate and save the free course enrollment:', error);
       return false;
@@ -185,13 +187,24 @@ export async function logUserActivity(actionType, details = {}) {
             finalAmount: purchase.finalAmount ?? purchase.amount,
             appliedCoupon: purchase.appliedCoupon || '',
             paymentId: verifiedPayment.paymentId,
-            purchasedAt: purchase.purchasedAt
+            purchasedAt: purchase.purchasedAt,
+            duration: purchase.duration || '',
+            expiresAt: purchase.expiresAt || null
           })));
         }
         userUpdates.processedPaymentIds = arrayUnion(verifiedPayment.paymentId);
       }
       if (actionType === 'enroll_free_course' && activityDetails.courseId) {
         userUpdates.enrolledCourseIds = arrayUnion(activityDetails.courseId);
+        if (courseEnrollment) {
+          userUpdates.enrolledCourses = arrayUnion({
+            courseId: courseEnrollment.courseId,
+            courseTitle: courseEnrollment.courseTitle,
+            duration: courseEnrollment.duration || '',
+            enrolledAt: courseEnrollment.enrolledAt,
+            expiresAt: courseEnrollment.expiresAt || null
+          });
+        }
       }
 
       transaction.set(activityRef, activity);

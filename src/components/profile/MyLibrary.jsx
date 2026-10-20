@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { BookOpen, ShoppingBag, ShoppingCart } from 'lucide-react';
+import { BookOpen, PlayCircle, ShoppingBag, ShoppingCart } from 'lucide-react';
 import AuthModal from '../auth/AuthModal';
 import UserButton from '../auth/UserButton';
 import CartDrawer from '../cart/CartDrawer';
@@ -12,7 +12,7 @@ import { fetchUserLibrary, formatPurchaseDate } from '../../services/userLibrary
 export default function MyLibrary() {
   const { currentUser, userProfile, refreshUserProfile } = useAuth();
   const { cartItems, clearCart } = useCart();
-  const [books, setBooks] = useState([]);
+  const [libraryItems, setLibraryItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -24,7 +24,7 @@ export default function MyLibrary() {
 
     const loadLibrary = async () => {
       if (!currentUser) {
-        setBooks([]);
+        setLibraryItems([]);
         setLoading(false);
         return;
       }
@@ -33,7 +33,7 @@ export default function MyLibrary() {
       setLoadError('');
       try {
         const libraryBooks = await fetchUserLibrary(currentUser);
-        if (isCurrentRequest) setBooks(libraryBooks);
+        if (isCurrentRequest) setLibraryItems(libraryBooks);
       } catch (error) {
         console.error('Unable to load the user library:', error);
         if (isCurrentRequest) setLoadError('Your library could not be loaded. Please try again.');
@@ -115,7 +115,7 @@ export default function MyLibrary() {
           <div className="rounded-xl bg-amber-100 p-3 text-amber-700"><ShoppingBag className="h-6 w-6" /></div>
           <div>
             <h1 className="text-2xl font-black text-slate-950 sm:text-3xl">My Library</h1>
-            <p className="mt-1 text-sm text-slate-600">Books linked to your account.</p>
+            <p className="mt-1 text-sm text-slate-600">Your ebooks and video courses, all in one place.</p>
           </div>
         </div>
 
@@ -131,45 +131,76 @@ export default function MyLibrary() {
               Log In
             </button>
           </section>
-        ) : books.length === 0 ? (
+        ) : libraryItems.length === 0 ? (
           <section className="rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center shadow-sm">
             <BookOpen className="mx-auto h-12 w-12 text-blue-200" />
-            <h2 className="mt-4 text-lg font-extrabold">No books in your library yet</h2>
-            <p className="mt-2 text-sm text-slate-600">Explore the catalog and choose your next study resource.</p>
+            <h2 className="mt-4 text-lg font-extrabold">Your library is empty</h2>
+            <p className="mt-2 text-sm text-slate-600">Explore books and video courses to find your next study resource.</p>
             <a href="/" className="mt-5 inline-flex rounded-lg bg-amber-400 px-5 py-3 text-sm font-extrabold text-slate-950 hover:bg-amber-300">
-              Explore Books
+              Explore Catalog
             </a>
           </section>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {books.map((book) => (
-              <article key={book.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                {book.coverImage ? (
-                  <img src={book.coverImage} alt="" className="h-56 w-full bg-slate-100 object-cover" />
+            {libraryItems.map((item) => (
+              <article key={`${item.itemType}-${item.id}`} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                {item.coverImage ? (
+                  <img src={item.coverImage} alt="" className="h-56 w-full bg-slate-100 object-cover" />
                 ) : (
-                  <div className="flex h-56 items-center justify-center bg-slate-100 text-slate-300"><BookOpen className="h-14 w-14" /></div>
+                  <div className="flex h-56 items-center justify-center bg-slate-100 text-slate-300">
+                    {item.itemType === 'course' ? <PlayCircle className="h-14 w-14" /> : <BookOpen className="h-14 w-14" />}
+                  </div>
                 )}
                 <div className="p-4">
-                  <h2 className="line-clamp-2 min-h-12 font-extrabold text-slate-900">{book.title}</h2>
-                  <p className="mt-2 text-xs text-slate-500">Purchased {formatPurchaseDate(book.purchasedAt)}</p>
-                  {book.fullPdfFile?.asset?.url ? (
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700">
+                    {item.itemType === 'course' ? 'Video Course' : 'Ebook'}
+                  </span>
+                  <h2 className="mt-1 line-clamp-2 min-h-12 font-extrabold text-slate-900">{item.title}</h2>
+                  {item.itemType === 'course' ? (
                     <>
-                      <a href={book.fullPdfFile.asset.url} target="_blank" rel="noopener noreferrer" className="mt-4 block rounded-lg bg-blue-950 px-4 py-2.5 text-center text-sm font-bold text-white hover:bg-blue-900">
-                        📖 Read Full Book
-                      </a>
-                      <a href={book.fullPdfFile.asset.url} download className="mt-2 block rounded-lg border border-blue-200 px-4 py-2 text-center text-xs font-bold text-blue-950 hover:bg-blue-50">
-                        ⬇ Download PDF
+                      <p className="mt-2 text-xs text-slate-500">
+                        {item.purchasedAt
+                          ? `Purchased ${formatPurchaseDate(item.purchasedAt)}`
+                          : `Enrolled ${formatPurchaseDate(item.enrolledAt)}`}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-slate-600">
+                        Access period: {item.duration || 'Not specified'}
+                      </p>
+                      <p className={`mt-2 text-xs font-extrabold ${item.isExpired ? 'text-rose-700' : 'text-emerald-700'}`}>
+                        {item.isExpired ? 'Validity Expired' : item.remainingValidity}
+                      </p>
+                      <a
+                        href={item.isExpired ? item.courseUrl.replace('?play=1', '?renew=1') : item.courseUrl}
+                        className={`mt-4 flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-center text-sm font-bold text-white ${
+                          item.isExpired ? 'bg-amber-600 hover:bg-amber-500' : 'bg-blue-950 hover:bg-blue-900'
+                        }`}
+                      >
+                        <PlayCircle className="h-4 w-4" /> {item.isExpired ? 'Renew Course' : 'Start Learning'}
                       </a>
                     </>
                   ) : (
-                    <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-center text-xs font-semibold text-amber-800">
-                      Full book PDF is not available yet.
-                    </p>
-                  )}
-                  {book.samplePdfUrl && (
-                    <a href={book.samplePdfUrl} target="_blank" rel="noopener noreferrer" className="mt-2 block rounded-lg border border-slate-200 px-4 py-2 text-center text-xs font-bold text-slate-700 hover:bg-slate-50">
-                      Preview Sample PDF
-                    </a>
+                    <>
+                      <p className="mt-2 text-xs text-slate-500">Purchased {formatPurchaseDate(item.purchasedAt)}</p>
+                      {item.fullPdfFile?.asset?.url ? (
+                        <>
+                          <a href={item.fullPdfFile.asset.url} target="_blank" rel="noopener noreferrer" className="mt-4 block rounded-lg bg-blue-950 px-4 py-2.5 text-center text-sm font-bold text-white hover:bg-blue-900">
+                            📖 Read Full Book
+                          </a>
+                          <a href={item.fullPdfFile.asset.url} download className="mt-2 block rounded-lg border border-blue-200 px-4 py-2 text-center text-xs font-bold text-blue-950 hover:bg-blue-50">
+                            ⬇ Download PDF
+                          </a>
+                        </>
+                      ) : (
+                        <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-center text-xs font-semibold text-amber-800">
+                          Full book PDF is not available yet.
+                        </p>
+                      )}
+                      {item.samplePdfUrl && (
+                        <a href={item.samplePdfUrl} target="_blank" rel="noopener noreferrer" className="mt-2 block rounded-lg border border-slate-200 px-4 py-2 text-center text-xs font-bold text-slate-700 hover:bg-slate-50">
+                          Preview Sample PDF
+                        </a>
+                      )}
+                    </>
                   )}
                 </div>
               </article>
