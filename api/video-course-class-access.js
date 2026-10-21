@@ -111,7 +111,17 @@ export async function getVideoCourseClassAccess({ body, authorization, env }) {
         title,
         videoType,
         videoLink,
-        "classPdfUrl": classPdf.asset->url
+        "classPdfUrl": classPdf.asset->url,
+        "mappedBook": mappedBook->{
+          _id,
+          title,
+          "slug": slug.current,
+          author,
+          "coverImageUrl": coverImage.asset->url,
+          offerPrice,
+          mrp,
+          buyUrl
+        }
       }`, { classId })
       : legacyLesson && {
         title: legacyLesson.videoTitle,

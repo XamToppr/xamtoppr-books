@@ -94,6 +94,7 @@ const mapOnlineClass = (onlineClass, pack) => ({
   teacherName: onlineClass.teacherName || '',
   thumbnailUrl: onlineClass.imageUrl || '',
   classPdfUrl: onlineClass.classPdfUrl || '',
+  classPdfAvailable: Boolean(onlineClass.classPdfAvailable || onlineClass.classPdfUrl),
   mappedBook: onlineClass.mappedBook || null,
   description: onlineClass.description || [],
   tracks: onlineClass.track ? [onlineClass.track] : [],
@@ -264,6 +265,7 @@ function VideoCoursesPage({
   const [activeVideo, setActiveVideo] = useState(null);
   const [isPlayerLoading, setIsPlayerLoading] = useState(false);
   const [playerError, setPlayerError] = useState('');
+  const [attachmentError, setAttachmentError] = useState('');
   const [enrollingCourseId, setEnrollingCourseId] = useState('');
   const [enrollmentError, setEnrollmentError] = useState('');
   const [localEnrolledCourseIds, setLocalEnrolledCourseIds] = useState([]);
@@ -486,7 +488,8 @@ function VideoCoursesPage({
             ...current,
             url: result.videoLink || '',
             type: result.videoType || current.type,
-            classPdfUrl: result.classPdfUrl || current.classPdfUrl
+            classPdfUrl: result.classPdfUrl || current.classPdfUrl,
+            mappedBook: result.mappedBook || current.mappedBook
           }
           : current
       ));
@@ -500,6 +503,84 @@ function VideoCoursesPage({
       if (requestId === playerRequestId.current) setIsPlayerLoading(false);
     }
   }, [currentUser, isCourseAccessible, isCourseExpired, onRequireAuth]);
+
+  const downloadClassPdf = async (video) => {
+    if (video.classPdfUrl) {
+      window.open(video.classPdfUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    if (!currentUser) {
+      onRequireAuth?.();
+      return;
+    }
+
+    const pdfWindow = window.open('', '_blank');
+    if (!pdfWindow) {
+      setAttachmentError('Allow pop-ups to open the class PDF notes.');
+      return;
+    }
+    setAttachmentError('');
+    try {
+      const idToken = await currentUser.getIdToken();
+      const response = await fetch('/api/video-course-class-access', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + idToken
+        },
+        body: JSON.stringify({
+          uid: currentUser.uid,
+          courseId: video.courseId,
+          classId: video.classId,
+          lessonKey: video.lessonKey || '',
+          firebaseApiKey: import.meta.env.VITE_FIREBASE_API_KEY
+        })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Class PDF notes could not be loaded.');
+      if (!result.classPdfUrl) throw new Error('PDF notes are not available for this class.');
+      pdfWindow.location.href = result.classPdfUrl;
+    } catch (error) {
+      pdfWindow.close();
+      console.error(`Failed to load PDF notes for "${video.title}":`, error);
+      setAttachmentError(error.message || 'Class PDF notes could not be loaded.');
+    }
+  };
+
+  const renderMappedBookCard = (book, compact = false) => {
+    if (!book) return null;
+    const price = book.offerPrice ?? book.mrp;
+    return (
+      <article className={`flex min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 ${compact ? 'w-full sm:max-w-sm' : 'w-full border-t-0 rounded-t-none sm:rounded-t-xl'}`}>
+        {book.coverImageUrl ? (
+          <img src={book.coverImageUrl} alt="" className="h-16 w-12 shrink-0 rounded-md object-cover" loading="lazy" />
+        ) : (
+          <span className="flex h-16 w-12 shrink-0 items-center justify-center rounded-md bg-slate-100 text-[10px] font-bold text-slate-400">Book</span>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700">Recommended book</p>
+          <h4 className="mt-0.5 line-clamp-2 text-sm font-extrabold text-slate-900">{book.title}</h4>
+          {price != null && (
+            <p className="mt-1 text-xs font-bold text-blue-950">
+              {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(price)}
+            </p>
+          )}
+        </div>
+        {book.slug && (
+          <button
+            type="button"
+            onClick={() => {
+              closePlayer();
+              navigate(`/book/${encodeURIComponent(book.slug)}`);
+            }}
+            className="shrink-0 rounded-lg border border-blue-200 px-3 py-2 text-xs font-extrabold text-blue-900 transition hover:bg-blue-50"
+          >
+            View Book
+          </button>
+        )}
+      </article>
+    );
+  };
 
   const autoOpenedCourseId = React.useRef('');
   useEffect(() => {
@@ -866,10 +947,25 @@ function VideoCoursesPage({
                                       ? 'Purchase required'
                                       : 'Watch Now'}
                                 </button>
+                                {video.classPdfAvailable && (
+                                  <button
+                                    type="button"
+                                    onClick={() => void downloadClassPdf({ ...video, packType: detailCourse.packType })}
+                                    className="inline-flex min-h-10 items-center justify-center rounded-xl border border-blue-200 px-3 py-2 text-xs font-extrabold text-blue-900 transition hover:bg-blue-50"
+                                  >
+                                    📥 Download PDF Notes
+                                  </button>
+                                )}
+                                {video.mappedBook && renderMappedBookCard(video.mappedBook, true)}
                               </article>
                             ))}
                           </div>
                         ) : <p className="text-sm text-slate-600">No lessons are mapped to this topic yet.</p>
+                      )}
+                      {attachmentError && (
+                        <p role="alert" className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+                          {attachmentError}
+                        </p>
                       )}
                     </section>
                   )}
@@ -1144,16 +1240,19 @@ function VideoCoursesPage({
                 <VideoPlayer video={activeVideo} />
               )}
             </div>
-            {activeVideo.classPdfUrl && (
-              <div className="border-t border-slate-200 p-4">
-                <a
-                  href={activeVideo.classPdfUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex min-h-11 items-center justify-center rounded-xl bg-blue-900 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-blue-800"
-                >
-                  Download class PDF notes
-                </a>
+            {(activeVideo.classPdfUrl || activeVideo.mappedBook) && (
+              <div className="space-y-3 border-t border-slate-200 p-4">
+                {activeVideo.mappedBook && renderMappedBookCard(activeVideo.mappedBook)}
+                {activeVideo.classPdfUrl && (
+                  <a
+                    href={activeVideo.classPdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex min-h-11 items-center justify-center rounded-xl bg-blue-900 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-blue-800"
+                  >
+                    📥 Download PDF Notes
+                  </a>
+                )}
               </div>
             )}
           </section>

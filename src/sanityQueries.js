@@ -106,7 +106,8 @@ const VIDEO_COURSE_PACK_PROJECTION = `{
     description,
     "videoLink": select(^.packType == "Free" && videoType == "shortReel" => videoLink, null),
     "imageUrl": image.asset->url,
-    "classPdfUrl": select(^.packType == "Free" => classPdf.asset->url, null),
+    "classPdfUrl": null,
+    "classPdfAvailable": defined(classPdf.asset),
     "mappedBook": mappedBook->{
       _id,
       title,
