@@ -1170,6 +1170,7 @@ const userActivity = defineType({
     }),
     defineField({ name: 'bookId', title: 'Book ID', type: 'string' }),
     defineField({ name: 'courseId', title: 'Course ID', type: 'string' }),
+    defineField({ name: 'courseTitle', title: 'Video Course Title', type: 'string' }),
     defineField({ name: 'bookTitle', title: 'Interested Book Title', type: 'string' }),
     defineField({ name: 'productType', title: 'Product Type', type: 'string' }),
     defineField({
@@ -1186,10 +1187,16 @@ const userActivity = defineType({
           { title: 'Checkout Initiated', value: 'checkout_initiated' },
           { title: 'Payment Failed', value: 'payment_failed' },
           { title: 'Payment Modal Closed / Abandoned', value: 'payment_abandoned' },
-          { title: 'Payment Attempt Failed / Modal Closed (High Intent)', value: 'payment_dropped' }
+          { title: 'Payment Attempt Failed / Modal Closed (High Intent)', value: 'payment_dropped' },
+          { title: 'Video Watched', value: 'video_watch' }
         ]
       }
     }),
+    defineField({ name: 'videoId', title: 'Video / Class ID', type: 'string' }),
+    defineField({ name: 'videoTitle', title: 'Video / Class Title', type: 'string' }),
+    defineField({ name: 'watchDurationSeconds', title: 'Watched Duration (seconds)', type: 'number' }),
+    defineField({ name: 'videoDurationSeconds', title: 'Video Duration (seconds)', type: 'number' }),
+    defineField({ name: 'videoProgressPercent', title: 'Video Progress (%)', type: 'number' }),
     defineField({ name: 'amount', title: 'Amount Paid', type: 'number' }),
     defineField({ name: 'context', title: 'Activity Context / Drop-off Reason', type: 'string' }),
     defineField({ name: 'coinsEarned', title: 'Coins Earned', type: 'number' }),

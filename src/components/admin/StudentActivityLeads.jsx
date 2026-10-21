@@ -10,7 +10,8 @@ const ACTIVITY_LABELS = {
   checkout_initiated: 'Checkout Initiated',
   payment_failed: 'Payment Failed',
   payment_abandoned: 'Payment Modal Closed / Abandoned',
-  payment_dropped: 'Payment Modal Closed / Abandoned'
+  payment_dropped: 'Payment Modal Closed / Abandoned',
+  video_watch: 'Video Watched'
 };
 
 const LEAD_LABELS = {
@@ -27,6 +28,15 @@ const formatDate = (value) => {
   if (!value) return '—';
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString();
+};
+
+const formatWatchDuration = (seconds) => {
+  const value = Number(seconds);
+  if (!Number.isFinite(value) || value <= 0) return '—';
+  const totalSeconds = Math.round(value);
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainingSeconds = totalSeconds % 60;
+  return minutes ? `${minutes}m ${remainingSeconds}s` : `${remainingSeconds}s`;
 };
 
 const timestampValue = (value) => {
@@ -155,7 +165,9 @@ export default function StudentActivityLeads() {
     sanityClient.withConfig({ useCdn: false }).fetch(
       `*[_type == "userActivity"] | order(timestamp desc) {
         _id, uid, student, studentName, phone, email, bookTitle, action,
-        coinsEarned, totalCoins, amount, context, reason, leadStatus, timestamp
+        coinsEarned, totalCoins, amount, context, reason, leadStatus, timestamp,
+        courseId, courseTitle, videoId, videoTitle, watchDurationSeconds,
+        videoDurationSeconds, videoProgressPercent
       }`
     ).then((rows) => {
       if (active) setActivities(rows);
@@ -226,7 +238,7 @@ export default function StudentActivityLeads() {
     padding: '8px 10px',
     minHeight: 38
   };
-  const cellStyle = { padding: 10, borderBottom: '1px solid #e5e7eb', verticalAlign: 'top' };
+  const cellStyle = { padding: '12px 14px', borderBottom: '1px solid #e5e7eb', verticalAlign: 'top' };
 
   return (
     <main style={{ padding: 24, height: '100%', overflow: 'auto' }}>
@@ -239,6 +251,7 @@ export default function StudentActivityLeads() {
           border-top: 2px solid #fb923c !important;
           border-bottom: 2px solid #fb923c !important;
         }
+        .student-history-table tbody tr:nth-child(even) { background: #f8fafc; }
       `}</style>
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
@@ -289,6 +302,7 @@ export default function StudentActivityLeads() {
             <option value="payment_abandoned">Payment Modal Closed / Abandoned</option>
             <option value="checkout_initiated">Checkout Initiated</option>
             <option value="payment_dropped">Payment Attempt Failed / Modal Closed</option>
+            <option value="video_watch">Video Watched</option>
           </select>
         </label>
         <label>
@@ -316,16 +330,16 @@ export default function StudentActivityLeads() {
 
       {error && <p role="alert" style={{ color: '#b91c1c' }}>{error}</p>}
       {loading ? <p>Loading student activity…</p> : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <div style={{ overflowX: 'auto', border: '1px solid #dbe2ea', borderRadius: 12, background: '#fff', boxShadow: '0 1px 3px rgba(15, 23, 42, 0.06)' }}>
+          <table style={{ width: '100%', minWidth: 1080, borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr>
                 {['Student Name', 'Phone Number', 'Email', 'Customer Status & Active Alert', 'Total Coins', 'Total Activities', 'Latest Interested Book', 'Last Active', 'History']
-                  .map((heading) => <th key={heading} style={{ padding: 10, borderBottom: '1px solid #d1d5db' }}>{heading}</th>)}
+                  .map((heading) => <th key={heading} style={{ padding: '13px 14px', borderBottom: '1px solid #cbd5e1', background: '#f1f5f9', color: '#334155', fontSize: 12, fontWeight: 800, whiteSpace: 'nowrap' }}>{heading}</th>)}
               </tr>
             </thead>
             <tbody>
-              {students.map((student) => {
+              {students.map((student, studentIndex) => {
                 const isExpanded = expandedStudent === student.key;
                 const elapsed = now !== null && timestampValue(student.lastActiveAt)
                   ? Math.max(0, now - timestampValue(student.lastActiveAt))
@@ -335,7 +349,7 @@ export default function StudentActivityLeads() {
                 const recoveryMessage = encodeURIComponent(getWhatsAppMessage(student));
                 return (
                   <Fragment key={student.key}>
-                    <tr className={isHot ? 'lead-hot-row' : undefined} style={{ background: isHot ? '#fff7ed' : undefined }}>
+                    <tr className={isHot ? 'lead-hot-row' : undefined} style={{ background: isHot ? '#fff7ed' : studentIndex % 2 ? '#f8fafc' : '#fff' }}>
                       <td style={cellStyle}>
                         {student.name || 'Student'}
                         {isHot && <div style={{ marginTop: 5, color: '#c2410c', fontSize: 12, fontWeight: 700 }}>⚡ Hot (Just Now)</div>}
@@ -424,12 +438,17 @@ export default function StudentActivityLeads() {
                     </tr>
                     {isExpanded && (
                       <tr>
-                        <td colSpan={9} style={{ padding: 12, background: '#f9fafb' }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                        <td colSpan={9} style={{ padding: 0, background: '#eef2f7', borderBottom: '2px solid #cbd5e1' }}>
+                          <section aria-label={`${student.name || 'Student'} activity history`} style={{ margin: 14, overflow: 'hidden', border: '1px solid #cbd5e1', borderRadius: 10, background: '#fff', boxShadow: 'inset 0 1px 2px rgba(15, 23, 42, 0.04)' }}>
+                            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '11px 14px', borderBottom: '1px solid #dbe2ea', background: '#f8fafc' }}>
+                              <strong style={{ color: '#1e293b', fontSize: 13 }}>Activity history</strong>
+                              <span style={{ color: '#64748b', fontSize: 12 }}>{student.activities.length} recorded events · chronological</span>
+                            </header>
+                          <table className="student-history-table" style={{ width: '100%', minWidth: 900, borderCollapse: 'collapse', textAlign: 'left' }}>
                             <thead>
                               <tr>
-                                {['Activity Type', 'Book Title', 'Amount', 'Coins Earned', 'Context / Reason', 'Timestamp']
-                                  .map((heading) => <th key={heading} style={{ padding: 8, borderBottom: '1px solid #d1d5db' }}>{heading}</th>)}
+                                {['Activity Type', 'Book / Course / Class', 'Watch Time', 'Progress', 'Amount', 'Coins Earned', 'Context / Reason', 'Timestamp']
+                                  .map((heading) => <th key={heading} style={{ padding: '10px 12px', borderBottom: '1px solid #d1d5db', background: '#f8fafc', color: '#475569', fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap' }}>{heading}</th>)}
                               </tr>
                             </thead>
                             <tbody>
@@ -441,7 +460,18 @@ export default function StudentActivityLeads() {
                                       <td style={cellStyle}>
                                         {ACTIVITY_LABELS[item.action] || item.action || 'User Activity'}
                                       </td>
-                                      <td style={cellStyle}>{item.bookTitle || '—'}</td>
+                                      <td style={cellStyle}>
+                                        <strong>{item.videoTitle || item.courseTitle || item.bookTitle || '—'}</strong>
+                                        {item.courseTitle && item.videoTitle && (
+                                          <div style={{ marginTop: 3, color: '#64748b', fontSize: 12 }}>{item.courseTitle}</div>
+                                        )}
+                                      </td>
+                                      <td style={cellStyle}>{item.action === 'video_watch' ? formatWatchDuration(item.watchDurationSeconds) : '—'}</td>
+                                      <td style={cellStyle}>
+                                        {item.action === 'video_watch' && Number.isFinite(Number(item.videoProgressPercent))
+                                          ? `${Math.round(Number(item.videoProgressPercent))}%`
+                                          : '—'}
+                                      </td>
                                       <td style={cellStyle}>{item.amount ? `₹${item.amount}` : '—'}</td>
                                       <td style={cellStyle}>{item.coinsEarned ? `+${item.coinsEarned}` : '—'}</td>
                                       <td style={cellStyle}>{item.context || item.reason || '—'}</td>
@@ -451,13 +481,14 @@ export default function StudentActivityLeads() {
                                 })
                                 : (
                                   <tr>
-                                    <td colSpan={6} style={{ ...cellStyle, textAlign: 'center' }}>
+                                    <td colSpan={8} style={{ ...cellStyle, textAlign: 'center', color: '#64748b' }}>
                                       No activity history available.
                                     </td>
                                   </tr>
                                 )}
                             </tbody>
                           </table>
+                          </section>
                         </td>
                       </tr>
                     )}

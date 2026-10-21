@@ -13,7 +13,8 @@ const ALLOWED_ACTIVITY_ACTIONS = new Set([
   'daily_login_visit',
   'enroll_free_course',
   'add_to_cart',
-  'purchase_complete'
+  'purchase_complete',
+  'video_watch'
 ]);
 
 export default async function handler(request, response) {
@@ -57,6 +58,11 @@ export default async function handler(request, response) {
   const phone = getString(body.phone);
   const reason = getString(body.reason);
   const amount = Number(body.amount) || 0;
+  const videoId = getString(body.videoId);
+  const videoTitle = getString(body.videoTitle);
+  const watchDurationSeconds = Number(body.watchDurationSeconds);
+  const videoDurationSeconds = Number(body.videoDurationSeconds);
+  const videoProgressPercent = Number(body.videoProgressPercent);
   console.log('Logging activity received:', {
     uid,
     action,
@@ -70,9 +76,19 @@ export default async function handler(request, response) {
     || process.env.FIREBASE_WEB_API_KEY;
   if (!uid || !ALLOWED_ACTIVITY_ACTIONS.has(action) || bookId.length > 200
     || bookTitle.length > 300 || courseId.length > 200 || courseTitle.length > 300
+    || videoId.length > 200 || videoTitle.length > 300
     || phone.length > 32 || reason.length > 500
     || !['book', 'videoCoursePack'].includes(productType)) {
     return response.status(400).json({ success: false, error: 'Activity details are invalid.' });
+  }
+  if (action === 'video_watch' && (
+    productType !== 'videoCoursePack'
+    || !courseId || !videoId || !videoTitle
+    || !Number.isInteger(watchDurationSeconds) || watchDurationSeconds < 1 || watchDurationSeconds > 86_400
+    || !Number.isInteger(videoDurationSeconds) || videoDurationSeconds < 0 || videoDurationSeconds > 86_400
+    || !Number.isInteger(videoProgressPercent) || videoProgressPercent < 0 || videoProgressPercent > 100
+  )) {
+    return response.status(400).json({ success: false, error: 'Video watch details are invalid.' });
   }
   if (action === 'purchase_complete') {
     return response.status(403).json({
@@ -120,7 +136,12 @@ export default async function handler(request, response) {
       courseTitle,
       phone,
       reason,
-      amount
+      amount,
+      videoId,
+      videoTitle,
+      watchDurationSeconds,
+      videoDurationSeconds,
+      videoProgressPercent
     };
     const result = await createSanityUserActivity(client, firebaseUser, payload);
     console.log("Logged Activity Successfully:", request.body);

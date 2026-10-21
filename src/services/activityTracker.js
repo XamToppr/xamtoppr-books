@@ -18,7 +18,8 @@ export const ACTIVITY_COIN_VALUES = Object.freeze({
   checkout_initiated: 0,
   payment_failed: 0,
   payment_abandoned: 0,
-  payment_dropped: 0
+  payment_dropped: 0,
+  video_watch: 0
 });
 
 const getLocalDate = () => new Date().toLocaleDateString('en-CA');
@@ -75,6 +76,53 @@ export async function logCheckoutActivity({
     return true;
   } catch (error) {
     console.error('Unable to log the checkout activity to Student Activity & Leads:', error);
+    return false;
+  }
+}
+
+export async function logVideoWatchActivity({
+  user = auth.currentUser,
+  courseId,
+  courseTitle,
+  videoId,
+  videoTitle,
+  watchDurationSeconds,
+  videoDurationSeconds,
+  videoProgressPercent
+}) {
+  if (!user || !courseId || !videoId || !videoTitle
+    || !Number.isFinite(watchDurationSeconds) || watchDurationSeconds < 1) return false;
+
+  try {
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/log-user-activity', {
+      method: 'POST',
+      keepalive: true,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${idToken}`
+      },
+      body: JSON.stringify({
+        uid: user.uid,
+        action: 'video_watch',
+        productType: 'videoCoursePack',
+        courseId,
+        courseTitle,
+        videoId,
+        videoTitle,
+        watchDurationSeconds: Math.round(watchDurationSeconds),
+        videoDurationSeconds: Math.round(videoDurationSeconds),
+        videoProgressPercent: Math.round(videoProgressPercent),
+        firebaseApiKey: auth.app.options.apiKey
+      })
+    });
+    const responseBody = await response.json();
+    if (!response.ok) {
+      throw new Error(responseBody.error || `Video watch activity logging failed with status ${response.status}.`);
+    }
+    return true;
+  } catch (error) {
+    console.error('Unable to log video watch activity to Student Activity & Leads:', error);
     return false;
   }
 }

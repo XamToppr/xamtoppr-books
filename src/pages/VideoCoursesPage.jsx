@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { logVideoWatchActivity } from '../services/activityTracker';
 import sanityClient from '../sanityClient';
 import { getCourseValidity } from '../utils/courseValidity';
 import {
@@ -210,10 +211,98 @@ function TaxonomySelect({ label, value, options, onChange }) {
   );
 }
 
-function VideoPlayer({ video }) {
+let youtubeApiPromise;
+
+function loadYouTubeApi() {
+  if (window.YT?.Player) return Promise.resolve(window.YT);
+  if (!youtubeApiPromise) {
+    youtubeApiPromise = new Promise((resolve, reject) => {
+      const previousCallback = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => {
+        previousCallback?.();
+        resolve(window.YT);
+      };
+      let script = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
+      if (!script) {
+        script = document.createElement('script');
+        script.src = 'https://www.youtube.com/iframe_api';
+        script.onerror = () => reject(new Error('YouTube playback tracking could not be initialized.'));
+        document.head.appendChild(script);
+      }
+    }).catch((error) => {
+      youtubeApiPromise = null;
+      throw error;
+    });
+  }
+  return youtubeApiPromise;
+}
+
+function VideoPlayer({ video, onWatch }) {
   const player = getVideoPlayer(video.url);
   const aspectClass = video.type === 'shortReel' ? 'aspect-[9/16]' : 'aspect-video';
+  const playerId = React.useId().replaceAll(':', '');
+  const progressRef = React.useRef({
+    watchedSeconds: 0,
+    durationSeconds: 0,
+    maxTimeSeconds: 0,
+    lastTimeSeconds: null
+  });
+  const flushWatch = useCallback(() => {
+    const progress = progressRef.current;
+    if (progress.watchedSeconds >= 1) {
+      onWatch({
+        watchDurationSeconds: progress.watchedSeconds,
+        videoDurationSeconds: progress.durationSeconds,
+        videoProgressPercent: progress.durationSeconds
+          ? Math.min(100, (progress.maxTimeSeconds / progress.durationSeconds) * 100)
+          : 0
+      });
+      progress.watchedSeconds = 0;
+    }
+    progress.lastTimeSeconds = null;
+  }, [onWatch]);
+  const updateWatchProgress = useCallback((currentTime, duration) => {
+    const progress = progressRef.current;
+    if (Number.isFinite(duration) && duration > 0) progress.durationSeconds = duration;
+    if (!Number.isFinite(currentTime) || currentTime < 0) return;
+    if (progress.lastTimeSeconds !== null) {
+      const elapsed = currentTime - progress.lastTimeSeconds;
+      if (elapsed > 0 && elapsed <= 2) progress.watchedSeconds += elapsed;
+    }
+    progress.maxTimeSeconds = Math.max(progress.maxTimeSeconds, currentTime);
+    progress.lastTimeSeconds = currentTime;
+  }, []);
+
+  useEffect(() => () => flushWatch(), [flushWatch]);
+
   if (player?.type === 'embed') {
+    const youtubeId = player.src.match(/youtube-nocookie\.com\/embed\/([A-Za-z0-9_-]{11})/)?.[1];
+    if (youtubeId) {
+      const elementId = `youtube-player-${playerId}`;
+      return (
+        <YouTubeTrackedPlayer
+          key={elementId}
+          video={video}
+          videoId={youtubeId}
+          elementId={elementId}
+          aspectClass={aspectClass}
+          updateWatchProgress={updateWatchProgress}
+          flushWatch={flushWatch}
+        />
+      );
+    }
+    const vimeoId = player.src.match(/player\.vimeo\.com\/video\/(\d+)/)?.[1];
+    if (vimeoId) {
+      return (
+        <VimeoTrackedPlayer
+          videoId={vimeoId}
+          video={video}
+          aspectClass={aspectClass}
+          updateWatchProgress={updateWatchProgress}
+          flushWatch={flushWatch}
+        />
+      );
+    }
     return (
       <iframe
         title={video.title}
@@ -226,7 +315,29 @@ function VideoPlayer({ video }) {
     );
   }
   if (player?.type === 'file') {
-    return <video className={`${aspectClass} w-full bg-black object-contain`} src={player.src} controls playsInline />;
+    return (
+      <video
+        className={`${aspectClass} w-full bg-black object-contain`}
+        src={player.src}
+        controls
+        playsInline
+        onPlay={(event) => {
+          progressRef.current.lastTimeSeconds = event.currentTarget.currentTime;
+        }}
+        onTimeUpdate={(event) => updateWatchProgress(
+          event.currentTarget.currentTime,
+          event.currentTarget.duration
+        )}
+        onPause={(event) => {
+          updateWatchProgress(event.currentTarget.currentTime, event.currentTarget.duration);
+          flushWatch();
+        }}
+        onEnded={(event) => {
+          updateWatchProgress(event.currentTarget.currentTime, event.currentTarget.duration);
+          flushWatch();
+        }}
+      />
+    );
   }
   return (
     <div className={`flex ${aspectClass} items-center justify-center bg-slate-950 p-6 text-center text-white`}>
@@ -238,6 +349,132 @@ function VideoPlayer({ video }) {
         )
         : <p>This video is not available to play.</p>}
     </div>
+  );
+}
+
+function YouTubeTrackedPlayer({
+  video,
+  videoId,
+  elementId,
+  aspectClass,
+  updateWatchProgress,
+  flushWatch
+}) {
+  const playerRef = React.useRef(null);
+  const intervalRef = React.useRef(null);
+
+  useEffect(() => {
+    let disposed = false;
+    loadYouTubeApi().then((youtube) => {
+      if (disposed) return;
+      playerRef.current = new youtube.Player(elementId, {
+        videoId,
+        playerVars: { playsinline: 1, rel: 0 },
+        events: {
+          onReady: () => {},
+          onStateChange: (event) => {
+            if (event.data === youtube.PlayerState.PLAYING) {
+              if (intervalRef.current) window.clearInterval(intervalRef.current);
+              const player = event.target;
+              updateWatchProgress(player.getCurrentTime(), player.getDuration());
+              intervalRef.current = window.setInterval(() => {
+                updateWatchProgress(player.getCurrentTime(), player.getDuration());
+              }, 1000);
+            } else {
+              if (intervalRef.current) window.clearInterval(intervalRef.current);
+              intervalRef.current = null;
+              const player = event.target;
+              updateWatchProgress(player.getCurrentTime(), player.getDuration());
+              if (event.data === youtube.PlayerState.PAUSED
+                || event.data === youtube.PlayerState.ENDED) flushWatch();
+            }
+          }
+        }
+      });
+    }).catch((error) => {
+      console.error(`Unable to initialize tracked playback for "${video.title}":`, error);
+    });
+
+    return () => {
+      disposed = true;
+      if (intervalRef.current) window.clearInterval(intervalRef.current);
+      intervalRef.current = null;
+      flushWatch();
+      playerRef.current?.destroy();
+      playerRef.current = null;
+    };
+  }, [elementId, videoId, video.title, updateWatchProgress, flushWatch]);
+
+  return <div id={elementId} title={video.title} className={`${aspectClass} w-full bg-black`} />;
+}
+
+function VimeoTrackedPlayer({
+  videoId,
+  video,
+  aspectClass,
+  updateWatchProgress,
+  flushWatch
+}) {
+  const frameRef = React.useRef(null);
+  const playerId = React.useId().replaceAll(':', '');
+
+  useEffect(() => {
+    const frame = frameRef.current;
+    if (!frame) return undefined;
+    const sendCommand = (method, value) => frame.contentWindow?.postMessage(
+      { method, value },
+      'https://player.vimeo.com'
+    );
+    const registerEvents = () => {
+      ['play', 'pause', 'ended', 'timeupdate'].forEach((eventName) => {
+        sendCommand('addEventListener', eventName);
+      });
+      sendCommand('getDuration');
+    };
+    const handleMessage = (event) => {
+      if (event.origin !== 'https://player.vimeo.com' || event.source !== frame.contentWindow) return;
+      let message = event.data;
+      if (typeof message === 'string') {
+        try {
+          message = JSON.parse(message);
+        } catch {
+          return;
+        }
+      }
+      const data = message?.data || {};
+      if (message?.event === 'play') {
+        updateWatchProgress(Number(data.seconds), Number(data.duration));
+      } else if (message?.event === 'timeupdate') {
+        updateWatchProgress(Number(data.seconds), Number(data.duration));
+      } else if (message?.method === 'getDuration') {
+        updateWatchProgress(Number.NaN, Number(message.value));
+      } else if (message?.event === 'pause' || message?.event === 'ended') {
+        if (Number.isFinite(Number(data.seconds))) {
+          updateWatchProgress(Number(data.seconds), Number(data.duration));
+        }
+        flushWatch();
+      }
+    };
+    frame.addEventListener('load', registerEvents);
+    window.addEventListener('message', handleMessage);
+    registerEvents();
+    return () => {
+      frame.removeEventListener('load', registerEvents);
+      window.removeEventListener('message', handleMessage);
+      flushWatch();
+    };
+  }, [flushWatch, updateWatchProgress]);
+
+  return (
+    <iframe
+      ref={frameRef}
+      title={video.title}
+      src={`https://player.vimeo.com/video/${videoId}?api=1&player_id=${playerId}`}
+      className={`${aspectClass} w-full bg-black`}
+      allow="autoplay; fullscreen; picture-in-picture"
+      allowFullScreen
+      referrerPolicy="strict-origin-when-cross-origin"
+    />
   );
 }
 
@@ -270,6 +507,17 @@ function VideoCoursesPage({
   const [enrollmentError, setEnrollmentError] = useState('');
   const [localEnrolledCourseIds, setLocalEnrolledCourseIds] = useState([]);
   const playerRequestId = React.useRef(0);
+  const handleVideoWatch = useCallback((engagement) => {
+    if (!currentUser || !activeVideo) return;
+    void logVideoWatchActivity({
+      user: currentUser,
+      courseId: activeVideo.courseId,
+      courseTitle: activeVideo.packTitle || '',
+      videoId: activeVideo.classId || activeVideo.lessonKey || activeVideo.id,
+      videoTitle: activeVideo.title,
+      ...engagement
+    });
+  }, [activeVideo, currentUser]);
   const [detailNavigation, setDetailNavigation] = useState(null);
   const courseSlug = useMemo(() => {
     const match = location.pathname.match(/^\/video-courses\/([^/]+)\/?$/);
@@ -1237,7 +1485,7 @@ function VideoCoursesPage({
                   {playerError}
                 </p>
               ) : (
-                <VideoPlayer video={activeVideo} />
+                <VideoPlayer video={activeVideo} onWatch={handleVideoWatch} />
               )}
             </div>
             {(activeVideo.classPdfUrl || activeVideo.mappedBook) && (

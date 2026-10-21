@@ -14,7 +14,8 @@ export const USER_ACTIVITY_COIN_VALUES = Object.freeze({
   checkout_initiated: 0,
   payment_failed: 0,
   payment_abandoned: 0,
-  payment_dropped: 0
+  payment_dropped: 0,
+  video_watch: 0
 });
 
 const isPaymentDrop = (action) => (
@@ -39,7 +40,12 @@ export async function createSanityUserActivity(client, firebaseUser, {
   courseTitle = '',
   phone = '',
   reason = '',
-  amount
+  amount,
+  videoId = '',
+  videoTitle = '',
+  watchDurationSeconds = 0,
+  videoDurationSeconds = 0,
+  videoProgressPercent = 0
 }) {
   const coinsEarned = USER_ACTIVITY_COIN_VALUES[action];
   if (coinsEarned == null) {
@@ -117,9 +123,17 @@ export async function createSanityUserActivity(client, firebaseUser, {
     email: firebaseUser.email || '',
     bookId,
     courseId,
-    bookTitle: courseTitle || bookTitle,
+    courseTitle,
+    bookTitle: videoTitle || courseTitle || bookTitle,
     productType,
     action,
+    ...(action === 'video_watch' ? {
+      videoId,
+      videoTitle,
+      watchDurationSeconds,
+      videoDurationSeconds,
+      videoProgressPercent
+    } : {}),
     ...(isCheckoutEvent(action) ? { context: reason, amount } : {}),
     coinsEarned,
     totalCoins,
