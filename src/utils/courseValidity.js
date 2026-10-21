@@ -58,19 +58,18 @@ export function getCourseValidity(expiresAt, now = new Date()) {
   let months = (expiry.getUTCFullYear() - current.getUTCFullYear()) * 12
     + expiry.getUTCMonth() - current.getUTCMonth();
   while (months > 0 && addCalendarMonths(current, months).getTime() > expiry.getTime()) months -= 1;
-  if (months > 0) {
-    return {
-      isActive: true,
-      isExpired: false,
-      remaining: `Expires in ${months} ${months === 1 ? 'month' : 'months'}`
-    };
-  }
-
-  const days = Math.ceil(difference / DAY_IN_MILLISECONDS);
+  const afterMonths = addCalendarMonths(current, months);
+  const days = Math.floor((expiry.getTime() - afterMonths.getTime()) / DAY_IN_MILLISECONDS);
+  const remainingParts = [];
+  if (months > 0) remainingParts.push(`${months} ${months === 1 ? 'month' : 'months'}`);
+  if (days > 0) remainingParts.push(`${days} ${days === 1 ? 'day' : 'days'}`);
+  const remaining = remainingParts.length
+    ? `Expires in ${remainingParts.join(' ')}`
+    : 'Expires in less than a day';
   return {
     isActive: true,
     isExpired: false,
-    remaining: `Expires in ${days} ${days === 1 ? 'day' : 'days'}`
+    remaining
   };
 }
 

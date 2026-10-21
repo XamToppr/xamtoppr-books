@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { initiatePayment } from '../../services/paymentService';
 import { fetchUserLibrary, formatPurchaseDate } from '../../services/userLibrary';
+import { getCourseValidity } from '../../utils/courseValidity';
 
 export default function MyLibrary() {
   const { currentUser, userProfile, refreshUserProfile } = useAuth();
@@ -17,7 +18,21 @@ export default function MyLibrary() {
   const [loadError, setLoadError] = useState('');
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showCartDrawer, setShowCartDrawer] = useState(false);
+  const [activeTab, setActiveTab] = useState('all');
+  const [currentTime, setCurrentTime] = useState(() => new Date());
   const paymentInProgressRef = useRef(false);
+  const ebooks = libraryItems.filter((item) => item.itemType === 'book');
+  const videoCourses = libraryItems.filter((item) => item.itemType === 'course');
+  const visibleItems = activeTab === 'ebooks'
+    ? ebooks
+    : activeTab === 'courses'
+      ? videoCourses
+      : libraryItems;
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentTime(new Date()), 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     let isCurrentRequest = true;
@@ -114,7 +129,7 @@ export default function MyLibrary() {
         <div className="mb-7 flex items-center gap-3">
           <div className="rounded-xl bg-amber-100 p-3 text-amber-700"><ShoppingBag className="h-6 w-6" /></div>
           <div>
-            <h1 className="text-2xl font-black text-slate-950 sm:text-3xl">My Library</h1>
+            <h1 className="text-2xl font-black text-slate-950 sm:text-3xl">My Library &amp; Purchases</h1>
             <p className="mt-1 text-sm text-slate-600">Your ebooks and video courses, all in one place.</p>
           </div>
         </div>
@@ -141,8 +156,48 @@ export default function MyLibrary() {
             </a>
           </section>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {libraryItems.map((item) => (
+          <>
+          <div role="tablist" aria-label="Library categories" className="mb-6 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+            {[
+              { id: 'all', label: 'All Items', count: libraryItems.length },
+              { id: 'ebooks', label: 'My Ebooks', count: ebooks.length },
+              { id: 'courses', label: 'My Video Courses', count: videoCourses.length }
+            ].map((tab) => (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tab.id}
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`rounded-xl px-4 py-2.5 text-sm font-extrabold transition ${
+                  activeTab === tab.id
+                    ? 'bg-blue-950 text-white'
+                    : 'bg-white text-slate-600 hover:bg-blue-50 hover:text-blue-950'
+                }`}
+              >
+                {tab.label} <span className="ml-1 opacity-75">({tab.count})</span>
+              </button>
+            ))}
+          </div>
+          {visibleItems.length === 0 ? (
+            <section className="rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center shadow-sm">
+              <BookOpen className="mx-auto h-12 w-12 text-blue-200" />
+              <h2 className="mt-4 text-lg font-extrabold">
+                {activeTab === 'ebooks' ? 'No ebooks yet' : 'No video courses yet'}
+              </h2>
+              <p className="mt-2 text-sm text-slate-600">Your purchases and enrollments will appear here.</p>
+              <a href={activeTab === 'ebooks' ? '/' : '/video-courses'} className="mt-5 inline-flex rounded-lg bg-amber-400 px-5 py-3 text-sm font-extrabold text-slate-950 hover:bg-amber-300">
+                Explore {activeTab === 'ebooks' ? 'Books' : 'Video Courses'}
+              </a>
+            </section>
+          ) : (
+          <div role="tabpanel" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {visibleItems.map((item) => {
+              const validity = item.itemType === 'course'
+                ? getCourseValidity(item.expiresAt, currentTime)
+                : null;
+              const courseIsExpired = validity?.isExpired || false;
+              return (
               <article key={`${item.itemType}-${item.id}`} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 {item.coverImage ? (
                   <img src={item.coverImage} alt="" className="h-56 w-full bg-slate-100 object-cover" />
@@ -166,16 +221,21 @@ export default function MyLibrary() {
                       <p className="mt-1 text-xs font-semibold text-slate-600">
                         Access period: {item.duration || 'Not specified'}
                       </p>
-                      <p className={`mt-2 text-xs font-extrabold ${item.isExpired ? 'text-rose-700' : 'text-emerald-700'}`}>
-                        {item.isExpired ? 'Validity Expired' : item.remainingValidity}
+                      <p className="mt-1 text-xs text-slate-500">
+                        Expires {formatPurchaseDate(item.expiresAt)}
+                      </p>
+                      <p className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-extrabold ${
+                        courseIsExpired ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'
+                      }`}>
+                        {courseIsExpired ? 'Expired' : validity.remaining}
                       </p>
                       <a
-                        href={item.isExpired ? item.courseUrl.replace('?play=1', '?renew=1') : item.courseUrl}
+                        href={courseIsExpired ? item.courseUrl.replace('?play=1', '?renew=1') : item.courseUrl}
                         className={`mt-4 flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-center text-sm font-bold text-white ${
-                          item.isExpired ? 'bg-amber-600 hover:bg-amber-500' : 'bg-blue-950 hover:bg-blue-900'
+                          courseIsExpired ? 'bg-amber-600 hover:bg-amber-500' : 'bg-blue-950 hover:bg-blue-900'
                         }`}
                       >
-                        <PlayCircle className="h-4 w-4" /> {item.isExpired ? 'Renew Course' : 'Start Learning'}
+                        <PlayCircle className="h-4 w-4" /> {courseIsExpired ? 'Renew Course' : 'Start Learning'}
                       </a>
                     </>
                   ) : (
@@ -204,8 +264,10 @@ export default function MyLibrary() {
                   )}
                 </div>
               </article>
-            ))}
+            )})}
           </div>
+          )}
+          </>
         )}
       </main>
       <CartDrawer

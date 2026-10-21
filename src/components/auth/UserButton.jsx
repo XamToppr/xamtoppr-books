@@ -1,12 +1,10 @@
 import React, { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import AuthModal from "./AuthModal";
-import PurchaseHistoryModal from "../profile/PurchaseHistoryModal";
 
 export default function UserButton() {
   const { currentUser, userProfile, logout } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Check karein agar user logged in hai par phone missing hai to popup force open rahe
@@ -91,30 +89,6 @@ export default function UserButton() {
                   </p>
                 </div>
 
-                <button
-                  onClick={() => {
-                    setMenuOpen(false);
-                    setShowHistoryModal(true);
-                  }}
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    padding: "9px 14px",
-                    background: "none",
-                    border: "none",
-                    textAlign: "left",
-                    fontSize: "13px",
-                    color: "#374151",
-                    cursor: "pointer"
-                  }}
-                  onMouseEnter={(e) => (e.target.style.background = "#f3f4f6")}
-                  onMouseLeave={(e) => (e.target.style.background = "none")}
-                >
-                  <span>📚 My Purchases</span>
-                </button>
-
                 <a
                   href="/my-library"
                   onClick={() => setMenuOpen(false)}
@@ -135,7 +109,7 @@ export default function UserButton() {
                   onMouseEnter={(e) => (e.currentTarget.style.background = "#f3f4f6")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
                 >
-                  <span>📚 My Library</span>
+                  <span>📚 My Library &amp; Purchases</span>
                 </a>
 
                 <button
@@ -171,12 +145,6 @@ export default function UserButton() {
       <AuthModal
         isOpen={showAuthModal || needsPhone}
         onClose={() => setShowAuthModal(false)}
-      />
-
-      {/* Purchase History Modal */}
-      <PurchaseHistoryModal
-        isOpen={showHistoryModal}
-        onClose={() => setShowHistoryModal(false)}
       />
     </>
   );
