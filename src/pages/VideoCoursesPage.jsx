@@ -1112,16 +1112,11 @@ function VideoCoursesPage({
           <section
             role="dialog"
             aria-modal="true"
-            aria-labelledby="video-dialog-title"
+            aria-label="Video player"
             className="video-modal-panel relative max-h-[92vh] w-full overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl"
             style={{ maxWidth: activeVideo.type === 'shortReel' ? '28rem' : '48rem' }}
           >
-            <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 sm:px-6">
-              <div>
-                <p className="text-xs font-extrabold uppercase tracking-wider text-blue-700">{activeVideo.packTitle} · {activeVideo.duration}</p>
-                <h2 id="video-dialog-title" className="mt-1 text-xl font-black text-slate-950">{activeVideo.title}</h2>
-                <p className="mt-1 text-xs text-slate-500">{[activeVideo.subject, activeVideo.module, activeVideo.topic].filter(Boolean).join(' · ')}</p>
-              </div>
+            <header className="flex justify-end px-3 pt-3">
               <button
                 type="button"
                 onClick={closePlayer}
@@ -1149,59 +1144,16 @@ function VideoCoursesPage({
                 <VideoPlayer video={activeVideo} />
               )}
             </div>
-            {activeVideo.description?.length > 0 && (
-              <div className="prose prose-slate max-w-none border-t border-slate-200 px-5 py-4 sm:px-6">
-                <PortableText value={activeVideo.description} />
-              </div>
-            )}
-            {(activeVideo.classPdfUrl || activeVideo.mappedBook) && (
-              <div className="space-y-4 border-t border-slate-200 p-5 sm:p-6">
-                {activeVideo.classPdfUrl && (
-                  <a
-                    href={activeVideo.classPdfUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex min-h-11 items-center justify-center rounded-xl bg-blue-900 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-blue-800"
-                  >
-                    Download class PDF notes
-                  </a>
-                )}
-                {activeVideo.mappedBook && (
-                  <article className="flex flex-wrap items-center gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    {activeVideo.mappedBook.coverImageUrl && (
-                      <img
-                        src={activeVideo.mappedBook.coverImageUrl}
-                        alt={`${activeVideo.mappedBook.title} cover`}
-                        className="h-24 w-16 rounded-lg object-cover"
-                        loading="lazy"
-                      />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-extrabold uppercase tracking-wider text-blue-700">Related book</p>
-                      <h3 className="mt-1 font-extrabold text-slate-950">{activeVideo.mappedBook.title}</h3>
-                      {activeVideo.mappedBook.author && (
-                        <p className="mt-1 text-xs text-slate-600">{activeVideo.mappedBook.author}</p>
-                      )}
-                      {activeVideo.mappedBook.offerPrice != null && (
-                        <p className="mt-2 text-sm font-extrabold text-blue-950">
-                          {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(activeVideo.mappedBook.offerPrice)}
-                        </p>
-                      )}
-                    </div>
-                    {activeVideo.mappedBook.slug && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          closePlayer();
-                          navigate(`/book/${encodeURIComponent(activeVideo.mappedBook.slug)}`);
-                        }}
-                        className="min-h-10 rounded-xl border border-blue-200 bg-white px-4 py-2 text-xs font-extrabold text-blue-900 transition hover:bg-blue-50"
-                      >
-                        View book
-                      </button>
-                    )}
-                  </article>
-                )}
+            {activeVideo.classPdfUrl && (
+              <div className="border-t border-slate-200 p-4">
+                <a
+                  href={activeVideo.classPdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl bg-blue-900 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-blue-800"
+                >
+                  Download class PDF notes
+                </a>
               </div>
             )}
           </section>
