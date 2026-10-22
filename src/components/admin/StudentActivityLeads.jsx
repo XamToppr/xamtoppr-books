@@ -26,6 +26,7 @@ const LEAD_LABELS = {
 };
 
 const PAYMENT_DROP_ACTIONS = ['payment_dropped', 'payment_failed', 'payment_abandoned'];
+const HISTORY_PAGE_SIZE = 25;
 
 const formatDate = (value) => {
   if (!value) return '—';
@@ -45,6 +46,19 @@ const formatWatchDuration = (seconds) => {
 const timestampValue = (value) => {
   const parsed = value ? new Date(value).getTime() : 0;
   return Number.isNaN(parsed) ? 0 : parsed;
+};
+
+const isInHistoryDateRange = (activity, range, startDate, endDate, currentTime) => {
+  if (range === 'all') return true;
+  const timestamp = timestampValue(activity.timestamp);
+  if (!timestamp) return false;
+  if (range === '7days') return timestamp >= currentTime - 7 * 24 * 60 * 60 * 1000;
+  if (range === '30days') return timestamp >= currentTime - 30 * 24 * 60 * 60 * 1000;
+
+  const start = startDate ? new Date(`${startDate}T00:00:00`).getTime() : null;
+  const end = endDate ? new Date(`${endDate}T23:59:59.999`).getTime() : null;
+  return (start === null || timestamp >= start)
+    && (end === null || timestamp <= end);
 };
 
 const getWhatsAppNumber = (phone) => {
@@ -162,6 +176,10 @@ export default function StudentActivityLeads() {
   const [followUpFilter, setFollowUpFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [expandedStudent, setExpandedStudent] = useState(null);
+  const [historyDateRange, setHistoryDateRange] = useState('all');
+  const [historyStartDate, setHistoryStartDate] = useState('');
+  const [historyEndDate, setHistoryEndDate] = useState('');
+  const [historyVisibleCount, setHistoryVisibleCount] = useState(HISTORY_PAGE_SIZE);
   const [activeLead, setActiveLead] = useState(null);
   const [remark, setRemark] = useState('');
   const [followUpStatus, setFollowUpStatus] = useState('Pending');
@@ -583,7 +601,10 @@ export default function StudentActivityLeads() {
                         <button
                           type="button"
                           aria-expanded={isExpanded}
-                          onClick={() => setExpandedStudent(isExpanded ? null : student.key)}
+                          onClick={() => {
+                            setHistoryVisibleCount(HISTORY_PAGE_SIZE);
+                            setExpandedStudent(isExpanded ? null : student.key);
+                          }}
                         >
                           {isExpanded ? '− Hide History' : '+ View History'}
                         </button>
@@ -595,8 +616,85 @@ export default function StudentActivityLeads() {
                           <section aria-label={`${student.name || 'Student'} activity history`} style={{ margin: 14, overflow: 'hidden', border: '1px solid #cbd5e1', borderRadius: 10, background: '#fff', boxShadow: 'inset 0 1px 2px rgba(15, 23, 42, 0.04)' }}>
                             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '11px 14px', borderBottom: '1px solid #dbe2ea', background: '#f8fafc' }}>
                               <strong style={{ color: '#1e293b', fontSize: 13 }}>Activity history</strong>
-                              <span style={{ color: '#64748b', fontSize: 12 }}>{student.activities.length} recorded events · chronological</span>
+                              <span style={{ color: '#64748b', fontSize: 12 }}>
+                                {student.activities.filter((activity) => isInHistoryDateRange(
+                                  activity,
+                                  historyDateRange,
+                                  historyStartDate,
+                                  historyEndDate,
+                                  now ?? Date.now()
+                                )).length} matching events · chronological
+                              </span>
                             </header>
+                            <nav aria-label="Activity history date range" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '10px 14px', borderBottom: '1px solid #e5e7eb' }}>
+                              {[
+                                ['all', 'All Time'],
+                                ['7days', 'Last 7 Days'],
+                                ['30days', 'Last 30 Days'],
+                                ['custom', 'Custom']
+                              ].map(([range, label]) => (
+                                <button
+                                  key={range}
+                                  type="button"
+                                  aria-pressed={historyDateRange === range}
+                                  onClick={() => {
+                                    setHistoryDateRange(range);
+                                    setHistoryVisibleCount(HISTORY_PAGE_SIZE);
+                                  }}
+                                  style={{
+                                    ...controlStyle,
+                                    minHeight: 34,
+                                    padding: '6px 9px',
+                                    cursor: 'pointer',
+                                    fontWeight: 700,
+                                    color: historyDateRange === range ? '#fff' : '#374151',
+                                    background: historyDateRange === range ? '#1d4ed8' : '#fff',
+                                    borderColor: historyDateRange === range ? '#1d4ed8' : '#d1d5db'
+                                  }}
+                                >
+                                  {label}
+                                </button>
+                              ))}
+                              {historyDateRange === 'custom' && (
+                                <>
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#475569', fontSize: 12 }}>
+                                    From
+                                    <input
+                                      type="date"
+                                      value={historyStartDate}
+                                      onChange={(event) => {
+                                        setHistoryStartDate(event.target.value);
+                                        setHistoryVisibleCount(HISTORY_PAGE_SIZE);
+                                      }}
+                                      style={{ ...controlStyle, minHeight: 34, padding: '5px 8px' }}
+                                    />
+                                  </label>
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#475569', fontSize: 12 }}>
+                                    To
+                                    <input
+                                      type="date"
+                                      value={historyEndDate}
+                                      onChange={(event) => {
+                                        setHistoryEndDate(event.target.value);
+                                        setHistoryVisibleCount(HISTORY_PAGE_SIZE);
+                                      }}
+                                      style={{ ...controlStyle, minHeight: 34, padding: '5px 8px' }}
+                                    />
+                                  </label>
+                                </>
+                              )}
+                            </nav>
+                            {(() => {
+                              const matchingActivities = student.activities.filter((activity) => isInHistoryDateRange(
+                                activity,
+                                historyDateRange,
+                                historyStartDate,
+                                historyEndDate,
+                                now ?? Date.now()
+                              ));
+                              const visibleActivities = matchingActivities.slice(-historyVisibleCount);
+                              return (
+                                <>
                           <table className="student-history-table" style={{ width: '100%', minWidth: 900, borderCollapse: 'collapse', textAlign: 'left' }}>
                             <thead>
                               <tr>
@@ -605,8 +703,8 @@ export default function StudentActivityLeads() {
                               </tr>
                             </thead>
                             <tbody>
-                              {Array.isArray(student.activities) && student.activities.length > 0
-                                ? student.activities.map((activity, index) => {
+                              {visibleActivities.length > 0
+                                ? visibleActivities.map((activity, index) => {
                                   const item = activity || {};
                                   return (
                                     <tr key={item._id || `${student.key}-activity-${index}`}>
@@ -635,12 +733,26 @@ export default function StudentActivityLeads() {
                                 : (
                                   <tr>
                                     <td colSpan={8} style={{ ...cellStyle, textAlign: 'center', color: '#64748b' }}>
-                                      No activity history available.
+                                      No activity found for this date range.
                                     </td>
                                   </tr>
                                 )}
                             </tbody>
                           </table>
+                                  {visibleActivities.length < matchingActivities.length && (
+                                    <div style={{ display: 'flex', justifyContent: 'center', padding: 12, borderTop: '1px solid #e5e7eb' }}>
+                                      <button
+                                        type="button"
+                                        onClick={() => setHistoryVisibleCount((count) => count + HISTORY_PAGE_SIZE)}
+                                        style={{ ...controlStyle, cursor: 'pointer', fontWeight: 700 }}
+                                      >
+                                        Load More History
+                                      </button>
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </section>
                         </td>
                       </tr>
