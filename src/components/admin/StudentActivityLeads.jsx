@@ -61,6 +61,24 @@ const isInHistoryDateRange = (activity, range, startDate, endDate, currentTime) 
     && (end === null || timestamp <= end);
 };
 
+const isActivityInExportDateRange = (activity, range, startDate, endDate, currentTime) => {
+  if (range === 'all') return true;
+  const timestamp = timestampValue(activity.timestamp);
+  if (!timestamp) return false;
+  if (range === 'today') {
+    const today = new Date(currentTime);
+    today.setHours(0, 0, 0, 0);
+    return timestamp >= today.getTime() && timestamp <= currentTime;
+  }
+  if (range === '7days') return timestamp >= currentTime - 7 * 24 * 60 * 60 * 1000 && timestamp <= currentTime;
+  if (range === '30days') return timestamp >= currentTime - 30 * 24 * 60 * 60 * 1000 && timestamp <= currentTime;
+
+  const start = startDate ? new Date(`${startDate}T00:00:00`).getTime() : null;
+  const end = endDate ? new Date(`${endDate}T23:59:59.999`).getTime() : null;
+  return (start === null || timestamp >= start)
+    && (end === null || timestamp <= end);
+};
+
 const getWhatsAppNumber = (phone) => {
   const digits = String(phone || '').replace(/\D/g, '');
   return digits.length === 10 ? `91${digits}` : digits;
@@ -180,6 +198,12 @@ export default function StudentActivityLeads() {
   const [historyStartDate, setHistoryStartDate] = useState('');
   const [historyEndDate, setHistoryEndDate] = useState('');
   const [historyVisibleCount, setHistoryVisibleCount] = useState(HISTORY_PAGE_SIZE);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportDateRange, setExportDateRange] = useState('all');
+  const [exportStartDate, setExportStartDate] = useState('');
+  const [exportEndDate, setExportEndDate] = useState('');
+  const [exportLeadCategory, setExportLeadCategory] = useState('all');
+  const [exportFollowUpStatus, setExportFollowUpStatus] = useState('all');
   const [activeLead, setActiveLead] = useState(null);
   const [remark, setRemark] = useState('');
   const [followUpStatus, setFollowUpStatus] = useState('Pending');
@@ -243,10 +267,16 @@ export default function StudentActivityLeads() {
     [followUps]
   );
 
+  const allStudents = useMemo(() => (
+    groupActivitiesByStudent(activities).map((student) => ({
+      ...student,
+      followUp: followUpsByIdentity.get(student.key) || null
+    }))
+  ), [activities, followUpsByIdentity]);
+
   const students = useMemo(() => {
     const normalizedSearch = search.trim().toLocaleLowerCase();
-    return groupActivitiesByStudent(activities).filter((student) => {
-      student.followUp = followUpsByIdentity.get(student.key) || null;
+    return allStudents.filter((student) => {
       const status = student.followUp?.status || 'Pending';
       if (leadTag !== 'all' && student.leadStatus !== leadTag) return false;
       if (activityType !== 'all' && !student.activities.some(({ action }) => action === activityType)) return false;
@@ -258,7 +288,32 @@ export default function StudentActivityLeads() {
         || [student.name, student.phone]
           .some((value) => value.toLocaleLowerCase().includes(normalizedSearch));
     });
-  }, [activities, activityType, followUpFilter, followUpsByIdentity, leadTag, quickFilter, search]);
+  }, [activityType, allStudents, followUpFilter, leadTag, quickFilter, search]);
+
+  const exportRangeError = exportDateRange !== 'custom'
+    ? ''
+    : !exportStartDate || !exportEndDate
+      ? 'Choose both a start and end date for a custom range.'
+      : exportStartDate > exportEndDate
+        ? 'The start date must be on or before the end date.'
+        : '';
+
+  const exportStudents = useMemo(() => allStudents.filter((student) => {
+    const hasActivityInRange = student.activities.some((activity) => isActivityInExportDateRange(
+      activity,
+      exportDateRange,
+      exportStartDate,
+      exportEndDate,
+      now ?? Date.now()
+    ));
+    if (!hasActivityInRange) return false;
+
+    if (exportLeadCategory === 'dropped' && !student.activeDrop) return false;
+    if (exportLeadCategory === 'customers' && !student.bookCount) return false;
+    if (exportLeadCategory === 'warm' && !student.activities.some(({ action }) => action === 'read_sample_pdf')) return false;
+    if (exportFollowUpStatus !== 'all' && (student.followUp?.status || 'Pending') !== exportFollowUpStatus) return false;
+    return true;
+  }), [allStudents, exportDateRange, exportEndDate, exportFollowUpStatus, exportLeadCategory, exportStartDate, now]);
 
   const openRemarkModal = (student) => {
     setActiveLead(student);
@@ -311,7 +366,17 @@ export default function StudentActivityLeads() {
     }
   };
 
+  const openExportModal = () => {
+    setExportDateRange('all');
+    setExportStartDate('');
+    setExportEndDate('');
+    setExportLeadCategory('all');
+    setExportFollowUpStatus('all');
+    setShowExportModal(true);
+  };
+
   const downloadCsv = () => {
+    if (exportRangeError || exportStudents.length === 0) return;
     const columns = [
       'Name',
       'Phone',
@@ -326,7 +391,7 @@ export default function StudentActivityLeads() {
       'Follow-up Status',
       'Latest Follow-up Remark'
     ];
-    const rows = students.map((student) => [
+    const rows = exportStudents.map((student) => [
       student.name,
       student.phone,
       student.email,
@@ -348,6 +413,7 @@ export default function StudentActivityLeads() {
     link.download = `xamtoppr-leads-${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
+    setShowExportModal(false);
   };
 
   const controlStyle = {
@@ -376,7 +442,7 @@ export default function StudentActivityLeads() {
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>Student Activity &amp; Leads</h1>
           <p style={{ margin: '6px 0 0', color: '#6b7280' }}>One row per student, with a chronological activity history.</p>
         </div>
-        <button type="button" onClick={downloadCsv} disabled={loading || students.length === 0}>
+        <button type="button" onClick={openExportModal} disabled={loading || allStudents.length === 0}>
           Download Leads (CSV)
         </button>
       </header>
@@ -768,6 +834,113 @@ export default function StudentActivityLeads() {
         </div>
       )}
       <p style={{ color: '#6b7280' }}>{students.length} students</p>
+      {showExportModal && (
+        <div
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setShowExportModal(false);
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1000,
+            display: 'grid',
+            placeItems: 'center',
+            padding: 16,
+            background: 'rgba(15, 23, 42, 0.55)'
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="lead-export-title"
+            style={{ width: 'min(100%, 520px)', padding: 24, borderRadius: 14, background: '#fff', boxShadow: '0 20px 50px rgba(15, 23, 42, 0.25)' }}
+          >
+            <h2 id="lead-export-title" style={{ margin: '0 0 6px', fontSize: 20 }}>
+              Export leads
+            </h2>
+            <p style={{ margin: '0 0 20px', color: '#64748b' }}>
+              Choose which leads to include in your CSV.
+            </p>
+            <label style={{ display: 'block', marginBottom: 14, fontWeight: 700 }}>
+              Activity date range
+              <select
+                value={exportDateRange}
+                onChange={(event) => setExportDateRange(event.target.value)}
+                style={{ ...controlStyle, display: 'block', width: '100%', boxSizing: 'border-box', marginTop: 6 }}
+              >
+                <option value="today">Today</option>
+                <option value="7days">Last 7 Days</option>
+                <option value="30days">Last 30 Days</option>
+                <option value="all">All Time</option>
+                <option value="custom">Custom Range</option>
+              </select>
+            </label>
+            {exportDateRange === 'custom' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+                <label style={{ fontWeight: 700 }}>
+                  From
+                  <input
+                    type="date"
+                    value={exportStartDate}
+                    onChange={(event) => setExportStartDate(event.target.value)}
+                    style={{ ...controlStyle, display: 'block', width: '100%', boxSizing: 'border-box', marginTop: 6 }}
+                  />
+                </label>
+                <label style={{ fontWeight: 700 }}>
+                  To
+                  <input
+                    type="date"
+                    value={exportEndDate}
+                    onChange={(event) => setExportEndDate(event.target.value)}
+                    style={{ ...controlStyle, display: 'block', width: '100%', boxSizing: 'border-box', marginTop: 6 }}
+                  />
+                </label>
+              </div>
+            )}
+            <label style={{ display: 'block', marginBottom: 14, fontWeight: 700 }}>
+              Lead category
+              <select
+                value={exportLeadCategory}
+                onChange={(event) => setExportLeadCategory(event.target.value)}
+                style={{ ...controlStyle, display: 'block', width: '100%', boxSizing: 'border-box', marginTop: 6 }}
+              >
+                <option value="all">All Leads</option>
+                <option value="dropped">Dropped Checkouts (Urgent)</option>
+                <option value="customers">Existing Customers</option>
+                <option value="warm">Warm Readers</option>
+              </select>
+            </label>
+            <label style={{ display: 'block', fontWeight: 700 }}>
+              Follow-up status
+              <select
+                value={exportFollowUpStatus}
+                onChange={(event) => setExportFollowUpStatus(event.target.value)}
+                style={{ ...controlStyle, display: 'block', width: '100%', boxSizing: 'border-box', marginTop: 6 }}
+              >
+                <option value="all">All Follow-up Statuses</option>
+                {FOLLOW_UP_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+              </select>
+            </label>
+            {exportRangeError && <p role="alert" style={{ margin: '12px 0 0', color: '#b91c1c' }}>{exportRangeError}</p>}
+            <p style={{ margin: '14px 0 0', color: '#64748b', fontSize: 13 }}>
+              {exportStudents.length} {exportStudents.length === 1 ? 'lead' : 'leads'} match these filters.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
+              <button type="button" onClick={() => setShowExportModal(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={downloadCsv}
+                disabled={Boolean(exportRangeError) || exportStudents.length === 0}
+              >
+                Export &amp; Download CSV
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
       {activeLead && (
         <div
           role="presentation"
