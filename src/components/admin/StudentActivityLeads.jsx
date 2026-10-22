@@ -1,5 +1,8 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useClient } from 'sanity';
 import sanityClient from '../../sanityClient';
+
+const FOLLOW_UP_STATUSES = ['Pending', 'Contacted', 'Converted', 'Not Interested'];
 
 const ACTIVITY_LABELS = {
   daily_login_visit: 'Daily Website Visit',
@@ -67,6 +70,12 @@ const getStudentKey = (activity) => {
   return identity ? String(identity).toLocaleLowerCase() : `activity:${activity._id}`;
 };
 
+const getFollowUpId = async (identity) => {
+  const digest = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(identity));
+  const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return `leadFollowUp-${hash}`;
+};
+
 const getLeadStatus = (student) => {
   const latestDrop = [...student.activities].reverse()
     .find(({ action }) => PAYMENT_DROP_ACTIONS.includes(action));
@@ -89,6 +98,8 @@ const groupActivitiesByStudent = (activities) => {
     const key = getStudentKey(activity);
     const student = grouped.get(key) || {
       key,
+      uid: '',
+      studentRef: '',
       name: '',
       phone: '',
       email: '',
@@ -96,6 +107,8 @@ const groupActivitiesByStudent = (activities) => {
       activities: []
     };
 
+    student.uid ||= activity.uid || '';
+    student.studentRef ||= activity.student?._ref || '';
     student.name ||= activity.studentName || '';
     student.phone ||= activity.phone || '';
     student.email ||= activity.email || '';
@@ -140,12 +153,20 @@ const groupActivitiesByStudent = (activities) => {
 const escapeCsv = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
 
 export default function StudentActivityLeads() {
+  const studioClient = useClient({ apiVersion: '2024-01-01' });
   const [activities, setActivities] = useState([]);
+  const [followUps, setFollowUps] = useState([]);
   const [activityType, setActivityType] = useState('all');
   const [leadTag, setLeadTag] = useState('all');
   const [quickFilter, setQuickFilter] = useState('all');
+  const [followUpFilter, setFollowUpFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [expandedStudent, setExpandedStudent] = useState(null);
+  const [activeLead, setActiveLead] = useState(null);
+  const [remark, setRemark] = useState('');
+  const [followUpStatus, setFollowUpStatus] = useState('Pending');
+  const [savingRemark, setSavingRemark] = useState(false);
+  const [followUpError, setFollowUpError] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [now, setNow] = useState(null);
@@ -159,6 +180,22 @@ export default function StudentActivityLeads() {
       window.clearInterval(interval);
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    studioClient.fetch(
+      '*[_type == "leadFollowUp"]{_id, identity, uid, student, studentName, status, latestRemark, updatedAt, history}'
+    ).then((rows) => {
+      if (active) setFollowUps(rows);
+    }).catch((fetchError) => {
+      console.error('Failed to load lead follow-ups:', fetchError);
+      if (active) setFollowUpError('Unable to load lead follow-ups. Please try again.');
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [studioClient]);
 
   useEffect(() => {
     let active = true;
@@ -183,19 +220,78 @@ export default function StudentActivityLeads() {
     };
   }, []);
 
+  const followUpsByIdentity = useMemo(
+    () => new Map(followUps.map((followUp) => [followUp.identity, followUp])),
+    [followUps]
+  );
+
   const students = useMemo(() => {
     const normalizedSearch = search.trim().toLocaleLowerCase();
     return groupActivitiesByStudent(activities).filter((student) => {
+      student.followUp = followUpsByIdentity.get(student.key) || null;
+      const status = student.followUp?.status || 'Pending';
       if (leadTag !== 'all' && student.leadStatus !== leadTag) return false;
       if (activityType !== 'all' && !student.activities.some(({ action }) => action === activityType)) return false;
       if (quickFilter === 'dropped' && !student.activeDrop) return false;
       if (quickFilter === 'customers' && !student.bookCount) return false;
       if (quickFilter === 'warm' && !student.activities.some(({ action }) => action === 'read_sample_pdf')) return false;
+      if (followUpFilter !== 'all' && status !== followUpFilter) return false;
       return !normalizedSearch
         || [student.name, student.phone]
           .some((value) => value.toLocaleLowerCase().includes(normalizedSearch));
     });
-  }, [activities, activityType, leadTag, quickFilter, search]);
+  }, [activities, activityType, followUpFilter, followUpsByIdentity, leadTag, quickFilter, search]);
+
+  const openRemarkModal = (student) => {
+    setActiveLead(student);
+    setRemark('');
+    setFollowUpStatus(student.followUp?.status || 'Pending');
+    setFollowUpError('');
+  };
+
+  const saveFollowUp = async (event) => {
+    event.preventDefault();
+    const note = remark.trim();
+    if (!activeLead || !note || savingRemark) return;
+
+    setSavingRemark(true);
+    setFollowUpError('');
+    try {
+      const id = await getFollowUpId(activeLead.key);
+      await studioClient.createIfNotExists({
+        _id: id,
+        _type: 'leadFollowUp',
+        identity: activeLead.key,
+        uid: activeLead.uid || undefined,
+        student: activeLead.studentRef ? { _type: 'reference', _ref: activeLead.studentRef } : undefined,
+        studentName: activeLead.name || 'Student',
+        status: followUpStatus
+      });
+      const createdAt = new Date().toISOString();
+      const entry = {
+        _key: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        remark: note,
+        status: followUpStatus,
+        createdAt
+      };
+      const savedFollowUp = await studioClient.patch(id)
+        .set({ status: followUpStatus, latestRemark: note, updatedAt: createdAt })
+        .setIfMissing({ history: [] })
+        .append('history', [entry])
+        .commit();
+
+      setFollowUps((current) => [
+        ...current.filter((followUp) => followUp._id !== id),
+        savedFollowUp
+      ]);
+      setActiveLead(null);
+    } catch (saveError) {
+      console.error('Failed to save lead follow-up:', saveError);
+      setFollowUpError('Unable to save this follow-up. Check your Sanity permissions and try again.');
+    } finally {
+      setSavingRemark(false);
+    }
+  };
 
   const downloadCsv = () => {
     const columns = [
@@ -208,7 +304,9 @@ export default function StudentActivityLeads() {
       'Total Coins',
       'Total Actions',
       'Latest Interested Book',
-      'Last Active Time'
+      'Last Active Time',
+      'Follow-up Status',
+      'Latest Follow-up Remark'
     ];
     const rows = students.map((student) => [
       student.name,
@@ -220,7 +318,9 @@ export default function StudentActivityLeads() {
       student.totalCoins,
       student.activities.length,
       student.latestBook,
-      formatDate(student.lastActiveAt)
+      formatDate(student.lastActiveAt),
+      student.followUp?.status || 'Pending',
+      student.followUp?.latestRemark || ''
     ]);
     const csv = [columns, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\r\n');
     const file = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
@@ -289,6 +389,33 @@ export default function StudentActivityLeads() {
         ))}
       </nav>
 
+      <nav aria-label="Follow-up status filters" style={{ display: 'flex', gap: 8, margin: '12px 0 20px', flexWrap: 'wrap' }}>
+        {[
+          ['all', 'All Follow-ups'],
+          ['Pending', 'Pending Follow-ups'],
+          ['Contacted', 'Contacted'],
+          ['Converted', 'Converted'],
+          ['Not Interested', 'Not Interested']
+        ].map(([status, label]) => (
+          <button
+            key={status}
+            type="button"
+            aria-pressed={followUpFilter === status}
+            onClick={() => setFollowUpFilter(status)}
+            style={{
+              ...controlStyle,
+              cursor: 'pointer',
+              fontWeight: 700,
+              color: followUpFilter === status ? '#fff' : '#374151',
+              background: followUpFilter === status ? '#0f766e' : '#fff',
+              borderColor: followUpFilter === status ? '#0f766e' : '#d1d5db'
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
       <section aria-label="Student filters" style={{ display: 'flex', gap: 12, margin: '20px 0', flexWrap: 'wrap' }}>
         <label>
           Activity Type{' '}
@@ -329,12 +456,13 @@ export default function StudentActivityLeads() {
       </section>
 
       {error && <p role="alert" style={{ color: '#b91c1c' }}>{error}</p>}
+      {followUpError && !activeLead && <p role="alert" style={{ color: '#b91c1c' }}>{followUpError}</p>}
       {loading ? <p>Loading student activity…</p> : (
         <div style={{ overflowX: 'auto', border: '1px solid #dbe2ea', borderRadius: 12, background: '#fff', boxShadow: '0 1px 3px rgba(15, 23, 42, 0.06)' }}>
-          <table style={{ width: '100%', minWidth: 1080, borderCollapse: 'collapse', textAlign: 'left' }}>
+          <table style={{ width: '100%', minWidth: 1260, borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr>
-                {['Student Name', 'Phone Number', 'Email', 'Customer Status & Active Alert', 'Total Coins', 'Total Activities', 'Latest Interested Book', 'Last Active', 'History']
+                {['Student Name', 'Phone Number', 'Email', 'Customer Status & Active Alert', 'Follow-up', 'Total Coins', 'Total Activities', 'Latest Interested Book', 'Last Active', 'History']
                   .map((heading) => <th key={heading} style={{ padding: '13px 14px', borderBottom: '1px solid #cbd5e1', background: '#f1f5f9', color: '#334155', fontSize: 12, fontWeight: 800, whiteSpace: 'nowrap' }}>{heading}</th>)}
               </tr>
             </thead>
@@ -400,6 +528,31 @@ export default function StudentActivityLeads() {
                           {LEAD_LABELS[student.leadStatus]}
                         </div>
                       </td>
+                      <td style={cellStyle}>
+                        <span style={{
+                          display: 'inline-flex',
+                          borderRadius: 999,
+                          padding: '4px 9px',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: student.followUp?.status === 'Converted' ? '#166534' : '#0f172a',
+                          background: student.followUp?.status === 'Converted' ? '#dcfce7' : '#e0f2fe',
+                          border: '1px solid #bae6fd'
+                        }}>
+                          {student.followUp?.status || 'Pending'}
+                        </span>
+                        <div style={{ maxWidth: 240, marginTop: 6, color: '#475569', fontSize: 12, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                          {student.followUp?.latestRemark || 'No remarks yet'}
+                        </div>
+                        {student.followUp?.updatedAt && (
+                          <div style={{ marginTop: 4, color: '#64748b', fontSize: 11 }}>
+                            {formatDate(student.followUp.updatedAt)}
+                          </div>
+                        )}
+                        <button type="button" onClick={() => openRemarkModal(student)} style={{ marginTop: 7 }}>
+                          + Add Remark
+                        </button>
+                      </td>
                       <td style={cellStyle}>{student.totalCoins}</td>
                       <td style={cellStyle}>{student.activities.length} activities</td>
                       <td style={{
@@ -438,7 +591,7 @@ export default function StudentActivityLeads() {
                     </tr>
                     {isExpanded && (
                       <tr>
-                        <td colSpan={9} style={{ padding: 0, background: '#eef2f7', borderBottom: '2px solid #cbd5e1' }}>
+                        <td colSpan={10} style={{ padding: 0, background: '#eef2f7', borderBottom: '2px solid #cbd5e1' }}>
                           <section aria-label={`${student.name || 'Student'} activity history`} style={{ margin: 14, overflow: 'hidden', border: '1px solid #cbd5e1', borderRadius: 10, background: '#fff', boxShadow: 'inset 0 1px 2px rgba(15, 23, 42, 0.04)' }}>
                             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '11px 14px', borderBottom: '1px solid #dbe2ea', background: '#f8fafc' }}>
                               <strong style={{ color: '#1e293b', fontSize: 13 }}>Activity history</strong>
@@ -496,13 +649,78 @@ export default function StudentActivityLeads() {
                 );
               })}
               {!students.length && (
-                <tr><td colSpan={9} style={{ padding: 20, textAlign: 'center', color: '#6b7280' }}>No matching students found.</td></tr>
+                <tr><td colSpan={10} style={{ padding: 20, textAlign: 'center', color: '#6b7280' }}>No matching students found.</td></tr>
               )}
             </tbody>
           </table>
         </div>
       )}
       <p style={{ color: '#6b7280' }}>{students.length} students</p>
+      {activeLead && (
+        <div
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !savingRemark) setActiveLead(null);
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1000,
+            display: 'grid',
+            placeItems: 'center',
+            padding: 16,
+            background: 'rgba(15, 23, 42, 0.55)'
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="lead-follow-up-title"
+            style={{ width: 'min(100%, 480px)', padding: 24, borderRadius: 14, background: '#fff', boxShadow: '0 20px 50px rgba(15, 23, 42, 0.25)' }}
+          >
+            <h2 id="lead-follow-up-title" style={{ margin: '0 0 6px', fontSize: 20 }}>
+              Add lead follow-up
+            </h2>
+            <p style={{ margin: '0 0 18px', color: '#64748b' }}>
+              {activeLead.name || 'Student'}{activeLead.phone ? ` · ${activeLead.phone}` : ''}
+            </p>
+            <form onSubmit={saveFollowUp}>
+              <label style={{ display: 'block', marginBottom: 14, fontWeight: 700 }}>
+                Follow-up status
+                <select
+                  value={followUpStatus}
+                  onChange={(event) => setFollowUpStatus(event.target.value)}
+                  style={{ ...controlStyle, display: 'block', width: '100%', boxSizing: 'border-box', marginTop: 6 }}
+                >
+                  {FOLLOW_UP_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+                </select>
+              </label>
+              <label style={{ display: 'block', fontWeight: 700 }}>
+                Remark
+                <textarea
+                  autoFocus
+                  required
+                  maxLength={2000}
+                  rows={5}
+                  value={remark}
+                  onChange={(event) => setRemark(event.target.value)}
+                  placeholder="Add a note about this follow-up..."
+                  style={{ ...controlStyle, display: 'block', width: '100%', boxSizing: 'border-box', marginTop: 6, resize: 'vertical' }}
+                />
+              </label>
+              {followUpError && <p role="alert" style={{ color: '#b91c1c' }}>{followUpError}</p>}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18 }}>
+                <button type="button" disabled={savingRemark} onClick={() => setActiveLead(null)}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={savingRemark || !remark.trim()}>
+                  {savingRemark ? 'Saving…' : 'Save follow-up'}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
     </main>
   );
 }

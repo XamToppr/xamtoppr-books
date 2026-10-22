@@ -1285,6 +1285,58 @@ const siteSettings = defineType({
   ]
 });
 
+const leadFollowUp = defineType({
+  name: 'leadFollowUp',
+  title: 'Lead Follow-up',
+  type: 'document',
+  fields: [
+    defineField({ name: 'identity', title: 'Student Identity Key', type: 'string', validation: (Rule) => Rule.required() }),
+    defineField({ name: 'uid', title: 'Firebase UID', type: 'string' }),
+    defineField({
+      name: 'student',
+      title: 'Student',
+      type: 'reference',
+      to: [{ type: 'studentUser' }]
+    }),
+    defineField({ name: 'studentName', title: 'Student Name', type: 'string' }),
+    defineField({
+      name: 'status',
+      title: 'Follow-up Status',
+      type: 'string',
+      options: { list: ['Pending', 'Contacted', 'Converted', 'Not Interested'] },
+      initialValue: 'Pending',
+      validation: (Rule) => Rule.required()
+    }),
+    defineField({ name: 'latestRemark', title: 'Latest Remark', type: 'text', rows: 3 }),
+    defineField({ name: 'updatedAt', title: 'Last Updated', type: 'datetime' }),
+    defineField({
+      name: 'history',
+      title: 'Follow-up History',
+      type: 'array',
+      of: [
+        defineArrayMember({
+          type: 'object',
+          fields: [
+            defineField({ name: 'remark', title: 'Remark', type: 'text', rows: 3, validation: (Rule) => Rule.required() }),
+            defineField({
+              name: 'status',
+              title: 'Status',
+              type: 'string',
+              options: { list: ['Pending', 'Contacted', 'Converted', 'Not Interested'] },
+              validation: (Rule) => Rule.required()
+            }),
+            defineField({ name: 'createdAt', title: 'Created At', type: 'datetime', validation: (Rule) => Rule.required() })
+          ]
+        })
+      ]
+    })
+  ],
+  preview: {
+    select: { title: 'studentName', subtitle: 'status' },
+    prepare: ({ title, subtitle }) => ({ title: title || 'Lead follow-up', subtitle })
+  }
+});
+
 export const schemaTypes = [
   ...masterTypes,
   book,
@@ -1311,6 +1363,7 @@ export const schemaTypes = [
   bookRequest,
   studentUser,
   userActivity,
+  leadFollowUp,
   coupon,
   siteSettings,
   examNotification,
