@@ -37,7 +37,6 @@ const syncStudentProfile = async (user, phone = "") => {
       : new Date().toISOString(),
   };
 
-  console.log("Syncing user to Sanity:", userData);
   try {
     const idToken = await user.getIdToken();
     const response = await fetch("/api/sync-student", {
@@ -56,7 +55,6 @@ const syncStudentProfile = async (user, phone = "") => {
     });
 
     const result = await response.json();
-    console.log("Sanity sync response:", result);
     if (!response.ok) {
       throw new Error(result.details || result.error || `Student profile sync failed with status ${response.status}.`);
     }

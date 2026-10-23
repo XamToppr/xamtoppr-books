@@ -94,7 +94,6 @@ export default async function handler(request, response) {
   try {
     const document = await syncStudentDocument(sanityClient, firebaseUser, phone, profile);
     const result = { success: true, documentId: document._id };
-    console.log('Student profile synced to Sanity:', result);
     return response.status(200).json(result);
   } catch (error) {
     console.error('Failed to sync a student profile to Sanity:', error);

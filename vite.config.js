@@ -180,7 +180,6 @@ const localStudentProfileApi = (env) => {
 
           const document = await syncStudentDocument(client, firebaseUser, phone, profile)
           const result = { success: true, documentId: document._id }
-          console.log('Student profile synced to Sanity:', result)
           response.statusCode = 200
           response.end(JSON.stringify(result))
         } catch (error) {
@@ -314,7 +313,6 @@ const localUserActivityApi = (env) => {
             reason,
             amount
           })
-          console.log("Logged Activity Successfully:", body)
           response.statusCode = 200
           response.end(JSON.stringify({ success: true, ...result }))
         } catch (error) {

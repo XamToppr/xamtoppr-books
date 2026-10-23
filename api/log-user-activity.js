@@ -63,14 +63,6 @@ export default async function handler(request, response) {
   const watchDurationSeconds = Number(body.watchDurationSeconds);
   const videoDurationSeconds = Number(body.videoDurationSeconds);
   const videoProgressPercent = Number(body.videoProgressPercent);
-  console.log('Logging activity received:', {
-    uid,
-    action,
-    bookId,
-    bookTitle,
-    amount,
-    reason
-  });
   const firebaseApiKey = getString(body.firebaseApiKey)
     || process.env.VITE_FIREBASE_API_KEY
     || process.env.FIREBASE_WEB_API_KEY;
@@ -144,7 +136,6 @@ export default async function handler(request, response) {
       videoProgressPercent
     };
     const result = await createSanityUserActivity(client, firebaseUser, payload);
-    console.log("Logged Activity Successfully:", request.body);
     return response.status(200).json({
       success: true,
       activityId: result.activityId,
