@@ -62,7 +62,6 @@ const syncStudentProfile = async (user, phone = "") => {
     }
     return true;
   } catch (err) {
-    if (err?.name === "AbortError") return false;
     console.error("Sanity sync error:", err);
     return false;
   }

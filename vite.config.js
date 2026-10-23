@@ -414,6 +414,15 @@ export default defineConfig(({ mode }) => {
     define: {
       'process.env': {}
     },
+    server: {
+      proxy: {
+        '/api/gemini': {
+          target: 'https://generativelanguage.googleapis.com',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/gemini/, '/v1beta/models/gemini-1.5-flash:generateContent')
+        }
+      }
+    },
     plugins: [
       localBookRequestApi(env),
       localStudentProfileApi(env),
