@@ -26,9 +26,7 @@ function getPaymentConfig(env) {
 }
 
 function getSanityClient(env) {
-  const token = env.SANITY_API_WRITE_TOKEN
-    || env.VITE_SANITY_WRITE_TOKEN
-    || env.VITE_SANITY_API_WRITE_TOKEN;
+  const token = env.SANITY_API_WRITE_TOKEN;
   if (!token) throw new PaymentRequestError(503, 'The server-side Sanity write token is not configured.');
   return createClient({
     projectId: env.SANITY_PROJECT_ID || env.VITE_SANITY_PROJECT_ID || 'rkev3aui',
@@ -441,7 +439,6 @@ export async function verifyRazorpayPayment({ body, authorization, env }) {
   const receivedSignature = Buffer.from(signature, 'hex');
   const signatureIsValid = expectedSignature.length === receivedSignature.length
     && timingSafeEqual(expectedSignature, receivedSignature);
-  console.log('Razorpay signature valid:', signatureIsValid);
   if (!signatureIsValid) {
     throw new PaymentRequestError(403, 'Razorpay payment signature is invalid.');
   }
@@ -512,8 +509,8 @@ export async function verifyRazorpayPayment({ body, authorization, env }) {
       bookId,
       pdfUrl: pdfUrlsByBookId.get(bookId) || null
     }));
-  } catch (sanityErr) {
-    console.error('Unable to resolve purchased PDF URLs from Sanity:', sanityErr);
+  } catch {
+    console.error('Unable to resolve purchased PDF URLs from Sanity.');
   }
   const profile = await sanity.getDocument(`student_${uid}`);
   await recordSanityPurchase(

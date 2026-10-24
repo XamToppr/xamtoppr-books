@@ -13,8 +13,6 @@ import tailwindcss from '@tailwindcss/vite'
 
 const localBookRequestApi = (env) => {
   const writeToken = env.SANITY_API_WRITE_TOKEN
-    || env.VITE_SANITY_WRITE_TOKEN
-    || env.VITE_SANITY_API_WRITE_TOKEN
   const client = writeToken
     ? createClient({
       projectId: env.SANITY_PROJECT_ID || env.VITE_SANITY_PROJECT_ID || 'rkev3aui',
@@ -89,7 +87,7 @@ const localBookRequestApi = (env) => {
             return
           }
 
-          console.error('Failed to create a local book request in Sanity:', error)
+          console.error('Failed to create a local book request in Sanity.')
           response.statusCode = 500
           response.end(JSON.stringify({ success: false, error: 'Unable to submit the book request.' }))
         }
@@ -100,8 +98,6 @@ const localBookRequestApi = (env) => {
 
 const localStudentProfileApi = (env) => {
   const writeToken = env.SANITY_API_WRITE_TOKEN
-    || env.VITE_SANITY_WRITE_TOKEN
-    || env.VITE_SANITY_API_WRITE_TOKEN
   const client = writeToken
     ? createClient({
       projectId: env.SANITY_PROJECT_ID || env.VITE_SANITY_PROJECT_ID || 'rkev3aui',
@@ -131,7 +127,7 @@ const localStudentProfileApi = (env) => {
           response.end(JSON.stringify({
             success: false,
             error: 'Student profile sync is missing a server-side Sanity write token.',
-            missingConfiguration: ['SANITY_API_WRITE_TOKEN or a VITE_SANITY_* compatibility variable']
+            missingConfiguration: ['SANITY_API_WRITE_TOKEN']
           }))
           return
         }
@@ -194,7 +190,7 @@ const localStudentProfileApi = (env) => {
             return
           }
 
-          console.error('Failed to sync a local student profile to Sanity:', error)
+          console.error('Failed to sync a local student profile to Sanity.')
           response.statusCode = 500
           response.end(JSON.stringify({
             success: false,
@@ -209,8 +205,6 @@ const localStudentProfileApi = (env) => {
 
 const localUserActivityApi = (env) => {
   const writeToken = env.SANITY_API_WRITE_TOKEN
-    || env.VITE_SANITY_WRITE_TOKEN
-    || env.VITE_SANITY_API_WRITE_TOKEN
   const client = writeToken
     ? createClient({
       projectId: env.SANITY_PROJECT_ID || env.VITE_SANITY_PROJECT_ID || 'rkev3aui',
@@ -331,7 +325,7 @@ const localUserActivityApi = (env) => {
             response.end(JSON.stringify({ success: false, error: error.message }))
             return
           }
-          console.error('Failed to sync local student activity to Sanity:', error)
+          console.error('Failed to sync local student activity to Sanity.')
           response.statusCode = 500
           response.end(JSON.stringify({ success: false, error: 'Unable to sync student activity to Sanity.' }))
         }
@@ -371,7 +365,7 @@ const localRazorpayApi = (env) => ({
             response.end(JSON.stringify({ success: false, error: 'Request body must be valid JSON.' }))
             return
           }
-          console.error(`Failed to read local Razorpay request at ${path}:`, error)
+          console.error('Failed to read a local Razorpay request.')
           response.statusCode = 400
           response.end(JSON.stringify({ success: false, error: 'Unable to read the request body.' }))
           return
@@ -396,7 +390,7 @@ const localRazorpayApi = (env) => ({
             response.end(JSON.stringify({ success: false, error: error.message }))
             return
           }
-          console.error(`Failed to handle local Razorpay request at ${path}:`, error)
+          console.error('Failed to handle a local Razorpay request.')
           response.statusCode = 500
           response.end(JSON.stringify({ success: false, error: 'Unable to process the Razorpay request.' }))
         }

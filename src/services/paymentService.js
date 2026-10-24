@@ -140,10 +140,7 @@ export async function initiatePayment({
               orderToken: order.orderToken
             }, user);
           } catch (error) {
-            console.error(
-              'Verify payment response error:',
-              error.responseData || error.message
-            );
+            console.error('Verify payment request failed.');
             throw error;
           }
           if (verification.success !== true || !Array.isArray(verification.purchases)) {
@@ -161,14 +158,14 @@ export async function initiatePayment({
             if (!logged) {
               console.warn('Payment was verified, but the Firestore library update did not complete.');
             }
-          } catch (error) {
-            console.error('Unable to update the Firestore library after verified payment:', error);
+          } catch {
+            console.error('Unable to update the Firestore library after verified payment.');
           }
 
           try {
             await refreshUserProfile?.();
-          } catch (error) {
-            console.error('Unable to refresh the user profile after verified payment:', error);
+          } catch {
+            console.error('Unable to refresh the user profile after verified payment.');
           }
           paymentCompleted = true;
           if (clearCart) clearCart();
@@ -180,7 +177,7 @@ export async function initiatePayment({
             amount: order.amount / 100
           });
         } catch (error) {
-          console.error('Failed to finalize the verified Razorpay payment:', error);
+          console.error('Failed to finalize the verified Razorpay payment.');
           fail(error);
         }
       },
@@ -202,7 +199,7 @@ export async function initiatePayment({
     razorpay.open();
     return true;
   } catch (error) {
-    console.error('Unable to initiate Razorpay payment:', error);
+    console.error('Unable to initiate Razorpay payment.');
     fail(error);
     return false;
   }

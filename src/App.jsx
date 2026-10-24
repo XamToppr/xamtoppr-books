@@ -163,8 +163,8 @@ const getHighDefinitionSanityImageUrl = (assetUrl) => {
     imageUrl.searchParams.set('auto', 'format');
     imageUrl.searchParams.set('dpr', String(window.devicePixelRatio || 1));
     return imageUrl.toString();
-  } catch (error) {
-    console.error('Unable to prepare Sanity image URL:', error);
+  } catch {
+    console.error('Unable to prepare Sanity image URL.');
     return assetUrl;
   }
 };
@@ -334,9 +334,13 @@ function BookStoreApp() {
     try {
       const audio = new Audio('/page-flip.mp3');
       audio.volume = 1.0;
-      audio.play().catch((e) => console.log('Audio wait/block:', e));
-    } catch (err) {
-      console.error(err);
+      audio.play().catch((error) => {
+        if (error.name !== 'NotAllowedError') {
+          console.error('Unable to play page-turn audio.');
+        }
+      });
+    } catch {
+      console.error('Unable to play page-turn audio.');
     }
   };
 
@@ -461,7 +465,7 @@ function BookStoreApp() {
       })
       .catch((error) => {
         if (isAbortError(error)) return;
-        console.error('Failed to load books from Sanity:', error);
+        console.error('Failed to load books from Sanity.');
         if (isCurrentRequest) {
           setBookLoadError('Books could not be loaded from Sanity. Please try again later.');
         }
@@ -488,7 +492,7 @@ function BookStoreApp() {
       })
       .catch((error) => {
         if (isAbortError(error)) return;
-        console.error('Failed to load site settings from Sanity:', error);
+        console.error('Failed to load site settings from Sanity.');
       });
 
     return () => {
@@ -509,7 +513,7 @@ function BookStoreApp() {
       })
       .catch((error) => {
         if (isAbortError(error)) return;
-        console.error('Failed to load exam notifications from Sanity:', error);
+        console.error('Failed to load exam notifications from Sanity.');
         if (isCurrentRequest) {
           setBlogLoadError('Exam notifications could not be loaded. Please try again later.');
         }
@@ -649,7 +653,7 @@ function BookStoreApp() {
       })
       .catch((error) => {
         if (isAbortError(error)) return;
-        console.error('Failed to load exam notification details from Sanity:', error);
+        console.error('Failed to load exam notification details from Sanity.');
         if (isCurrentRequest) {
           setBlogDetailError('Notification details could not be loaded. Please try again.');
         }
@@ -675,8 +679,8 @@ function BookStoreApp() {
     try {
       await navigator.clipboard.writeText(bookUrl);
       showToast('Book link copied to clipboard!');
-    } catch (error) {
-      console.error('Unable to copy the book link:', error);
+    } catch {
+      console.error('Unable to copy the book link.');
       showToast('Could not copy the book link. Please try again.');
     }
   };
@@ -714,8 +718,8 @@ function BookStoreApp() {
         return;
       }
       localStorage.setItem(storageKey, 'true');
-    } catch (error) {
-      console.error('Unable to save the book download state:', error);
+    } catch {
+      console.error('Unable to save the book download state.');
     }
 
     downloadedBooksRef.current.add(book.sanityId);
@@ -726,7 +730,7 @@ function BookStoreApp() {
         .commit()
         .catch((error) => {
           if (isAbortError(error)) return;
-          console.error('Failed to update the book download count in Sanity:', error);
+          console.error('Failed to update the book download count in Sanity.');
         });
     }
   };
@@ -779,8 +783,8 @@ function BookStoreApp() {
           ? `Added video course "${book.title}" to your cart.`
           : `Added "${book.title}" to your cart.`);
       }
-    } catch (error) {
-      console.error('Unable to add this product to the cart:', error);
+    } catch {
+      console.error('Unable to add this product to the cart.');
       showToast('This item could not be added to your cart.');
     }
   };
@@ -901,8 +905,8 @@ function BookStoreApp() {
     try {
       if (localStorage.getItem(storageKey)) return false;
       localStorage.setItem(storageKey, String(userStar));
-    } catch (error) {
-      console.error('Unable to save the book rating state:', error);
+    } catch {
+      console.error('Unable to save the book rating state.');
       return false;
     }
 
@@ -920,7 +924,7 @@ function BookStoreApp() {
         .commit()
         .catch((error) => {
           if (isAbortError(error)) return;
-          console.error('Failed to update the book rating in Sanity:', error);
+          console.error('Failed to update the book rating in Sanity.');
         });
     }
     return true;
@@ -966,9 +970,9 @@ function BookStoreApp() {
       form.reset();
       setShowRequestBookModal(false);
       showToast('Your book request has been submitted successfully!');
-    } catch (error) {
+    } catch {
       if (isAbortError(error)) return;
-      console.error('Failed to submit the book request:', error);
+      console.error('Failed to submit the book request.');
       setBookRequestError(error instanceof Error && error.message
         ? error.message
         : 'Your request could not be submitted. Please try again.');
@@ -981,8 +985,8 @@ function BookStoreApp() {
     if (!sanityId) return false;
     try {
       return Boolean(localStorage.getItem(`rated_${sanityId}`));
-    } catch (error) {
-      console.error('Unable to load the saved book rating state:', error);
+    } catch {
+      console.error('Unable to load the saved book rating state.');
       return false;
     }
   };
@@ -1457,7 +1461,7 @@ function BookStoreApp() {
                   type="button"
                   onClick={() => {
                     setMobileMenuOpen(false);
-                    void logout().catch((error) => console.error('Failed to log out:', error));
+                    void logout().catch(() => console.error('Failed to log out.'));
                   }}
                   className="w-full rounded-lg border border-rose-400/40 px-3 py-2.5 text-center text-sm font-semibold text-rose-200 transition hover:bg-rose-950/40"
                 >
@@ -3010,8 +3014,8 @@ function BookStoreApp() {
             if (!document.fullscreenElement) {
               await document.documentElement.requestFullscreen();
             }
-          } catch (error) {
-            console.error('Failed to enter browser fullscreen:', error);
+          } catch {
+            console.error('Failed to enter browser fullscreen.');
             showToast('Browser fullscreen was blocked. Use the fullscreen control again to retry.');
           }
         };
@@ -3020,8 +3024,8 @@ function BookStoreApp() {
           if (document.fullscreenElement) {
             try {
               await document.exitFullscreen();
-            } catch (error) {
-              console.error('Failed to exit browser fullscreen:', error);
+            } catch {
+              console.error('Failed to exit browser fullscreen.');
               showToast('Could not exit browser fullscreen. Press Escape to leave fullscreen.');
             }
           } else {
@@ -3032,8 +3036,8 @@ function BookStoreApp() {
           if (document.fullscreenElement) {
             try {
               await document.exitFullscreen();
-            } catch (error) {
-              console.error('Failed to exit browser fullscreen while closing flipbook:', error);
+            } catch {
+              console.error('Failed to exit browser fullscreen while closing flipbook.');
               showToast('Could not close the fullscreen reader. Press Escape and try again.');
               return;
             }
@@ -3734,7 +3738,7 @@ function SiteContentPage({ page }) {
       })
       .catch((error) => {
         if (isAbortError(error)) return;
-        console.error(`Failed to load ${page.title} content from Sanity:`, error);
+        console.error('Failed to load page content from Sanity.');
         if (isCurrentRequest) {
           setLoadError(`The ${page.title.toLowerCase()} page could not be loaded. Please try again later.`);
         }

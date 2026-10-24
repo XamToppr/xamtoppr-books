@@ -18,8 +18,8 @@ export default function CopyCouponIcon({ code: couponCode, title }) {
         status: 'success',
         duration: 2500
       });
-    } catch (error) {
-      console.error('Unable to copy the coupon code:', error);
+    } catch {
+      console.error('Unable to copy the coupon code.');
       toast.push({
         title: 'Unable to copy coupon code',
         description: 'Check clipboard permissions and try again.',

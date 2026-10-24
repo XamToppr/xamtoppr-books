@@ -49,8 +49,8 @@ export default function MyLibrary() {
       try {
         const libraryBooks = await fetchUserLibrary(currentUser);
         if (isCurrentRequest) setLibraryItems(libraryBooks);
-      } catch (error) {
-        console.error('Unable to load the user library:', error);
+      } catch {
+        console.error('Unable to load the user library.');
         if (isCurrentRequest) setLoadError('Your library could not be loaded. Please try again.');
       } finally {
         if (isCurrentRequest) setLoading(false);

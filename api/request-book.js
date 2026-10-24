@@ -8,9 +8,7 @@ export default async function handler(request, response) {
     return response.status(405).json({ success: false, error: 'Method not allowed.' });
   }
 
-  const sanityWriteToken = process.env.SANITY_API_WRITE_TOKEN
-    || process.env.VITE_SANITY_WRITE_TOKEN
-    || process.env.VITE_SANITY_API_WRITE_TOKEN;
+  const sanityWriteToken = process.env.SANITY_API_WRITE_TOKEN;
   if (!sanityWriteToken) {
     console.error('Book request endpoint is missing a server-side Sanity write token.');
     return response.status(503).json({
@@ -60,8 +58,8 @@ export default async function handler(request, response) {
     });
     await sanityClient.create(document);
     return response.status(200).json({ success: true });
-  } catch (error) {
-    console.error('Failed to create a book request in Sanity:', error);
+  } catch {
+    console.error('Failed to create a book request in Sanity.');
     return response.status(500).json({ success: false, error: 'Unable to submit the book request.' });
   }
 }

@@ -229,8 +229,8 @@ export default function StudentActivityLeads() {
       '*[_type == "leadFollowUp"]{_id, identity, uid, student, studentName, status, latestRemark, updatedAt, history}'
     ).then((rows) => {
       if (active) setFollowUps(rows);
-    }).catch((fetchError) => {
-      console.error('Failed to load lead follow-ups:', fetchError);
+    }).catch(() => {
+      console.error('Failed to load lead follow-ups.');
       if (active) setFollowUpError('Unable to load lead follow-ups. Please try again.');
     });
 
@@ -250,8 +250,8 @@ export default function StudentActivityLeads() {
       }`
     ).then((rows) => {
       if (active) setActivities(rows);
-    }).catch((fetchError) => {
-      console.error('Failed to load Student Activity & Leads:', fetchError);
+    }).catch(() => {
+      console.error('Failed to load Student Activity & Leads.');
       if (active) setError('Unable to load student activity. Please try again.');
     }).finally(() => {
       if (active) setLoading(false);
@@ -358,8 +358,8 @@ export default function StudentActivityLeads() {
         savedFollowUp
       ]);
       setActiveLead(null);
-    } catch (saveError) {
-      console.error('Failed to save lead follow-up:', saveError);
+    } catch {
+      console.error('Failed to save lead follow-up.');
       setFollowUpError('Unable to save this follow-up. Check your Sanity permissions and try again.');
     } finally {
       setSavingRemark(false);

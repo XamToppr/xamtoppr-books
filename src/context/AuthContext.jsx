@@ -59,8 +59,8 @@ const syncStudentProfile = async (user, phone = "") => {
       throw new Error(result.details || result.error || `Student profile sync failed with status ${response.status}.`);
     }
     return true;
-  } catch (err) {
-    console.error("Sanity sync error:", err);
+  } catch {
+    console.error("Sanity profile sync failed.");
     return false;
   }
 };
@@ -98,7 +98,7 @@ export const AuthProvider = ({ children }) => {
       setUserProfile(profile);
       return user;
     } catch (error) {
-      console.error("Google sign-in error:", error);
+      console.error("Google sign-in failed.");
       throw error;
     }
   };
@@ -126,7 +126,7 @@ export const AuthProvider = ({ children }) => {
       setUserProfile((prev) => ({ ...prev, phone: phoneNumber }));
       void syncStudentProfile(currentUser, phoneNumber);
     } catch (error) {
-      console.error("Error updating phone:", error);
+      console.error("Unable to update the phone number.");
       throw error;
     }
   };
@@ -145,7 +145,7 @@ export const AuthProvider = ({ children }) => {
       await signOut(auth);
       setUserProfile(null);
     } catch (error) {
-      console.error("Logout error:", error);
+      console.error("Logout failed.");
       throw error;
     }
   };
@@ -174,7 +174,7 @@ export const AuthProvider = ({ children }) => {
             }
           } catch (error) {
             if (error?.name !== "AbortError") {
-              console.error("Failed to restore the Firebase authentication session:", error);
+              console.error("Failed to restore the Firebase authentication session.");
             }
             if (isActive) {
               setUserProfile(null);
@@ -185,8 +185,8 @@ export const AuthProvider = ({ children }) => {
           }
         });
       })
-      .catch((error) => {
-        console.error("Failed to enable Firebase browser-local persistence:", error);
+      .catch(() => {
+        console.error("Failed to enable Firebase browser-local persistence.");
         if (isActive) setLoading(false);
       });
 

@@ -11,8 +11,8 @@ const readStoredCart = () => {
     return Array.isArray(parsedCart)
       ? parsedCart.filter((book) => book && typeof book.id === 'string' && typeof book.title === 'string')
       : [];
-  } catch (error) {
-    console.error('Unable to load the saved cart:', error);
+  } catch {
+    console.error('Unable to load the saved cart.');
     return [];
   }
 };
@@ -24,8 +24,8 @@ export function CartProvider({ children }) {
   useEffect(() => {
     try {
       localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems));
-    } catch (error) {
-      console.error('Unable to save the cart:', error);
+    } catch {
+      console.error('Unable to save the cart.');
     }
   }, [cartItems]);
 

@@ -23,9 +23,7 @@ export default async function handler(request, response) {
     return response.status(405).json({ success: false, error: 'Method not allowed.' });
   }
 
-  const sanityWriteToken = process.env.SANITY_API_WRITE_TOKEN
-    || process.env.VITE_SANITY_WRITE_TOKEN
-    || process.env.VITE_SANITY_API_WRITE_TOKEN;
+  const sanityWriteToken = process.env.SANITY_API_WRITE_TOKEN;
   if (!sanityWriteToken) {
     return response.status(503).json({ success: false, error: 'Activity logging is missing the server-side Sanity write token.' });
   }
@@ -102,7 +100,7 @@ export default async function handler(request, response) {
     if (error.code === 'INVALID_FIREBASE_TOKEN') {
       return response.status(401).json({ success: false, error: 'Authentication is invalid or expired.' });
     }
-    console.error('Unable to verify Firebase user for activity logging:', error);
+    console.error('Unable to verify Firebase user for activity logging.');
     return response.status(502).json({ success: false, error: 'Unable to verify the account right now.' });
   }
 
@@ -145,7 +143,7 @@ export default async function handler(request, response) {
     if (error.code === 'COURSE_NOT_ENROLLABLE') {
       return response.status(409).json({ success: false, error: error.message });
     }
-    console.error('Failed to write student activity to Sanity:', error);
+    console.error('Failed to write student activity to Sanity.');
     return response.status(500).json({ success: false, error: 'Unable to sync student activity to Sanity.' });
   }
 }

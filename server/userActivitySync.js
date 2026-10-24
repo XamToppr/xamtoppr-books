@@ -178,7 +178,7 @@ export async function createSanityUserActivity(client, firebaseUser, {
   try {
     await transaction.commit();
   } catch (error) {
-    console.error('Sanity transaction error in createSanityUserActivity:', error);
+    console.error('Sanity transaction failed in createSanityUserActivity.');
     throw error;
   }
 

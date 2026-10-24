@@ -29,9 +29,6 @@ async function readRequestBody(request) {
 }
 
 export default async function handler(request, response) {
-  console.log('Incoming verification request method:', request.method);
-  console.log('Has secret:', Boolean(process.env.RAZORPAY_KEY_SECRET || process.env.RAZORPAY_SECRET));
-
   if (request.method !== 'POST') {
     response.setHeader('Allow', 'POST');
     return response.status(405).json({ success: false, error: 'Method not allowed.' });
@@ -39,13 +36,6 @@ export default async function handler(request, response) {
 
   try {
     const body = await readRequestBody(request);
-    console.log('Verification payload fields present:', {
-      orderId: Boolean(body?.razorpay_order_id || body?.order_id || body?.razorpayOrderId || body?.orderId),
-      paymentId: Boolean(body?.razorpay_payment_id || body?.payment_id || body?.razorpayPaymentId || body?.paymentId),
-      signature: Boolean(body?.razorpay_signature || body?.signature || body?.razorpaySignature),
-      orderToken: Boolean(body?.orderToken),
-      uid: Boolean(body?.uid)
-    });
     const result = await verifyRazorpayPayment({
       body,
       authorization: request.headers.authorization,
@@ -60,7 +50,7 @@ export default async function handler(request, response) {
         message: error.message
       });
     }
-    console.error('Failed to verify Razorpay payment:', error);
+    console.error('Failed to verify Razorpay payment.');
     return response.status(500).json({
       success: false,
       error: 'Unable to verify the payment.',

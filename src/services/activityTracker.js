@@ -74,8 +74,8 @@ export async function logCheckoutActivity({
       throw new Error(responseBody.error || `Checkout activity logging failed with status ${response.status}.`);
     }
     return true;
-  } catch (error) {
-    console.error('Unable to log the checkout activity to Student Activity & Leads:', error);
+  } catch {
+    console.error('Unable to log the checkout activity to Student Activity & Leads.');
     return false;
   }
 }
@@ -121,8 +121,8 @@ export async function logVideoWatchActivity({
       throw new Error(responseBody.error || `Video watch activity logging failed with status ${response.status}.`);
     }
     return true;
-  } catch (error) {
-    console.error('Unable to log video watch activity to Student Activity & Leads:', error);
+  } catch {
+    console.error('Unable to log video watch activity to Student Activity & Leads.');
     return false;
   }
 }
@@ -161,8 +161,8 @@ export async function logUserActivity(actionType, details = {}) {
         throw new Error(responseBody.error || `Course enrollment failed with status ${response.status}.`);
       }
       courseEnrollment = responseBody.courseEnrollment || null;
-    } catch (error) {
-      console.error('Unable to validate and save the free course enrollment:', error);
+    } catch {
+      console.error('Unable to validate and save the free course enrollment.');
       return false;
     }
   }
@@ -285,12 +285,12 @@ export async function logUserActivity(actionType, details = {}) {
       }
     } catch (error) {
       if (error?.name !== 'AbortError') {
-        console.warn(`Unable to sync ${actionType} activity to Sanity.`, error);
+        console.warn('Unable to sync user activity to Sanity.');
       }
     }
     return true;
-  } catch (error) {
-    console.warn(`Unable to log ${actionType} activity while offline or unavailable.`, error);
+  } catch {
+    console.warn('Unable to log user activity while offline or unavailable.');
     return false;
   }
 }

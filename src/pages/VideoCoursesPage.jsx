@@ -229,7 +229,7 @@ function loadYouTubeApi() {
         script.onerror = () => reject(new Error('YouTube playback tracking could not be initialized.'));
         document.head.appendChild(script);
       }
-    }).catch((error) => {
+    }).catch(() => {
       youtubeApiPromise = null;
       throw error;
     });
@@ -391,8 +391,8 @@ function YouTubeTrackedPlayer({
           }
         }
       });
-    }).catch((error) => {
-      console.error(`Unable to initialize tracked playback for "${video.title}":`, error);
+    }).catch(() => {
+      console.error('Unable to initialize tracked playback.');
     });
 
     return () => {
@@ -588,7 +588,7 @@ function VideoCoursesPage({
       })
       .catch((error) => {
         if (error?.name === 'AbortError') return;
-        console.error('Failed to load video courses or online classes from Sanity:', error);
+        console.error('Failed to load video courses or online classes from Sanity.');
         if (isCurrentRequest) setLoadError('Video courses could not be loaded. Please try again later.');
       })
       .finally(() => {
@@ -743,7 +743,7 @@ function VideoCoursesPage({
       ));
     } catch (error) {
       if (error?.name === 'AbortError') return;
-      console.error(`Failed to load entitled course class "${video.title}":`, error);
+      console.error('Failed to load entitled course class.');
       if (requestId === playerRequestId.current) {
         setPlayerError(error.message || 'This video could not be loaded. Please try again.');
       }
@@ -790,7 +790,7 @@ function VideoCoursesPage({
       pdfWindow.location.href = result.classPdfUrl;
     } catch (error) {
       pdfWindow.close();
-      console.error(`Failed to load PDF notes for "${video.title}":`, error);
+      console.error('Failed to load PDF notes.');
       setAttachmentError(error.message || 'Class PDF notes could not be loaded.');
     }
   };
@@ -858,7 +858,7 @@ function VideoCoursesPage({
         current.includes(course.id) ? current : [...current, course.id]
       ));
     } catch (error) {
-      console.error(`Failed to enroll in video course "${course.title}":`, error);
+      console.error('Failed to enroll in video course.');
       setEnrollmentError(error.message || 'Enrollment could not be saved. Please try again.');
     } finally {
       setEnrollingCourseId('');

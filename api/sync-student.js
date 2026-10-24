@@ -9,9 +9,7 @@ export default async function handler(request, response) {
     return response.status(405).json({ success: false, error: 'Method not allowed.' });
   }
 
-  const sanityWriteToken = process.env.SANITY_API_WRITE_TOKEN
-    || process.env.VITE_SANITY_WRITE_TOKEN
-    || process.env.VITE_SANITY_API_WRITE_TOKEN;
+  const sanityWriteToken = process.env.SANITY_API_WRITE_TOKEN;
   const projectId = process.env.SANITY_PROJECT_ID
     || process.env.VITE_SANITY_PROJECT_ID
     || 'rkev3aui';
@@ -19,10 +17,8 @@ export default async function handler(request, response) {
     || process.env.VITE_SANITY_DATASET
     || 'production';
   if (!sanityWriteToken) {
-    const missingConfiguration = [
-      'SANITY_API_WRITE_TOKEN, VITE_SANITY_WRITE_TOKEN, or VITE_SANITY_API_WRITE_TOKEN'
-    ].filter(Boolean);
-    console.error('Student profile sync is missing server configuration:', missingConfiguration);
+    const missingConfiguration = ['SANITY_API_WRITE_TOKEN'];
+    console.error('Student profile sync is missing server configuration.');
     return response.status(503).json({
       success: false,
       error: 'Profile sync is unavailable because server configuration is missing.',
@@ -75,7 +71,7 @@ export default async function handler(request, response) {
     if (error.code === 'INVALID_FIREBASE_TOKEN') {
       return response.status(401).json({ success: false, error: 'Authentication is invalid or expired.' });
     }
-    console.error('Failed to verify Firebase identity for student profile sync:', error);
+    console.error('Failed to verify Firebase identity for student profile sync.');
     return response.status(502).json({ success: false, error: 'Unable to verify the account right now.' });
   }
 
@@ -96,7 +92,7 @@ export default async function handler(request, response) {
     const result = { success: true, documentId: document._id };
     return response.status(200).json(result);
   } catch (error) {
-    console.error('Failed to sync a student profile to Sanity:', error);
+    console.error('Failed to sync a student profile to Sanity.');
     return response.status(500).json({
       success: false,
       error: 'Unable to sync the student profile.',

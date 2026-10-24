@@ -122,7 +122,7 @@ The CSV export uses the same filtered, deduplicated student rows and is named `x
 
 `sanity.config.js` resolves document actions using the logged-in user's Sanity roles. Users with the `administrator` role retain the default actions, including Delete. All other users (including editors and users without an administrator role) have Delete, Discard Changes, and Unpublish removed from the document action menu. Other actions such as Publish and Duplicate remain available, and editors can create and edit documents and upload assets according to their assigned Sanity permissions. Manage role membership and underlying dataset permissions in Sanity Manage; this Studio action-menu restriction is a UX safeguard and does not replace server-side/API access controls.
 
-The public Sanity client is read-only. Book requests, profile records, and activity events are written by server endpoints using a Sanity token with dataset write permission. **Do not configure a write token in browser code or commit real credentials.** Although compatibility fallbacks accept `VITE_SANITY_WRITE_TOKEN` and `VITE_SANITY_API_WRITE_TOKEN` on the server, prefer the non-prefixed, server-only `SANITY_API_WRITE_TOKEN`.
+The public Sanity client is read-only. Book requests, profile records, and activity events are written by server endpoints using a Sanity token with dataset write permission. **Configure write tokens only as the server-side `SANITY_API_WRITE_TOKEN`; never prefix them with `VITE_`, reference them in browser code, or commit real credentials.**
 
 ## Environment variables
 
@@ -151,8 +151,6 @@ These Firebase web app values are public client configuration (not service-accou
 | `SANITY_DATASET` | No | Server dataset; defaults to `production` |
 | `VITE_SANITY_PROJECT_ID` | No | Public Sanity project ID override; also accepted as a server-side compatibility fallback |
 | `VITE_SANITY_DATASET` | No | Public Sanity dataset override; also accepted as a server-side compatibility fallback |
-| `VITE_SANITY_WRITE_TOKEN` | Compatibility only | Accepted by server endpoints if the preferred token name is unavailable; **never reference it in frontend code** |
-| `VITE_SANITY_API_WRITE_TOKEN` | Compatibility only | Legacy server-side token fallback; **never reference it in frontend code** |
 
 ### Razorpay configuration
 
@@ -220,7 +218,7 @@ npm run preview
 2. Use `npm install` for install and `npm run build` for the build command. Vite outputs to `dist`.
 3. Add the six `VITE_FIREBASE_*` values, `VITE_RAZORPAY_KEY_ID`, server-only `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`, and `SANITY_API_WRITE_TOKEN` in **Project Settings → Environment Variables** for Production (and Preview/Development as appropriate). Start with Razorpay test credentials.
 4. Optionally configure `SANITY_PROJECT_ID` and `SANITY_DATASET` if not using the defaults.
-5. Redeploy after adding or changing environment variables. Vercel serves `api/*.js` as serverless functions; `vercel.json` rewrites frontend paths to the SPA while `/api/*` routes are handled by their functions.
+5. Redeploy after adding or changing environment variables. Vercel serves `api/*.js` as serverless functions; `vercel.json` rewrites frontend paths to the SPA while `/api/*` routes are handled by their functions and applies security headers, including a CSP for the storefront's Sanity, Firebase, Razorpay, Google Fonts, YouTube, and Vimeo integrations. HTTPS-hosted course media is allowed for admin-managed video URLs.
 6. Test Google login, refresh persistence, phone onboarding, student and activity records in Sanity Studio, leads filters/CSV export, book requests, single-book checkout, multi-book checkout, and cancelled/declined payments.
 
 If `/api/sync-student` returns an error, inspect the response JSON and Vercel Function logs. A missing write token cannot be repaired by a browser fallback; configure the token as a server-side Vercel environment variable. Never solve this by exposing a Sanity write token through `VITE_` client code.

@@ -119,8 +119,8 @@ const getHighDefinitionImageUrl = (assetUrl) => {
       imageUrl.searchParams.set('auto', 'format');
     }
     return imageUrl.toString();
-  } catch (error) {
-    console.error('Unable to prepare the book cover URL:', error);
+  } catch {
+    console.error('Unable to prepare the book cover URL.');
     return assetUrl;
   }
 };
@@ -304,8 +304,8 @@ export default function BookDetailPage() {
       || profileRefreshAttemptedForUserRef.current === currentUser.uid) return;
 
     profileRefreshAttemptedForUserRef.current = currentUser.uid;
-    refreshUserProfile().catch((error) => {
-      console.error('Unable to refresh the user profile before checking book ownership:', error);
+    refreshUserProfile().catch(() => {
+      console.error('Unable to refresh the user profile before checking book ownership.');
     });
   }, [currentUser?.uid, refreshUserProfile, userProfile?.purchasedBooks]);
 
@@ -323,8 +323,8 @@ export default function BookDetailPage() {
           setLoadedSlug(slug);
         }
       })
-      .catch((error) => {
-        console.error('Unable to load the requested book:', error);
+      .catch(() => {
+        console.error('Unable to load the requested book.');
         if (isCurrentRequest) {
           setLoadError('This book could not be loaded. Please try again later.');
           setLoadedSlug(slug);
@@ -357,8 +357,8 @@ export default function BookDetailPage() {
           error: ''
         });
       }
-    }).catch((error) => {
-      console.error('Unable to load popular books:', error);
+    }).catch(() => {
+      console.error('Unable to load popular books.');
       if (isCurrentRequest) {
         setRelatedBooksResult({
           slug,
@@ -442,8 +442,8 @@ export default function BookDetailPage() {
     try {
       await navigator.clipboard.writeText(window.location.href);
       showToast('Book link copied to clipboard.');
-    } catch (error) {
-      console.error('Unable to copy the book link:', error);
+    } catch {
+      console.error('Unable to copy the book link.');
       showToast('Could not copy the link. Please copy it from your browser address bar.');
     }
   };

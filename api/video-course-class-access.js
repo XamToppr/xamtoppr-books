@@ -24,9 +24,7 @@ class VideoCourseAccessError extends Error {
 }
 
 function getSanityClient(env) {
-  const token = env.SANITY_API_WRITE_TOKEN
-    || env.VITE_SANITY_WRITE_TOKEN
-    || env.VITE_SANITY_API_WRITE_TOKEN;
+  const token = env.SANITY_API_WRITE_TOKEN;
   if (!token) {
     throw new VideoCourseAccessError(503, 'Course access is not configured.');
   }
@@ -137,7 +135,7 @@ export async function getVideoCourseClassAccess({ body, authorization, env }) {
       throw new VideoCourseAccessError(401, 'Authentication is invalid or expired.');
     }
     if (error instanceof VideoCourseAccessError) throw error;
-    console.error('Unable to load entitled video course class:', error);
+    console.error('Unable to load entitled video course class.');
     throw new VideoCourseAccessError(500, 'Unable to load this class right now.');
   }
 }
@@ -167,7 +165,7 @@ export default async function handler(request, response) {
     if (error instanceof VideoCourseAccessError) {
       return response.status(error.status).json({ success: false, error: error.message });
     }
-    console.error('Unable to handle course class access request:', error);
+    console.error('Unable to handle course class access request.');
     return response.status(500).json({ success: false, error: 'Unable to load this class right now.' });
   }
 }
