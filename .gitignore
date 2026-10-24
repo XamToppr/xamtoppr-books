@@ -5,9 +5,6 @@ dist-ssr/
 .env
 .env.*
 !.env.example
-rank-engine/.venv/
-rank-engine/__pycache__/
-rank-engine/**/__pycache__/
 *.py[cod]
 *.class
 npm-debug.log*
