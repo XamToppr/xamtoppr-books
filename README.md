@@ -63,6 +63,8 @@ Sanity Studio is available at `/admin`. Schemas in `sanity/schemaTypes.js` inclu
 
 The `studentUser` document uses a stable ID (`student_<Firebase UID>`) and fields `fullName`, `email`, `phone`, `firebaseUid`, `createdAt`, and `purchasedBooks`. Each login/profile sync updates profile fields without replacing existing orders. `purchasedBooks` contains a book reference, title snapshot, original amount, final amount paid, applied coupon code, order/payment ID, and purchase timestamp. `bookRequest` documents are also written through a server endpoint.
 
+The **File Upload** tool in the Studio navigation uploads PDFs and images as Sanity assets. Choose an upload type, optionally add a remark, and use **Add More** to upload several assets in one operation. The selected upload type is saved as the asset label and the remark as its description; each successful upload displays a public CDN URL that can be copied. Uploads use the authenticated Sanity Studio client, so no privileged API token is exposed in the browser. Sanity asset URLs are public; do not upload files that must remain private.
+
 ### Book master taxonomy
 
 The **Master** section in Sanity Studio (`/admin`) manages Tracks, Platforms, Subjects, Modules, and Topics. Each document has a name, generated slug, and Active/Inactive status. Platforms reference Tracks, Subjects reference Platforms, Modules reference Subjects, and Topics reference Modules. Create parents first; a child’s parent is required.

@@ -2,6 +2,7 @@ import { defineConfig } from 'sanity';
 import { structureTool } from 'sanity/structure';
 import { schemaTypes } from './sanity/schemaTypes.js';
 import StudentActivityLeads from './src/components/admin/StudentActivityLeads.jsx';
+import FileUpload from './src/components/admin/FileUpload.jsx';
 import CopyCouponAction from './sanity/actions/copyCouponAction.js';
 import { createCouponPublishAction } from './sanity/couponActions.js';
 
@@ -47,6 +48,11 @@ export default defineConfig({
       name: 'student-activity-leads',
       title: 'Student Activity & Leads',
       component: StudentActivityLeads
+    },
+    {
+      name: 'file-upload',
+      title: 'File Upload',
+      component: FileUpload
     }
   ],
   document: {
