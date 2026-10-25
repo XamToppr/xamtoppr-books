@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { useClient } from 'sanity';
+import UploadedFilesList from './UploadedFilesList.jsx';
 import './FileUpload.css';
 
 const UPLOAD_TYPES = ['Book PDF', 'Cover Image', 'Study Notes', 'Other'];
@@ -28,6 +29,8 @@ export default function FileUpload() {
   const [isUploading, setIsUploading] = useState(false);
   const [formError, setFormError] = useState('');
   const [uploadMessage, setUploadMessage] = useState('');
+  const [activeTab, setActiveTab] = useState('upload');
+  const [listVersion, setListVersion] = useState(0);
 
   const updateEntry = (id, changes) => {
     setEntries((current) => current.map((entry) => (
@@ -78,6 +81,7 @@ export default function FileUpload() {
       for (const entry of entries) {
         updateEntry(entry.id, { status: 'uploading', error: '', copyFeedback: '' });
 
+        let uploadedAsset;
         try {
           const assetType = getAssetType(entry.file);
           const asset = await studioClient.assets.upload(assetType, entry.file, {
@@ -92,12 +96,30 @@ export default function FileUpload() {
             throw new Error('Sanity did not return a public asset URL.');
           }
 
+          uploadedAsset = asset;
+          await studioClient.create({
+            _type: 'uploadedFile',
+            filename: entry.file.name,
+            url: asset.url,
+            uploadType: entry.uploadType,
+            remark: entry.remark.trim(),
+            uploadedAt: new Date().toISOString(),
+            assetId: asset._id
+          });
+
           updateEntry(entry.id, { status: 'uploaded', asset });
           uploadedCount += 1;
+          setListVersion((version) => version + 1);
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Unknown upload error.';
           console.error(`Unable to upload "${entry.file.name}".`, error);
-          updateEntry(entry.id, { status: 'error', error: message });
+          updateEntry(entry.id, {
+            status: 'error',
+            asset: uploadedAsset || null,
+            error: uploadedAsset
+              ? `The file uploaded, but its tracking record could not be saved: ${message}`
+              : message
+          });
           failedCount += 1;
         }
       }
@@ -126,9 +148,35 @@ export default function FileUpload() {
     <main className="file-upload">
       <header className="file-upload__header">
         <h1>File Upload</h1>
-        <p>Upload PDFs and images to Sanity and copy their public CDN URLs.</p>
+        <p>Upload and manage your PDFs and images stored in Sanity.</p>
       </header>
 
+      <nav className="file-upload__tabs" aria-label="File upload sections" role="tablist">
+        <button
+          aria-selected={activeTab === 'upload'}
+          className={`file-upload__tab${activeTab === 'upload' ? ' file-upload__tab--active' : ''}`}
+          id="file-upload-tab"
+          role="tab"
+          type="button"
+          onClick={() => setActiveTab('upload')}
+        >
+          Upload New File
+        </button>
+        <button
+          aria-selected={activeTab === 'list'}
+          className={`file-upload__tab${activeTab === 'list' ? ' file-upload__tab--active' : ''}`}
+          id="all-upload-files-tab"
+          role="tab"
+          type="button"
+          onClick={() => setActiveTab('list')}
+        >
+          All Upload Files
+        </button>
+      </nav>
+
+      {activeTab === 'list' ? (
+        <UploadedFilesList key={listVersion} />
+      ) : (
       <form onSubmit={handleUpload}>
         <div className="file-upload__items">
           {entries.map((entry, index) => (
@@ -197,7 +245,11 @@ export default function FileUpload() {
 
               {entry.asset && (
                 <div className="file-upload__result" role="status">
-                  <p>Upload successful. Your public Sanity CDN URL:</p>
+                  <p>
+                    {entry.status === 'error'
+                      ? 'The file uploaded, but its tracking record could not be saved. Public URL:'
+                      : 'Upload successful. Your public Sanity CDN URL:'}
+                  </p>
                   <a href={entry.asset.url} rel="noreferrer" target="_blank">{entry.asset.url}</a>
                   <button
                     className="file-upload__copy"
@@ -234,6 +286,7 @@ export default function FileUpload() {
           </button>
         </div>
       </form>
+      )}
     </main>
   );
 }

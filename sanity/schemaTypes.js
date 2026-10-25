@@ -8,6 +8,7 @@ import videoCoursePack, {
   videoCourseScheduleItem
 } from './schemas/videoCoursePack.js';
 import onlineClass from './schemas/onlineClass.js';
+import uploadedFile from './schemas/uploadedFile.js';
 import { masterTypes } from './masterSchemas.js';
 
 const examCategorySuggestions = ['SSC', 'Railway', 'Banking', 'Teaching', 'Defence', 'State Exams', 'UPSC'];
@@ -1342,6 +1343,7 @@ export const schemaTypes = [
   book,
   videoCoursePack,
   onlineClass,
+  uploadedFile,
   videoCourseLesson,
   videoCourseScheduleItem,
   videoCoursePlannerItem,
