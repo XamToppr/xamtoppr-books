@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { PortableText } from '@portabletext/react';
+import portableTextComponents from '../components/PortableTextComponents';
 import {
   ArrowRight,
   BookOpen,
@@ -1002,7 +1003,7 @@ function VideoCoursesPage({
                   {activeDetailTab === 'description' && (
                     <div className="prose prose-slate max-w-none">
                       {detailCourse.richDescription.length ? (
-                        <PortableText value={detailCourse.richDescription} />
+                        <PortableText value={detailCourse.richDescription} components={portableTextComponents} />
                       ) : (
                         <p className="text-sm leading-7 text-slate-600">{detailCourse.description || 'Course details will be added soon.'}</p>
                       )}

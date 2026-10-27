@@ -13,6 +13,7 @@ import { calculateCourseExpiryDate, getCourseValidity } from './utils/courseVali
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import HTMLFlipBook from 'react-pageflip';
 import { PortableText } from '@portabletext/react';
+import sharedPortableTextComponents from './components/PortableTextComponents';
 import { Studio } from 'sanity';
 import { Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import sanityConfig from '../sanity.config.js';
@@ -73,8 +74,13 @@ const EXAM_CATEGORIES = [
 const getPortableTextPlainText = (content) => {
   if (Array.isArray(content)) {
     return content
-      .flatMap((block) => block.children || [])
-      .map((child) => child.text || '')
+      .flatMap((block) => {
+        if (block?._type === 'table') {
+          return (block.rows || []).flatMap((row) => row.cells || []);
+        }
+        if (block?._type === 'image') return block.alt ? [block.alt] : [];
+        return (block.children || []).map((child) => child.text || '');
+      })
       .join(' ')
       .replace(/\s+/g, ' ')
       .trim();
@@ -348,7 +354,7 @@ function BookStoreApp() {
   const renderPdfModalDescription = (text) => {
     if (!text) return '';
     if (Array.isArray(text)) {
-      return <PortableText value={text} />;
+      return <PortableText value={text} components={sharedPortableTextComponents} />;
     }
     const parts = text.split(/(\*\*.*?\*\*)/g);
     return parts.map((part, index) => {
@@ -370,7 +376,7 @@ function BookStoreApp() {
     if (Array.isArray(text)) {
       return (
         <div className="prose prose-invert prose-sm max-w-none">
-          <PortableText value={text} />
+          <PortableText value={text} components={sharedPortableTextComponents} />
         </div>
       );
     }
@@ -2320,7 +2326,7 @@ function BookStoreApp() {
                           </h2>
                           <div className="prose prose-slate mt-4 max-w-none text-sm leading-7">
                             {Array.isArray(blog.overview)
-                              ? <PortableText value={blog.overview} />
+                              ? <PortableText value={blog.overview} components={sharedPortableTextComponents} />
                               : <p className="whitespace-pre-line">{blog.overview}</p>}
                           </div>
                         </section>
@@ -2690,7 +2696,7 @@ function BookStoreApp() {
                               <section key={section.sectionId} id={`notification-${section.sectionId}`} className="scroll-mt-44 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                                 <h2 className="mb-4 text-lg font-extrabold text-blue-950">{sectionTitle}</h2>
                                 <div className="prose prose-slate max-w-none text-sm leading-7">
-                                  <PortableText value={section.content} />
+                                  <PortableText value={section.content} components={sharedPortableTextComponents} />
                                 </div>
                               </section>
                             );
@@ -3751,6 +3757,7 @@ function SiteContentPage({ page }) {
 
   const content = settings?.[page.field];
   const portableTextComponents = {
+    ...sharedPortableTextComponents,
     block: {
       normal: ({ children }) => <p className="mb-5 leading-8 text-slate-700 last:mb-0">{children}</p>,
       h2: ({ children }) => <h2 className="mb-4 mt-10 text-2xl font-extrabold tracking-tight text-blue-950 first:mt-0 sm:text-3xl">{children}</h2>,

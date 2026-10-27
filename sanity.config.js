@@ -1,5 +1,6 @@
 import { defineConfig } from 'sanity';
 import { structureTool } from 'sanity/structure';
+import { table } from '@sanity/table';
 import { schemaTypes } from './sanity/schemaTypes.js';
 import StudentActivityLeads from './src/components/admin/StudentActivityLeads.jsx';
 import FileUpload from './src/components/admin/FileUpload.jsx';
@@ -74,6 +75,7 @@ export default defineConfig({
     }
   },
   plugins: [
+    table(),
     structureTool({
       structure: (S) => S.list()
         .title('Content')

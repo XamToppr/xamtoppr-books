@@ -24,6 +24,7 @@ import { Link, useParams } from 'react-router-dom';
 import AuthModal from '../components/auth/AuthModal';
 import CouponField from '../components/coupon/CouponField';
 import Footer from '../components/Footer';
+import portableTextComponents from '../components/PortableTextComponents';
 import UserButton from '../components/auth/UserButton';
 import { useAuth } from '../context/AuthContext';
 import { initiatePayment } from '../services/paymentService';
@@ -669,7 +670,7 @@ export default function BookDetailPage() {
                   <h2 id="about-book-title" className="text-xl font-extrabold text-slate-950">About this book</h2>
                   {book.description ? (
                     <div className="book-description mt-3 text-sm leading-7 text-slate-700">
-                      <PortableText value={book.description} />
+                      <PortableText value={book.description} components={portableTextComponents} />
                     </div>
                   ) : (
                     <p className="mt-3 text-sm leading-7 text-slate-600">Get focused preparation material for {categoryLabel} with this XamToppr book.</p>

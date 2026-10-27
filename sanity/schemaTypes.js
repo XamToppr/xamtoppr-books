@@ -10,6 +10,7 @@ import videoCoursePack, {
 import onlineClass from './schemas/onlineClass.js';
 import uploadedFile from './schemas/uploadedFile.js';
 import { masterTypes } from './masterSchemas.js';
+import { portableTextImageMember, portableTextTableMember } from './portableTextMembers.js';
 
 const examCategorySuggestions = ['SSC', 'Railway', 'Banking', 'Teaching', 'Defence', 'State Exams', 'UPSC'];
 
@@ -323,9 +324,20 @@ const richNoteBlock = defineType({
             { title: 'Strong', value: 'strong' },
             { title: 'Emphasis', value: 'em' },
             { title: 'Underline', value: 'underline' }
+          ],
+          annotations: [
+            defineType({
+              name: 'link',
+              title: 'Link',
+              type: 'object',
+              fields: [defineField({ name: 'href', title: 'URL', type: 'url' })]
+            })
           ]
         }
-      })]
+      }),
+      portableTextImageMember,
+      portableTextTableMember
+      ]
     })
   ],
   preview: { select: { title: 'sectionTitle' }, prepare: ({ title }) => ({ title: title || 'Rich Text Section' }) }
@@ -921,11 +933,21 @@ const book = defineType({
           marks: {
             decorators: [
               { title: 'Bold', value: 'strong' },
-              { title: 'Italic', value: 'em' }
+              { title: 'Italic', value: 'em' },
+              { title: 'Underline', value: 'underline' }
             ],
-            annotations: []
+            annotations: [
+              defineType({
+                name: 'link',
+                title: 'Link',
+                type: 'object',
+                fields: [defineField({ name: 'href', title: 'URL', type: 'url' })]
+              })
+            ]
           }
-        })
+        }),
+        portableTextImageMember,
+        portableTextTableMember
       ]
     }),
     defineField({
@@ -1280,7 +1302,9 @@ const siteSettings = defineType({
               })
             ]
           }
-        })
+        }),
+        portableTextImageMember,
+        portableTextTableMember
       ]
     }))
   ]

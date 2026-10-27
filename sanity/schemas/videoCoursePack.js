@@ -1,4 +1,5 @@
 import { defineArrayMember, defineField, defineType } from 'sanity';
+import { portableTextImageMember, portableTextTableMember } from '../portableTextMembers.js';
 
 const richTextMember = defineArrayMember({
   type: 'block',
@@ -14,9 +15,17 @@ const richTextMember = defineArrayMember({
   marks: {
     decorators: [
       { title: 'Bold', value: 'strong' },
-      { title: 'Italic', value: 'em' }
+      { title: 'Italic', value: 'em' },
+      { title: 'Underline', value: 'underline' }
     ],
-    annotations: []
+    annotations: [
+      defineType({
+        name: 'link',
+        title: 'Link',
+        type: 'object',
+        fields: [defineField({ name: 'href', title: 'URL', type: 'url' })]
+      })
+    ]
   }
 });
 
@@ -367,7 +376,11 @@ const videoCoursePack = defineType({
       title: 'Description',
       type: 'array',
       group: 'details',
-      of: [richTextMember]
+      of: [
+        richTextMember,
+        portableTextImageMember,
+        portableTextTableMember
+      ]
     }),
     defineField({
       name: 'tracks',
