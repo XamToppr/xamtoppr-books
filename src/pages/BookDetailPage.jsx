@@ -668,7 +668,7 @@ export default function BookDetailPage() {
                 <section className="mt-8" aria-labelledby="about-book-title">
                   <h2 id="about-book-title" className="text-xl font-extrabold text-slate-950">About this book</h2>
                   {book.description ? (
-                    <div className="prose prose-slate mt-3 max-w-none text-sm leading-7">
+                    <div className="book-description mt-3 text-sm leading-7 text-slate-700">
                       <PortableText value={book.description} />
                     </div>
                   ) : (
