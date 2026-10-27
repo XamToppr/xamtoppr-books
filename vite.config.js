@@ -8,11 +8,12 @@ import {
 } from './server/razorpayPayments.js'
 import { getVideoCourseClassAccess } from './api/video-course-class-access.js'
 import { defineConfig, loadEnv } from 'vite'
+import { getSanityWriteToken } from './server/environment.js'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 const localBookRequestApi = (env) => {
-  const writeToken = env.SANITY_API_WRITE_TOKEN
+  const writeToken = getSanityWriteToken(env)
   const client = writeToken
     ? createClient({
       projectId: env.SANITY_PROJECT_ID || env.VITE_SANITY_PROJECT_ID || 'rkev3aui',
@@ -39,7 +40,7 @@ const localBookRequestApi = (env) => {
 
         if (!client) {
           response.statusCode = 503
-          response.end(JSON.stringify({ success: false, error: 'SANITY_API_WRITE_TOKEN is not configured for local development.' }))
+          response.end(JSON.stringify({ success: false, error: 'SANITY_API_WRITE_TOKEN or SANITY_WRITE_TOKEN is not configured for local development.' }))
           return
         }
 
@@ -97,7 +98,7 @@ const localBookRequestApi = (env) => {
 }
 
 const localStudentProfileApi = (env) => {
-  const writeToken = env.SANITY_API_WRITE_TOKEN
+  const writeToken = getSanityWriteToken(env)
   const client = writeToken
     ? createClient({
       projectId: env.SANITY_PROJECT_ID || env.VITE_SANITY_PROJECT_ID || 'rkev3aui',
@@ -127,7 +128,7 @@ const localStudentProfileApi = (env) => {
           response.end(JSON.stringify({
             success: false,
             error: 'Student profile sync is missing a server-side Sanity write token.',
-            missingConfiguration: ['SANITY_API_WRITE_TOKEN']
+            missingConfiguration: ['SANITY_API_WRITE_TOKEN or SANITY_WRITE_TOKEN']
           }))
           return
         }
@@ -204,7 +205,7 @@ const localStudentProfileApi = (env) => {
 }
 
 const localUserActivityApi = (env) => {
-  const writeToken = env.SANITY_API_WRITE_TOKEN
+  const writeToken = getSanityWriteToken(env)
   const client = writeToken
     ? createClient({
       projectId: env.SANITY_PROJECT_ID || env.VITE_SANITY_PROJECT_ID || 'rkev3aui',

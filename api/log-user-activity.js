@@ -1,6 +1,7 @@
 import { createClient } from '@sanity/client';
 import { createSanityUserActivity } from '../server/userActivitySync.js';
 import { verifyFirebaseIdToken } from '../server/studentProfileSync.js';
+import { getSanityWriteToken } from '../server/environment.js';
 
 const getString = (value) => (typeof value === 'string' ? value.trim() : '');
 const ALLOWED_ACTIVITY_ACTIONS = new Set([
@@ -23,7 +24,7 @@ export default async function handler(request, response) {
     return response.status(405).json({ success: false, error: 'Method not allowed.' });
   }
 
-  const sanityWriteToken = process.env.SANITY_API_WRITE_TOKEN;
+  const sanityWriteToken = getSanityWriteToken(process.env);
   if (!sanityWriteToken) {
     return response.status(503).json({ success: false, error: 'Activity logging is missing the server-side Sanity write token.' });
   }

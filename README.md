@@ -149,6 +149,8 @@ These Firebase web app values are public client configuration (not service-accou
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `SANITY_API_WRITE_TOKEN` | Yes for writes | **Server-only** token with write access for student sync, activity, and purchase records |
+| `VITE_SANITY_API_WRITE_TOKEN` | Fallback | Accepted by server routes for existing Vercel configurations; never reference it from frontend code |
+| `SANITY_WRITE_TOKEN` | Fallback | Legacy server-only alias for the Sanity write token |
 | `SANITY_PROJECT_ID` | No | Server project ID; defaults to `rkev3aui` |
 | `SANITY_DATASET` | No | Server dataset; defaults to `production` |
 | `VITE_SANITY_PROJECT_ID` | No | Public Sanity project ID override; also accepted as a server-side compatibility fallback |
@@ -159,10 +161,10 @@ These Firebase web app values are public client configuration (not service-accou
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `VITE_RAZORPAY_KEY_ID` | Yes | Public Checkout key ID bundled for Razorpay.js |
-| `RAZORPAY_KEY_ID` | Yes for server order creation | Server-side Razorpay key ID; should match the browser key ID |
-| `RAZORPAY_KEY_SECRET` | Yes | **Server-only** secret for Razorpay REST API authentication and payment signature verification (`RAZORPAY_SECRET` is accepted as a legacy server-only fallback) |
+| `RAZORPAY_KEY_ID` | Yes for server order creation | Server-side Razorpay key ID; should match the browser key ID (`VITE_RAZORPAY_KEY_ID` is also accepted server-side) |
+| `RAZORPAY_KEY_SECRET` | Yes | **Server-only** secret for Razorpay REST API authentication and payment signature verification (`RAZORPAY_SECRET` and `VITE_RAZORPAY_KEY_SECRET` are also accepted server-side) |
 
-For a typical local `.env`, provide all six Firebase variables, the Razorpay test key ID, `RAZORPAY_KEY_SECRET`, and `SANITY_API_WRITE_TOKEN`. Project ID and dataset can be omitted to use the defaults. Never use a Razorpay live secret in browser variables. Do not paste real values into this README or commit the `.env` file.
+For a typical local `.env`, provide all six Firebase variables, the Razorpay test key ID, `RAZORPAY_KEY_SECRET`, and `SANITY_API_WRITE_TOKEN`. Project ID and dataset can be omitted to use the defaults. Prefer non-`VITE_` names for secrets: the prefix is not a security control, and variables referenced by browser code may be included in the client bundle. Never reference Sanity write tokens or Razorpay secrets from frontend code. Do not paste real values into this README or commit the `.env` file.
 
 ### Local `.env` template
 
@@ -201,7 +203,7 @@ The Vite middleware implements `/api/request-book`, `/api/sync-student`, `/api/l
 ### Razorpay test mode
 
 1. Create or open a Razorpay account and use its **Test Mode** API key pair for local development.
-2. Set `VITE_RAZORPAY_KEY_ID` in the Vite environment and set both `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` for server endpoints. The secret must not use a `VITE_` prefix.
+2. Set `VITE_RAZORPAY_KEY_ID` in the Vite environment and set `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` for server endpoints. The API also supports `VITE_RAZORPAY_KEY_ID` and `VITE_RAZORPAY_KEY_SECRET` as server-side fallbacks; keep secrets out of frontend code.
 3. Set the Sanity write token and Firebase web configuration as described above; the server must be able to verify Firebase ID tokens and write purchase records to Sanity.
 4. Restart Vite after changing environment values, sign in, and test a single-book purchase and a multi-book cart checkout using Razorpay's official test payment methods.
 5. Confirm that declined/cancelled payments create no purchase records, while a captured test payment appears in the user's My Library, the `studentUser.purchasedBooks` array, and the `purchase_complete` activity in Sanity.
@@ -218,9 +220,9 @@ npm run preview
 
 1. Import the Git repository into Vercel and set the project root to the repository root.
 2. Use `npm install` for install and `npm run build` for the build command. Vite outputs to `dist`.
-3. Add the six `VITE_FIREBASE_*` values, `VITE_RAZORPAY_KEY_ID`, server-only `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`, and `SANITY_API_WRITE_TOKEN` in **Project Settings → Environment Variables** for Production (and Preview/Development as appropriate). Start with Razorpay test credentials.
+3. Add the six `VITE_FIREBASE_*` values, `VITE_RAZORPAY_KEY_ID`, and the server credentials in **Project Settings → Environment Variables** for Production (and Preview/Development as appropriate). API routes accept `SANITY_API_WRITE_TOKEN`, `SANITY_WRITE_TOKEN`, or `VITE_SANITY_API_WRITE_TOKEN` for the Sanity write token; Razorpay accepts `RAZORPAY_KEY_ID` or `VITE_RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`, `RAZORPAY_SECRET`, or `VITE_RAZORPAY_KEY_SECRET`. Start with Razorpay test credentials.
 4. Optionally configure `SANITY_PROJECT_ID` and `SANITY_DATASET` if not using the defaults.
 5. Redeploy after adding or changing environment variables. Vercel serves `api/*.js` as serverless functions; `vercel.json` rewrites frontend paths to the SPA while `/api/*` routes are handled by their functions and applies security headers, including a CSP for the storefront's Sanity, Firebase, Razorpay, Google Fonts, YouTube, and Vimeo integrations. HTTPS-hosted course media is allowed for admin-managed video URLs.
 6. Test Google login, refresh persistence, phone onboarding, student and activity records in Sanity Studio, leads filters/CSV export, book requests, single-book checkout, multi-book checkout, and cancelled/declined payments.
 
-If `/api/sync-student` returns an error, inspect the response JSON and Vercel Function logs. A missing write token cannot be repaired by a browser fallback; configure the token as a server-side Vercel environment variable. Never solve this by exposing a Sanity write token through `VITE_` client code.
+If `/api/sync-student` returns an error, inspect the response JSON and Vercel Function logs. `VITE_` is not a security prefix: any such value referenced by browser code can be included in the client bundle. The Sanity write token and Razorpay secret are only read by server routes through `process.env`; do not reference or expose them in frontend code. Prefer the non-`VITE_` names for secrets where possible.

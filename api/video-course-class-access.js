@@ -1,5 +1,6 @@
 import { createClient } from '@sanity/client';
 import { verifyFirebaseIdToken } from '../server/studentProfileSync.js';
+import { getSanityWriteToken } from '../server/environment.js';
 import { isCourseEntitlementActive } from '../src/utils/courseValidity.js';
 
 const getString = (value) => (typeof value === 'string' ? value.trim() : '');
@@ -24,7 +25,7 @@ class VideoCourseAccessError extends Error {
 }
 
 function getSanityClient(env) {
-  const token = env.SANITY_API_WRITE_TOKEN;
+  const token = getSanityWriteToken(env);
   if (!token) {
     throw new VideoCourseAccessError(503, 'Course access is not configured.');
   }

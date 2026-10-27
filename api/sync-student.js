@@ -1,5 +1,6 @@
 import { createClient } from '@sanity/client';
 import { syncStudentDocument, verifyFirebaseIdToken } from '../server/studentProfileSync.js';
+import { getSanityWriteToken } from '../server/environment.js';
 
 const getString = (value) => (typeof value === 'string' ? value.trim() : '');
 
@@ -9,7 +10,7 @@ export default async function handler(request, response) {
     return response.status(405).json({ success: false, error: 'Method not allowed.' });
   }
 
-  const sanityWriteToken = process.env.SANITY_API_WRITE_TOKEN;
+  const sanityWriteToken = getSanityWriteToken(process.env);
   const projectId = process.env.SANITY_PROJECT_ID
     || process.env.VITE_SANITY_PROJECT_ID
     || 'rkev3aui';
@@ -17,7 +18,7 @@ export default async function handler(request, response) {
     || process.env.VITE_SANITY_DATASET
     || 'production';
   if (!sanityWriteToken) {
-    const missingConfiguration = ['SANITY_API_WRITE_TOKEN'];
+    const missingConfiguration = ['SANITY_API_WRITE_TOKEN or SANITY_WRITE_TOKEN'];
     console.error('Student profile sync is missing server configuration.');
     return response.status(503).json({
       success: false,

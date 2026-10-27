@@ -2,6 +2,7 @@ import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto
 import { createClient } from '@sanity/client';
 import { verifyFirebaseIdToken } from './studentProfileSync.js';
 import { getLeadStatus } from './userActivitySync.js';
+import { getSanityWriteToken } from './environment.js';
 import { calculateCourseExpiryDate, isCourseEntitlementActive } from '../src/utils/courseValidity.js';
 
 const API_BASE = 'https://api.razorpay.com/v1';
@@ -17,8 +18,11 @@ export class PaymentRequestError extends Error {
 const getString = (value) => (typeof value === 'string' ? value.trim() : '');
 
 function getPaymentConfig(env) {
-  const keyId = env.RAZORPAY_KEY_ID || env.VITE_RAZORPAY_KEY_ID;
-  const keySecret = env.RAZORPAY_KEY_SECRET || env.RAZORPAY_SECRET;
+  const keyId = env.RAZORPAY_KEY_ID?.trim() || env.VITE_RAZORPAY_KEY_ID?.trim();
+  const keySecret = env.RAZORPAY_KEY_SECRET?.trim()
+    || env.RAZORPAY_SECRET?.trim()
+    || env.VITE_RAZORPAY_KEY_SECRET?.trim()
+    || '';
   if (!keyId || !keySecret) {
     throw new PaymentRequestError(503, 'Razorpay server credentials are not configured.');
   }
@@ -26,7 +30,7 @@ function getPaymentConfig(env) {
 }
 
 function getSanityClient(env) {
-  const token = env.SANITY_API_WRITE_TOKEN;
+  const token = getSanityWriteToken(env);
   if (!token) throw new PaymentRequestError(503, 'The server-side Sanity write token is not configured.');
   return createClient({
     projectId: env.SANITY_PROJECT_ID || env.VITE_SANITY_PROJECT_ID || 'rkev3aui',
