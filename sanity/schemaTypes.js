@@ -822,6 +822,20 @@ const book = defineType({
       hidden: true
     }),
     defineField({
+      name: 'isPreviousYear',
+      title: 'Previous Year Paper',
+      type: 'boolean',
+      group: 'taxonomy',
+      initialValue: false
+    }),
+    defineField({
+      name: 'isMockTest',
+      title: 'Mock Test',
+      type: 'boolean',
+      group: 'taxonomy',
+      initialValue: false
+    }),
+    defineField({
       name: 'coverImage',
       title: 'Cover Image',
       type: 'image',
@@ -857,6 +871,13 @@ const book = defineType({
       type: 'file',
       group: 'media',
       options: { accept: '.pdf' }
+    }),
+    defineField({
+      name: 'pdfUrl',
+      title: 'External PDF URL',
+      type: 'url',
+      group: 'media',
+      description: 'Optional link if PDF is hosted elsewhere'
     }),
     defineField({ name: 'fileSize', title: 'File Size', type: 'string', group: 'media' }),
     defineField({ name: 'totalPages', title: 'Total Pages', type: 'number', group: 'media', validation: (Rule) => Rule.min(0) }),

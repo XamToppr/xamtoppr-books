@@ -247,6 +247,8 @@ function BookStoreApp() {
   const [selectedMedium, setSelectedMedium] = useState('All Mediums');
   const [selectedSubject, setSelectedSubject] = useState('All Subjects');
   const [selectedTopic, setSelectedTopic] = useState('');
+  const [showPreviousYearPapers, setShowPreviousYearPapers] = useState(false);
+  const [showMockTests, setShowMockTests] = useState(false);
   const [sortBy, setSortBy] = useState('popular');
   const [savedBooks, setSavedBooks] = useState(['xt-bk-001']);
   const [selectedBookForModal, setSelectedBookForModal] = useState(null);
@@ -443,7 +445,7 @@ function BookStoreApp() {
               coverAccent: 'text-amber-400',
               coverImage: getHighDefinitionSanityImageUrl(book.coverImageUrl),
               samplePdfUrl: book.samplePdfUrl || '',
-              pdfUrl: book.buyUrl || (isFree ? book.samplePdfUrl : ''),
+              pdfUrl: isFree ? book.pdfUrl || book.samplePdfUrl || '' : '',
               samplePages: Array.isArray(book.samplePages)
                 ? book.samplePages.filter(Boolean).map(getHighDefinitionSanityImageUrl)
                 : [],
@@ -458,6 +460,8 @@ function BookStoreApp() {
               flipkartUrl: book.flipkartUrl || '',
               sampleFlipbookUrl: book.sampleFlipbookUrl || '',
               isFeatured: Boolean(book.isFeatured),
+              isPreviousYear: Boolean(book.isPreviousYear),
+              isMockTest: Boolean(book.isMockTest),
               publishedYear: new Date().getFullYear().toString(),
               description: book.description || '',
               descriptionText: getPortableTextPlainText(book.description),
@@ -1013,6 +1017,8 @@ function BookStoreApp() {
     setSelectedMedium('All Mediums');
     setSelectedSubject('All Subjects');
     setSelectedTopic('');
+    setShowPreviousYearPapers(false);
+    setShowMockTests(false);
     setQuickFilterBadge('ALL');
     setSortBy('popular');
     showToast('Filters cleared successfully');
@@ -1093,6 +1099,8 @@ function BookStoreApp() {
       if (selectedTrack && !book.tracks.some((track) => track?.name === selectedTrack)) return false;
       if (selectedPlatform && !book.platforms.some((platform) => platform?.name === selectedPlatform)) return false;
       if (selectedTopic && book.topic?.name !== selectedTopic) return false;
+      if (showPreviousYearPapers && !book.isPreviousYear) return false;
+      if (showMockTests && !book.isMockTest) return false;
 
       if (selectedMedium !== 'All Mediums') {
         if (!book.language.toLowerCase().includes(selectedMedium.toLowerCase().split(' ')[0])) {
@@ -1130,6 +1138,8 @@ function BookStoreApp() {
     selectedMedium,
     selectedSubject,
     selectedTopic,
+    showPreviousYearPapers,
+    showMockTests,
     quickFilterBadge,
     sortBy
   ]);
@@ -1681,6 +1691,8 @@ function BookStoreApp() {
                   selectedMedium !== 'All Mediums' ||
                   selectedSubject !== 'All Subjects' ||
                   selectedTopic ||
+                  showPreviousYearPapers ||
+                  showMockTests ||
                   quickFilterBadge !== 'ALL' ||
                   searchQuery) && (
                   <button
@@ -1850,6 +1862,32 @@ function BookStoreApp() {
                   ))}
                 </select>
               </div>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                aria-pressed={showPreviousYearPapers}
+                onClick={() => setShowPreviousYearPapers((selected) => !selected)}
+                className={`rounded-lg border px-3 py-2 text-xs font-bold transition ${
+                  showPreviousYearPapers
+                    ? 'border-blue-950 bg-blue-950 text-white'
+                    : 'border-slate-300 bg-white text-slate-700 hover:bg-blue-50'
+                }`}
+              >
+                Previous Year Papers
+              </button>
+              <button
+                type="button"
+                aria-pressed={showMockTests}
+                onClick={() => setShowMockTests((selected) => !selected)}
+                className={`rounded-lg border px-3 py-2 text-xs font-bold transition ${
+                  showMockTests
+                    ? 'border-blue-950 bg-blue-950 text-white'
+                    : 'border-slate-300 bg-white text-slate-700 hover:bg-blue-50'
+                }`}
+              >
+                Mock Tests
+              </button>
             </div>
           </div>
         </section>

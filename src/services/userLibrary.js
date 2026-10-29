@@ -57,6 +57,7 @@ export async function fetchUserLibrary(user) {
           title,
           "coverImageUrl": coverImage.asset->url,
           "samplePdfUrl": samplePdfFile.asset->url,
+          pdfUrl,
           fullPdfFile {
             asset-> {
               url
@@ -96,6 +97,7 @@ export async function fetchUserLibrary(user) {
       title: catalogBook.title || entry.title || entry.bookTitle || 'Purchased book',
       coverImage: catalogBook.coverImageUrl || entry.coverImage || '',
       fullPdfFile: catalogBook.fullPdfFile || null,
+      pdfUrl: catalogBook.pdfUrl || '',
       samplePdfUrl: catalogBook.samplePdfUrl || '',
       purchasedAt: entry.purchasedAt || entry.purchaseDate || entry.createdAt || null,
       amountPaid: entry.finalAmount ?? entry.price ?? entry.amount ?? null

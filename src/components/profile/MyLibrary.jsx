@@ -197,6 +197,7 @@ export default function MyLibrary() {
                 ? getCourseValidity(item.expiresAt, currentTime)
                 : null;
               const courseIsExpired = validity?.isExpired || false;
+              const fullPdfUrl = item.fullPdfFile?.asset?.url || item.pdfUrl || '';
               return (
               <article key={`${item.itemType}-${item.id}`} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 {item.coverImage ? (
@@ -241,12 +242,12 @@ export default function MyLibrary() {
                   ) : (
                     <>
                       <p className="mt-2 text-xs text-slate-500">Purchased {formatPurchaseDate(item.purchasedAt)}</p>
-                      {item.fullPdfFile?.asset?.url ? (
+                      {fullPdfUrl ? (
                         <>
-                          <a href={item.fullPdfFile.asset.url} target="_blank" rel="noopener noreferrer" className="mt-4 block rounded-lg bg-blue-950 px-4 py-2.5 text-center text-sm font-bold text-white hover:bg-blue-900">
+                          <a href={fullPdfUrl} target="_blank" rel="noopener noreferrer" className="mt-4 block rounded-lg bg-blue-950 px-4 py-2.5 text-center text-sm font-bold text-white hover:bg-blue-900">
                             📖 Read Full Book
                           </a>
-                          <a href={item.fullPdfFile.asset.url} download className="mt-2 block rounded-lg border border-blue-200 px-4 py-2 text-center text-xs font-bold text-blue-950 hover:bg-blue-50">
+                          <a href={fullPdfUrl} download className="mt-2 block rounded-lg border border-blue-200 px-4 py-2 text-center text-xs font-bold text-blue-950 hover:bg-blue-50">
                             ⬇ Download PDF
                           </a>
                         </>

@@ -378,7 +378,7 @@ export default function BookDetailPage() {
   const originalPrice = Number(book?.price) || 0;
   const finalPrice = coupon?.finalAmount ?? price;
   const alreadyPurchased = Boolean(book && hasPurchasedBook(userProfile, book));
-  const fullPdfUrl = book?.fullPdfFile?.asset?.url || '';
+  const fullPdfUrl = book?.fullPdfFile?.asset?.url || book?.pdfUrl || '';
   const coverImageUrl = getHighDefinitionImageUrl(book?.coverImage);
   const category = useMemo(() => {
     const categories = Array.isArray(book?.examCategory) ? book.examCategory : [];

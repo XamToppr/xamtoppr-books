@@ -505,7 +505,7 @@ export async function verifyRazorpayPayment({ body, authorization, env }) {
       .filter((item) => item.productType === 'book')
       .map((item) => item.productId);
     const books = await sanity.fetch(
-      '*[_type == "book" && _id in $bookIds]{_id, "pdfUrl": fullPdfFile.asset->url}',
+      '*[_type == "book" && _id in $bookIds]{_id, "pdfUrl": coalesce(fullPdfFile.asset->url, pdfUrl)}',
       { bookIds: purchasedBookIds }
     );
     const pdfUrlsByBookId = new Map(books.map((book) => [book._id, book.pdfUrl || null]));
