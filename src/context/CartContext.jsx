@@ -34,7 +34,23 @@ export function CartProvider({ children }) {
     if (!productId || !product?.title) {
       throw new Error('A valid product is required to add it to the cart.');
     }
-    if (cartItemsRef.current.some((item) => item.id === productId)) return;
+    const existingIndex = cartItemsRef.current.findIndex((item) => item.id === productId);
+    if (existingIndex !== -1) {
+      if (product.productType !== 'videoCoursePack') return;
+      const currentItem = cartItemsRef.current[existingIndex];
+      const updatedItem = {
+        ...currentItem,
+        price: Number(product.offerPrice ?? product.price) || 0,
+        displayPrice: product.displayPrice || '',
+        selectedPlanTitle: product.selectedPlanTitle || ''
+      };
+      if (currentItem.price === updatedItem.price && currentItem.selectedPlanTitle === updatedItem.selectedPlanTitle) return;
+      const nextItems = [...cartItemsRef.current];
+      nextItems[existingIndex] = updatedItem;
+      cartItemsRef.current = nextItems;
+      setCartItems(nextItems);
+      return;
+    }
 
     const nextItems = [...cartItemsRef.current, {
       id: productId,
@@ -45,6 +61,7 @@ export function CartProvider({ children }) {
       title: product.title,
       price: Number(product.offerPrice ?? product.price) || 0,
       displayPrice: product.displayPrice || '',
+      selectedPlanTitle: product.selectedPlanTitle || '',
       coverImage: product.coverImage || '',
       pdfUrl: product.pdfUrl || '',
       samplePdfUrl: product.samplePdfUrl || ''

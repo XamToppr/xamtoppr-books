@@ -67,6 +67,9 @@ export default function CartDrawer({ isOpen, onClose, onProceedCheckout }) {
                         Video course{book.packPurpose ? ` · ${book.packPurpose}` : ''}
                       </p>
                     )}
+                    {book.selectedPlanTitle && (
+                      <p className="mt-1 text-xs font-semibold text-slate-600">{book.selectedPlanTitle}</p>
+                    )}
                   </div>
                   <button
                     type="button"

@@ -851,6 +851,7 @@ function BookStoreApp() {
       offerPrice: course.price,
       displayPrice: `₹${Number(course.price).toLocaleString('en-IN')}`,
       coverImage: course.thumbnailUrl || '',
+      selectedPlanTitle: course.selectedPlanTitle || '',
       packPurpose: course.packPurpose || 'Individual'
     });
     setShowCartDrawer(true);

@@ -334,6 +334,143 @@ const videoCoursePack = defineType({
       })
     }),
     defineField({
+      name: 'pricingPlans',
+      title: 'Pricing Plans',
+      type: 'array',
+      group: 'details',
+      description: 'Optional purchase options shown on the course detail page.',
+      of: [
+        defineArrayMember({
+          type: 'object',
+          fields: [
+            defineField({
+              name: 'planTitle',
+              title: 'Plan Title',
+              type: 'string',
+              validation: (Rule) => Rule.required()
+            }),
+            defineField({
+              name: 'price',
+              title: 'Price',
+              type: 'number',
+              validation: (Rule) => Rule.required().min(0).precision(2)
+            }),
+            defineField({
+              name: 'mrp',
+              title: 'MRP',
+              type: 'number',
+              validation: (Rule) => Rule.min(0).precision(2)
+            }),
+            defineField({
+              name: 'isRecommended',
+              title: 'Recommended Plan',
+              type: 'boolean',
+              initialValue: false
+            })
+          ],
+          preview: {
+            select: { title: 'planTitle', price: 'price', isRecommended: 'isRecommended' },
+            prepare: ({ title, price, isRecommended }) => ({
+              title: title || 'Untitled pricing plan',
+              subtitle: [price != null ? `₹${price}` : '', isRecommended ? 'Recommended' : ''].filter(Boolean).join(' · ')
+            })
+          }
+        })
+      ]
+    }),
+    defineField({
+      name: 'courseFeatures',
+      title: 'Course Features',
+      type: 'array',
+      group: 'details',
+      of: [defineArrayMember({ type: 'string' })]
+    }),
+    defineField({
+      name: 'mentors',
+      title: 'Mentors',
+      type: 'array',
+      group: 'details',
+      of: [
+        defineArrayMember({
+          type: 'object',
+          fields: [
+            defineField({
+              name: 'name',
+              title: 'Name',
+              type: 'string',
+              validation: (Rule) => Rule.required()
+            }),
+            defineField({
+              name: 'designation',
+              title: 'Designation / Specialization',
+              type: 'string'
+            }),
+            defineField({
+              name: 'details',
+              title: 'Details',
+              type: 'text',
+              rows: 4
+            }),
+            defineField({
+              name: 'youtubeLink',
+              title: 'YouTube Link',
+              type: 'url',
+              validation: (Rule) => Rule.uri({ scheme: ['http', 'https'] })
+            })
+          ],
+          preview: {
+            select: { title: 'name', subtitle: 'designation' },
+            prepare: ({ title, subtitle }) => ({
+              title: title || 'Unnamed mentor',
+              subtitle
+            })
+          }
+        })
+      ]
+    }),
+    defineField({
+      name: 'courseTypeTag',
+      title: 'Course Type Tag',
+      type: 'string',
+      group: 'details',
+      options: {
+        layout: 'dropdown',
+        list: [
+          { title: 'Live Classes', value: 'Live Classes' },
+          { title: 'Pre-Recorded', value: 'Pre-Recorded' },
+          { title: 'Live + Recorded', value: 'Live + Recorded' }
+        ]
+      }
+    }),
+    defineField({
+      name: 'language',
+      title: 'Course Language',
+      type: 'string',
+      group: 'details',
+      description: 'For example, Hinglish or English.'
+    }),
+    defineField({
+      name: 'videoHours',
+      title: 'Video Hours',
+      type: 'number',
+      group: 'details',
+      validation: (Rule) => Rule.min(0).precision(1)
+    }),
+    defineField({
+      name: 'mockTestsCount',
+      title: 'Mock Tests',
+      type: 'number',
+      group: 'details',
+      validation: (Rule) => Rule.min(0).integer()
+    }),
+    defineField({
+      name: 'ebooksCount',
+      title: 'E-books',
+      type: 'number',
+      group: 'details',
+      validation: (Rule) => Rule.min(0).integer()
+    }),
+    defineField({
       name: 'duration',
       title: 'Access Duration',
       type: 'string',

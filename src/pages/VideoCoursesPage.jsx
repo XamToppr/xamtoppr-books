@@ -3,12 +3,13 @@ import { PortableText } from '@portabletext/react';
 import portableTextComponents from '../components/PortableTextComponents';
 import {
   ArrowRight,
-  BookOpen,
+  BookMarked,
   CalendarDays,
   ChevronDown,
   ChevronLeft,
   Check,
   Clock3,
+  ClipboardCheck,
   ListChecks,
   Play,
   Search,
@@ -152,6 +153,15 @@ const mapPack = (pack, index) => {
     packType: pack.packType || 'Free',
     packPurpose: pack.packPurpose || 'Individual',
     price: Number(pack.price) || 0,
+    mrp: Number(pack.mrp) || 0,
+    pricingPlans: Array.isArray(pack.pricingPlans) ? pack.pricingPlans : [],
+    courseFeatures: Array.isArray(pack.courseFeatures) ? pack.courseFeatures.filter(Boolean) : [],
+    mentors: Array.isArray(pack.mentors) ? pack.mentors : [],
+    courseTypeTag: pack.courseTypeTag || '',
+    language: pack.language || '',
+    videoHours: Number(pack.videoHours) || 0,
+    mockTestsCount: Number(pack.mockTestsCount) || 0,
+    ebooksCount: Number(pack.ebooksCount) || 0,
     thumbnailUrl: pack.thumbnailUrl || '',
     modules,
     accent: COURSE_ACCENTS[index % COURSE_ACCENTS.length]
@@ -507,6 +517,7 @@ function VideoCoursesPage({
   const [enrollingCourseId, setEnrollingCourseId] = useState('');
   const [enrollmentError, setEnrollmentError] = useState('');
   const [localEnrolledCourseIds, setLocalEnrolledCourseIds] = useState([]);
+  const [selectedPlanKey, setSelectedPlanKey] = useState('');
   const playerRequestId = React.useRef(0);
   const handleVideoWatch = useCallback((engagement) => {
     if (!currentUser || !activeVideo) return;
@@ -540,6 +551,27 @@ function VideoCoursesPage({
     ...updates
   }));
   const detailCourse = courses.find((course) => course.slug === courseSlug || course.id === courseSlug);
+  const detailPricingPlans = detailCourse
+    ? (detailCourse.pricingPlans.length
+      ? detailCourse.pricingPlans
+      : [{
+        planTitle: detailCourse.duration || 'Full Course Access',
+        price: detailCourse.price,
+        mrp: detailCourse.mrp,
+        isRecommended: false
+      }])
+    : [];
+  const defaultPricingPlanIndex = Math.max(0, detailPricingPlans.findIndex((plan) => plan.isRecommended));
+  const currentPricingPlanKey = detailCourse
+    ? `${detailCourse.id}-${detailPricingPlans[defaultPricingPlanIndex]?._key || defaultPricingPlanIndex}`
+    : '';
+  const activePricingPlanKey = selectedPlanKey.startsWith(`${detailCourse?.id}-`)
+    ? selectedPlanKey
+    : currentPricingPlanKey;
+  const selectedPricingPlanIndex = detailPricingPlans.findIndex((plan, index) => (
+    `${detailCourse?.id}-${plan._key || index}` === activePricingPlanKey
+  ));
+  const selectedPricingPlan = detailPricingPlans[selectedPricingPlanIndex] || detailPricingPlans[0];
   const accessibleCourseIds = useMemo(() => {
     const ownedIds = new Set([
       ...enrolledCourseIds.flatMap(getCourseIdentifiers),
@@ -574,6 +606,9 @@ function VideoCoursesPage({
   const detailCourseValidity = detailCourse
     ? getCourseValidity(courseExpiryById[detailCourse.id])
     : null;
+  const selectedPlanPrice = Number(selectedPricingPlan?.price ?? detailCourse?.price) || 0;
+  const selectedPlanMrp = Number(selectedPricingPlan?.mrp ?? detailCourse?.mrp) || 0;
+  const selectedPlanSavings = Math.max(0, selectedPlanMrp - selectedPlanPrice);
 
   useEffect(() => {
     let isCurrentRequest = true;
@@ -654,9 +689,14 @@ function VideoCoursesPage({
       ? (detailCourse.onlineClasses.length ? detailCourse.onlineClasses : detailCourse.videos)
       : []
   ), [detailCourse]);
-  const detailSubjects = [...new Map(detailVideos
-    .filter((video) => video.subjectId)
-    .map((video) => [video.subjectId, { id: video.subjectId, name: video.subject }])).values()];
+  const detailSubjects = [...new Map([
+    ...(detailCourse?.subjectRefs || [])
+      .filter((item) => item?._id && item?.name)
+      .map((item) => [item._id, { id: item._id, name: item.name }]),
+    ...detailVideos
+      .filter((video) => video.subjectId)
+      .map((video) => [video.subjectId, { id: video.subjectId, name: video.subject }])
+  ]).values()];
   const subjectVideos = detailVideos.filter((video) => video.subjectId === selectedSubjectId);
   const detailModules = [...new Map(subjectVideos
     .filter((video) => video.moduleId)
@@ -668,10 +708,15 @@ function VideoCoursesPage({
   const topicVideos = moduleVideos.filter((video) => video.topicId === selectedTopicId);
   const detailTabs = [
     { id: 'description', label: 'Description' },
-    { id: 'timeTable', label: 'Time Table' },
-    { id: 'syllabusPlanner', label: 'Syllabus / Planner' },
     { id: 'demoVideos', label: 'Demo Videos' },
-    { id: 'delivery', label: detailCourse?.deliveryMode || 'Recorded Video' }
+    { id: 'syllabusPlanner', label: 'Syllabus / Planner' },
+    { id: 'timeTable', label: 'Time Table' },
+    { id: 'delivery', label: 'Subjects' },
+    ...detailSubjects.map((item) => ({
+      id: `subject-${item.id}`,
+      label: item.name,
+      subjectId: item.id
+    }))
   ];
 
   function closePlayer() {
@@ -877,7 +922,8 @@ function VideoCoursesPage({
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <section className="relative overflow-hidden bg-gradient-to-br from-[#0c2356] via-blue-900 to-indigo-900 text-white">
+      {!courseSlug && (
+        <section className="relative overflow-hidden bg-gradient-to-br from-[#0c2356] via-blue-900 to-indigo-900 text-white">
         <div className="pointer-events-none absolute -right-24 -top-32 h-96 w-96 rounded-full border-[48px] border-white/5" />
         <div className="pointer-events-none absolute bottom-0 right-1/3 h-48 w-48 rounded-full bg-amber-400/10 blur-3xl" />
         <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
@@ -898,7 +944,8 @@ function VideoCoursesPage({
             </a>
           </div>
         </div>
-      </section>
+        </section>
+      )}
 
       <main id="course-catalog" className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6 sm:pb-20 sm:pt-10 lg:px-8">
         {courseSlug ? (
@@ -930,82 +977,99 @@ function VideoCoursesPage({
                 <ChevronLeft className="h-4 w-4" /> All Video Courses
               </button>
 
-              <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                <div className="relative min-h-56 overflow-hidden bg-gradient-to-br from-blue-800 to-indigo-950 p-6 text-white sm:min-h-72 sm:p-9">
-                  {detailCourse.thumbnailUrl && (
-                    <img src={detailCourse.thumbnailUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/65 to-slate-950/15" />
-                  <div className="relative z-10 flex min-h-44 max-w-3xl flex-col justify-end sm:min-h-52">
-                    <div className="flex flex-wrap gap-2">
-                      <span className={`rounded-full px-3 py-1 text-xs font-extrabold ${detailCourse.packType === 'Free' ? 'bg-emerald-300 text-emerald-950' : 'bg-amber-300 text-amber-950'}`}>
-                        {detailCourse.packType}
-                      </span>
-                      <span className="rounded-full border border-white/30 bg-white/10 px-3 py-1 text-xs font-bold">{detailCourse.deliveryMode}</span>
-                    </div>
-                    <h2 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">{detailCourse.title}</h2>
-                    <p className="mt-3 max-w-2xl text-sm leading-6 text-blue-100 sm:text-base">{detailCourse.description}</p>
-                    <p className="mt-3 text-sm font-extrabold text-white">
-                      {detailCourse.packType === 'Free'
-                        ? 'Free'
-                        : new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(detailCourse.price)}
-                      {detailCourse.duration && <span className="ml-3 font-medium text-blue-100">{detailCourse.duration} access</span>}
+              <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-8">
+                <section className="min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                  <header className="border-b border-slate-100 px-5 py-7 sm:px-8 sm:py-9">
+                    <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-blue-700">
+                      {detailCourse.courseTypeTag || detailCourse.deliveryMode}
                     </p>
-                    {isDetailCourseExpired ? (
-                      <div className="mt-4 flex flex-wrap items-center gap-3">
-                        <span className="rounded-full bg-rose-100 px-3 py-1.5 text-xs font-extrabold text-rose-800">
-                          Validity Expired
-                        </span>
+                    <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">{detailCourse.title}</h2>
+                    {detailCourse.description && (
+                      <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">{detailCourse.description}</p>
+                    )}
+                  </header>
+
+                  <div role="tablist" aria-label="Course details" className="flex gap-1 overflow-x-auto border-b border-slate-200 px-3 pt-3 sm:px-5">
+                    {detailTabs.map((tab) => {
+                      const isSelected = tab.subjectId
+                        ? activeDetailTab === 'delivery' && selectedSubjectId === tab.subjectId
+                        : activeDetailTab === tab.id && (tab.id !== 'delivery' || !selectedSubjectId);
+                      return (
                         <button
                           type="button"
-                          onClick={() => detailCourse.packType === 'Free'
-                            ? void enrollFreeCourse(detailCourse)
-                            : onBuyCourse?.(detailCourse)}
-                          disabled={enrollingCourseId === detailCourse.id}
-                          className="rounded-xl bg-amber-400 px-4 py-2.5 text-sm font-extrabold text-slate-950 hover:bg-amber-300 disabled:cursor-wait disabled:opacity-60"
+                          role="tab"
+                          key={tab.id}
+                          id={`course-tab-${tab.id}`}
+                          aria-selected={isSelected}
+                          aria-controls="course-detail-panel"
+                          onClick={() => updateDetailNavigation(tab.subjectId
+                            ? { tab: 'delivery', subjectId: tab.subjectId, moduleId: '', topicId: '' }
+                            : { tab: tab.id, ...(tab.id === 'delivery' ? { subjectId: '', moduleId: '', topicId: '' } : {}) })}
+                          className={`min-h-11 shrink-0 border-b-2 px-3 text-xs font-extrabold transition sm:px-4 sm:text-sm ${
+                            isSelected
+                              ? 'border-amber-500 text-blue-950'
+                              : 'border-transparent text-slate-500 hover:text-blue-800'
+                          }`}
                         >
-                          {detailCourse.packType === 'Free' ? 'Renew Free Enrollment' : 'Renew Course'}
+                          {tab.label}
                         </button>
-                      </div>
-                    ) : isDetailCourseAccessible && courseExpiryById[detailCourse.id] ? (
-                      <p className="mt-3 text-sm font-bold text-emerald-200">{detailCourseValidity.remaining}</p>
-                    ) : null}
+                      );
+                    })}
                   </div>
-                </div>
 
-                <div role="tablist" aria-label="Course details" className="flex gap-1 overflow-x-auto border-b border-slate-200 px-3 pt-3 sm:px-6">
-                  {detailTabs.map((tab) => (
-                    <button
-                      type="button"
-                      role="tab"
-                      key={tab.id}
-                      id={`course-tab-${tab.id}`}
-                      aria-selected={activeDetailTab === tab.id}
-                      aria-controls="course-detail-panel"
-                      onClick={() => updateDetailNavigation({ tab: tab.id })}
-                      className={`min-h-11 shrink-0 border-b-2 px-3 text-xs font-extrabold transition sm:px-4 sm:text-sm ${
-                        activeDetailTab === tab.id
-                          ? 'border-amber-500 text-blue-950'
-                          : 'border-transparent text-slate-500 hover:text-blue-800'
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-
-                <div
-                  id="course-detail-panel"
-                  role="tabpanel"
-                  aria-labelledby={`course-tab-${activeDetailTab}`}
-                  className="min-h-64 p-4 sm:p-7"
-                >
+                  <div
+                    id="course-detail-panel"
+                    role="tabpanel"
+                    aria-labelledby={activeDetailTab === 'delivery' && selectedSubjectId
+                      ? `course-tab-subject-${selectedSubjectId}`
+                      : `course-tab-${activeDetailTab}`}
+                    className="min-h-64 p-5 sm:p-8"
+                  >
                   {activeDetailTab === 'description' && (
-                    <div className="prose prose-slate max-w-none">
-                      {detailCourse.richDescription.length ? (
-                        <PortableText value={detailCourse.richDescription} components={portableTextComponents} />
-                      ) : (
-                        <p className="text-sm leading-7 text-slate-600">{detailCourse.description || 'Course details will be added soon.'}</p>
+                    <div className="space-y-10">
+                      <div className="prose prose-slate max-w-none">
+                        {detailCourse.richDescription.length ? (
+                          <PortableText value={detailCourse.richDescription} components={portableTextComponents} />
+                        ) : (
+                          <p className="text-sm leading-7 text-slate-600">{detailCourse.description || 'Course details will be added soon.'}</p>
+                        )}
+                      </div>
+                      {detailCourse.courseFeatures.length > 0 && (
+                        <section aria-labelledby="course-features-heading">
+                          <h3 id="course-features-heading" className="text-xl font-black text-slate-950">What You'll Get</h3>
+                          <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+                            {detailCourse.courseFeatures.map((feature, index) => (
+                              <li key={`${feature}-${index}`} className="flex items-start gap-3 text-sm leading-6 text-slate-700">
+                                <Check className="mt-1 h-4 w-4 shrink-0 text-emerald-600" />
+                                <span>{feature}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </section>
+                      )}
+                      {detailCourse.mentors.length > 0 && (
+                        <section aria-labelledby="course-mentors-heading">
+                          <h3 id="course-mentors-heading" className="text-xl font-black text-slate-950">Meet Your Mentors</h3>
+                          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                            {detailCourse.mentors.map((mentor, index) => (
+                              <article key={mentor._key || `${mentor.name}-${index}`} className="rounded-2xl border border-slate-200 p-5">
+                                <h4 className="font-extrabold text-slate-950">{mentor.name}</h4>
+                                {mentor.designation && <p className="mt-1 text-sm font-semibold text-blue-800">{mentor.designation}</p>}
+                                {mentor.details && <p className="mt-3 text-sm leading-6 text-slate-600">{mentor.details}</p>}
+                                {mentor.youtubeLink && (
+                                  <a
+                                    href={mentor.youtubeLink}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-blue-800 hover:text-blue-950"
+                                  >
+                                    <Play className="h-4 w-4" /> Watch mentor videos
+                                  </a>
+                                )}
+                              </article>
+                            ))}
+                          </div>
+                        </section>
                       )}
                     </div>
                   )}
@@ -1218,8 +1282,134 @@ function VideoCoursesPage({
                       )}
                     </section>
                   )}
-                </div>
-              </section>
+                  </div>
+                </section>
+
+                <aside className="lg:sticky lg:top-6" aria-label="Course purchase options">
+                  <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-lg shadow-slate-200/60">
+                    <div className="relative aspect-video bg-slate-100">
+                      {detailCourse.thumbnailUrl ? (
+                        <img src={detailCourse.thumbnailUrl} alt={`${detailCourse.title} course thumbnail`} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className={`h-full w-full bg-gradient-to-br ${detailCourse.accent}`} />
+                      )}
+                      {detailCourse.courseTypeTag && (
+                        <span className="absolute left-4 top-4 rounded-lg bg-white px-3 py-1.5 text-xs font-extrabold text-blue-950 shadow">
+                          {detailCourse.courseTypeTag}
+                        </span>
+                      )}
+                    </div>
+                    <div className="p-5 sm:p-6">
+                      <p className="text-xs font-extrabold uppercase tracking-wider text-slate-500">Course access</p>
+                      {detailCourse.packType === 'Free' ? (
+                        <p className="mt-2 text-3xl font-black text-slate-950">Free</p>
+                      ) : (
+                        <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                          <span className="text-3xl font-black text-slate-950">
+                            {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(selectedPlanPrice)}
+                          </span>
+                          {selectedPlanMrp > selectedPlanPrice && (
+                            <span className="text-sm font-semibold text-slate-400 line-through">
+                              {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(selectedPlanMrp)}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {selectedPlanSavings > 0 && detailCourse.packType !== 'Free' && (
+                        <p className="mt-1 text-sm font-bold text-emerald-700">
+                          You save {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(selectedPlanSavings)}
+                        </p>
+                      )}
+
+                      {detailCourse.packType !== 'Free' && detailCourse.pricingPlans.length > 0 && (
+                        <fieldset className="mt-5 space-y-2.5">
+                          <legend className="mb-2 text-sm font-extrabold text-slate-900">Choose your plan</legend>
+                          {detailPricingPlans.map((plan, index) => {
+                            const planKey = `${detailCourse.id}-${plan._key || index}`;
+                            const isSelected = selectedPricingPlanIndex === index;
+                            return (
+                              <label
+                                key={planKey}
+                                className={`relative flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${
+                                  isSelected ? 'border-blue-700 bg-blue-50/70 ring-1 ring-blue-700' : 'border-slate-200 hover:border-blue-300'
+                                }`}
+                              >
+                                <input
+                                  type="radio"
+                                  name="course-pricing-plan"
+                                  value={planKey}
+                                  checked={isSelected}
+                                  onChange={() => setSelectedPlanKey(planKey)}
+                                  className="mt-1 h-4 w-4 accent-blue-800"
+                                />
+                                <span className="min-w-0 flex-1">
+                                  <span className="flex flex-wrap items-center gap-2 font-bold text-slate-900">
+                                    {plan.planTitle || `Plan ${index + 1}`}
+                                    {plan.isRecommended && (
+                                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-amber-900">Recommended</span>
+                                    )}
+                                  </span>
+                                  {plan.mrp > plan.price && (
+                                    <span className="mt-1 block text-xs text-slate-500">
+                                      MRP <span className="line-through">
+                                        {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(plan.mrp))}
+                                      </span>
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="shrink-0 text-sm font-black text-slate-950">
+                                  {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(plan.price) || 0)}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </fieldset>
+                      )}
+
+                      {detailCourse.duration && (
+                        <p className="mt-4 flex items-center gap-2 text-sm text-slate-600">
+                          <Clock3 className="h-4 w-4 text-blue-700" /> {detailCourse.duration} access
+                        </p>
+                      )}
+                      {isDetailCourseExpired && (
+                        <p className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-sm font-bold text-rose-800">Your course validity has expired.</p>
+                      )}
+                      {isDetailCourseAccessible && courseExpiryById[detailCourse.id] && !isDetailCourseExpired && (
+                        <p className="mt-4 text-sm font-bold text-emerald-700">{detailCourseValidity.remaining}</p>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isDetailCourseAccessible && !isDetailCourseExpired) {
+                            updateDetailNavigation({ tab: 'delivery', subjectId: detailSubjects[0]?.id || '', moduleId: '', topicId: '' });
+                          } else if (detailCourse.packType === 'Free') {
+                            void enrollFreeCourse(detailCourse);
+                          } else {
+                            onBuyCourse?.({
+                              ...detailCourse,
+                              price: selectedPricingPlan?.price ?? detailCourse.price,
+                              mrp: selectedPricingPlan?.mrp ?? detailCourse.mrp,
+                              selectedPlanTitle: selectedPricingPlan?.planTitle || ''
+                            });
+                          }
+                        }}
+                        disabled={enrollingCourseId === detailCourse.id}
+                        className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-5 py-3 text-sm font-extrabold text-slate-950 shadow-sm transition hover:bg-amber-300 disabled:cursor-wait disabled:opacity-60"
+                      >
+                        {isDetailCourseAccessible && !isDetailCourseExpired
+                          ? 'Continue Learning'
+                          : detailCourse.packType === 'Free'
+                            ? (isDetailCourseExpired ? 'Renew Free Enrollment' : 'Enroll for Free')
+                            : (isDetailCourseExpired ? 'Renew Course' : 'Buy Now')}
+                        <ArrowRight className="h-4 w-4" />
+                      </button>
+                      <p className="mt-3 text-center text-xs leading-5 text-slate-500">
+                        {detailCourse.packType === 'Free' ? 'Start learning after enrolling.' : 'Secure checkout. Course access is added to your account after purchase.'}
+                      </p>
+                    </div>
+                  </div>
+                </aside>
+              </div>
             </div>
           )
         ) : (
@@ -1300,86 +1490,114 @@ function VideoCoursesPage({
                 const courseIsExpired = isCourseExpired(course);
                 const courseValidity = getCourseValidity(courseExpiryById[course.id]);
                 const courseIsAccessible = isCourseAccessible(course);
+                const cardPlan = course.pricingPlans.find((plan) => plan.isRecommended) || course.pricingPlans[0];
+                const cardPrice = Number(cardPlan?.price ?? course.price) || 0;
+                const cardMrp = Number(cardPlan?.mrp ?? course.mrp) || 0;
+                const discountPercentage = cardMrp > cardPrice
+                  ? Math.round(((cardMrp - cardPrice) / cardMrp) * 100)
+                  : 0;
+                const instructorNames = course.mentors.map((mentor) => mentor.name).filter(Boolean);
+                const courseTypeLabel = course.courseTypeTag
+                  || (course.deliveryMode === 'Live Class' ? 'Live Classes' : 'Recorded');
+                const courseStats = [
+                  course.videoHours > 0
+                    ? { key: 'hours', icon: Clock3, label: `${course.videoHours} video hours` }
+                    : course.lessons > 0
+                      ? { key: 'lessons', icon: Play, label: `${course.lessons} lessons` }
+                      : null,
+                  course.mockTestsCount > 0
+                    ? { key: 'tests', icon: ClipboardCheck, label: `${course.mockTestsCount} mock tests` }
+                    : null,
+                  course.ebooksCount > 0
+                    ? { key: 'ebooks', icon: BookMarked, label: `${course.ebooksCount} e-books` }
+                    : null
+                ].filter(Boolean);
                 return (
                 <article key={course.id} className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-200 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl">
                   <div className={`relative aspect-video overflow-hidden bg-gradient-to-br ${course.accent}`}>
                     {course.thumbnailUrl && (
-                      <img src={course.thumbnailUrl} alt="" className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]" loading="lazy" />
+                      <img src={course.thumbnailUrl} alt={`${course.title} thumbnail`} className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]" loading="lazy" />
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/35 via-transparent to-transparent" />
-                    <span className={`absolute right-3 top-3 rounded-full px-3 py-1 text-[11px] font-extrabold shadow ${course.packType === 'Free' ? 'bg-emerald-300 text-emerald-950' : 'bg-amber-300 text-amber-950'}`}>
-                      {course.packType}
+                    <span className="absolute left-3 top-3 rounded-md bg-white/95 px-2.5 py-1.5 text-[11px] font-extrabold text-slate-900 shadow-sm">
+                      {courseTypeLabel}
                     </span>
-                    {courseIsExpired && (
-                      <span className="absolute bottom-3 right-3 rounded-full bg-rose-100 px-2.5 py-1 text-[10px] font-extrabold text-rose-800">
-                        Validity Expired
-                      </span>
-                    )}
-                    {course.platforms[0]?.name && (
-                      <span className="absolute bottom-3 left-3 rounded-full border border-white/30 bg-slate-950/50 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur">
-                        {course.platforms[0].name}
-                      </span>
-                    )}
                   </div>
-                  <div className="flex flex-1 flex-col p-4">
-                    <h3 className="line-clamp-2 min-h-12 text-base font-extrabold leading-6 text-slate-950">{course.title}</h3>
-                    <div className="mt-2 flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-slate-500">
-                      {course.duration && <span className="inline-flex items-center gap-1"><Clock3 className="h-3.5 w-3.5 text-blue-700" />{course.duration}</span>}
-                      {courseIsAccessible && courseExpiryById[course.id] && (
-                        <span className="font-bold text-emerald-700">{courseValidity.remaining}</span>
-                      )}
-                      {course.lessons > 0 && <span className="inline-flex items-center gap-1"><BookOpen className="h-3.5 w-3.5 text-blue-700" />{course.lessons} lessons</span>}
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {uniqueValues([
-                        ...course.tracks.map((item) => item.name),
-                        ...course.platforms.map((item) => item.name),
-                        course.packPurpose
-                      ]).map((tag) => (
-                        <span key={tag} className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-600">{tag}</span>
-                      ))}
-                    </div>
+                  <div className="flex flex-1 flex-col p-5">
+                    <h3 className="line-clamp-2 min-h-14 text-lg font-extrabold leading-7 text-slate-950">{course.title}</h3>
+                    <p className="mt-2 min-h-5 text-xs font-medium leading-5 text-slate-500">
+                      By: {instructorNames.length ? instructorNames.join(', ') : 'XamToppr Team'}
+                      {course.language && <> <span className="mx-1.5 text-slate-300">|</span> {course.language}</>}
+                    </p>
+                    {courseIsExpired && (
+                      <p className="mt-2 text-xs font-bold text-rose-700">Validity expired</p>
+                    )}
+                    {courseIsAccessible && courseExpiryById[course.id] && !courseIsExpired && (
+                      <p className="mt-2 text-xs font-bold text-emerald-700">{courseValidity.remaining}</p>
+                    )}
+
+                    {courseStats.length > 0 && (
+                      <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-2 border-t border-slate-100 pt-3">
+                        {courseStats.map(({ key, icon: Icon, label }) => (
+                          <li key={key} className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600">
+                            <Icon className="h-3.5 w-3.5 text-blue-700" />
+                            {label}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+
                     <div className="mt-auto border-t border-slate-100 pt-4">
-                      <p className="text-lg font-black text-blue-950">
-                      {course.packType === 'Free'
-                        ? 'Free'
-                        : new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(course.price)}
-                      </p>
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/video-courses/${encodeURIComponent(course.slug)}`)}
-                          className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-white px-2.5 py-2 text-xs font-extrabold text-blue-950 transition hover:bg-blue-50"
-                        >
-                          Explore <ArrowRight className="h-3.5 w-3.5" />
-                        </button>
-                        {course.packType === 'Free' ? (
-                          <button
-                            type="button"
-                            onClick={() => courseIsAccessible && !courseIsExpired
-                              ? navigate(`/video-courses/${encodeURIComponent(course.slug)}`)
-                              : void enrollFreeCourse(course)}
-                            disabled={enrollingCourseId === course.id}
-                            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-2 text-xs font-extrabold text-white transition hover:bg-emerald-500 disabled:cursor-wait disabled:opacity-60"
-                          >
-                            {enrollingCourseId === course.id
-                              ? 'Enrolling…'
-                              : courseIsAccessible && !courseIsExpired
-                                ? <><Check className="h-3.5 w-3.5" /> Enrolled</>
-                                : courseIsExpired ? 'Renew Free' : 'Enroll Free'}
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => courseIsAccessible && !courseIsExpired
-                              ? navigate(`/video-courses/${encodeURIComponent(course.slug)}`)
-                              : onBuyCourse?.(course)}
-                            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-2 text-xs font-extrabold text-white transition hover:bg-emerald-500"
-                          >
-                            {courseIsExpired ? 'Renew Course' : courseIsAccessible ? 'Continue' : 'Buy Now'}
-                          </button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-xl font-black text-slate-950">
+                          {course.packType === 'Free'
+                            ? 'Free'
+                            : new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(cardPrice)}
+                        </p>
+                        {cardMrp > cardPrice && (
+                          <span className="text-sm font-semibold text-slate-400 line-through">
+                            {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(cardMrp)}
+                          </span>
+                        )}
+                        {discountPercentage > 0 && (
+                          <span className="rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-extrabold text-emerald-700">
+                            {discountPercentage}% off
+                          </span>
                         )}
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (course.packType === 'Free') {
+                            if (courseIsAccessible && !courseIsExpired) {
+                              navigate(`/video-courses/${encodeURIComponent(course.slug)}`);
+                            } else {
+                              void enrollFreeCourse(course);
+                            }
+                          } else if (courseIsAccessible && !courseIsExpired) {
+                            navigate(`/video-courses/${encodeURIComponent(course.slug)}`);
+                          } else {
+                            onBuyCourse?.({
+                              ...course,
+                              price: cardPlan?.price ?? course.price,
+                              mrp: cardPlan?.mrp ?? course.mrp,
+                              selectedPlanTitle: cardPlan?.planTitle || ''
+                            });
+                          }
+                        }}
+                        disabled={course.packType === 'Free' && enrollingCourseId === course.id}
+                        className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-950 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-blue-900 disabled:cursor-wait disabled:opacity-60"
+                      >
+                        <span className="text-white">{course.packType === 'Free'
+                          ? enrollingCourseId === course.id
+                            ? 'Enrolling…'
+                            : courseIsAccessible && !courseIsExpired
+                              ? 'View Full Course'
+                              : courseIsExpired ? 'Renew Free' : 'Enroll Free'
+                          : courseIsAccessible && !courseIsExpired
+                            ? 'View Full Course'
+                            : courseIsExpired ? 'Renew Course' : 'Buy Now'}</span>
+                        <ArrowRight className="h-4 w-4 text-white" />
+                      </button>
                     </div>
                   </div>
                 </article>
