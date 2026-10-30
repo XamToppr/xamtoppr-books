@@ -1331,6 +1331,61 @@ const siteSettings = defineType({
   ]
 });
 
+const order = defineType({
+  name: 'order',
+  title: 'Order',
+  type: 'document',
+  fields: [
+    defineField({ name: 'userEmail', title: 'Student Email', type: 'string' }),
+    defineField({ name: 'userPhone', title: 'Student Phone', type: 'string' }),
+    defineField({
+      name: 'bookName',
+      title: 'Book',
+      type: 'reference',
+      to: [{ type: 'book' }]
+    }),
+    defineField({
+      name: 'amount',
+      title: 'Amount Paid (₹)',
+      type: 'number',
+      validation: (Rule) => Rule.required().min(0)
+    }),
+    defineField({
+      name: 'paymentStatus',
+      title: 'Payment Status',
+      type: 'string',
+      options: { list: ['Success', 'Pending', 'Failed'] },
+      initialValue: 'Pending',
+      validation: (Rule) => Rule.required()
+    }),
+    defineField({ name: 'razorpayOrderId', title: 'Razorpay Order ID', type: 'string' }),
+    defineField({ name: 'paymentId', title: 'Razorpay Payment ID', type: 'string' }),
+    defineField({
+      name: 'purchasedAt',
+      title: 'Purchased At',
+      type: 'datetime',
+      validation: (Rule) => Rule.required()
+    })
+  ],
+  preview: {
+    select: {
+      title: 'bookName.title',
+      userEmail: 'userEmail',
+      paymentStatus: 'paymentStatus',
+      purchasedAt: 'purchasedAt'
+    },
+    prepare: ({ title, userEmail, paymentStatus, purchasedAt }) => ({
+      title: title || 'Order',
+      subtitle: [paymentStatus, userEmail, purchasedAt && new Date(purchasedAt).toLocaleString()]
+        .filter(Boolean)
+        .join(' · ')
+    })
+  },
+  orderings: [
+    { title: 'Purchase date (newest first)', name: 'purchasedAtDesc', by: [{ field: 'purchasedAt', direction: 'desc' }] }
+  ]
+});
+
 const leadFollowUp = defineType({
   name: 'leadFollowUp',
   title: 'Lead Follow-up',
@@ -1410,6 +1465,7 @@ export const schemaTypes = [
   bookRequest,
   studentUser,
   userActivity,
+  order,
   leadFollowUp,
   coupon,
   siteSettings,

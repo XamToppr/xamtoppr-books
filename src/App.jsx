@@ -459,7 +459,7 @@ function BookStoreApp() {
               amazonUrl: book.amazonUrl || '',
               flipkartUrl: book.flipkartUrl || '',
               sampleFlipbookUrl: book.sampleFlipbookUrl || '',
-              isFeatured: Boolean(book.isFeatured),
+              isFeatured: book.isFeatured === true,
               isPreviousYear: Boolean(book.isPreviousYear),
               isMockTest: Boolean(book.isMockTest),
               publishedYear: new Date().getFullYear().toString(),
@@ -1145,10 +1145,7 @@ function BookStoreApp() {
   ]);
 
   const featuredBooks = useMemo(() => {
-    const highlightedBooks = booksList.filter((book) =>
-      book.isFeatured || ['bestseller', 'new launch', 'trending'].includes(book.badge.toLowerCase())
-    );
-    return highlightedBooks.length >= 2 ? highlightedBooks : booksList.slice(0, 4);
+    return booksList.filter((book) => book.isFeatured === true);
   }, [booksList]);
 
   useEffect(() => {
