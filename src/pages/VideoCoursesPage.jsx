@@ -36,6 +36,22 @@ const REEL_ACCENTS = [
   'from-emerald-500 via-teal-600 to-blue-800',
   'from-violet-500 via-purple-600 to-indigo-900'
 ];
+const courseDescriptionComponents = {
+  ...portableTextComponents,
+  block: {
+    normal: ({ children }) => <p className="my-4 text-sm leading-7 text-slate-700">{children}</p>,
+    h2: ({ children }) => <h2 className="mb-4 mt-8 text-2xl font-black leading-tight text-slate-950">{children}</h2>,
+    h3: ({ children }) => <h3 className="mb-3 mt-6 text-xl font-extrabold leading-snug text-slate-950">{children}</h3>
+  },
+  list: {
+    bullet: ({ children }) => <ul className="my-5 list-disc space-y-2 pl-6 text-sm leading-7 text-slate-700">{children}</ul>,
+    number: ({ children }) => <ol className="my-5 list-decimal space-y-2 pl-6 text-sm leading-7 text-slate-700">{children}</ol>
+  },
+  listItem: {
+    bullet: ({ children }) => <li className="pl-1">{children}</li>,
+    number: ({ children }) => <li className="pl-1">{children}</li>
+  }
+};
 
 const uniqueValues = (items) => [...new Set(items.filter(Boolean))]
   .sort((first, second) => first.localeCompare(second));
@@ -1027,11 +1043,11 @@ function VideoCoursesPage({
                   >
                   {activeDetailTab === 'description' && (
                     <div className="space-y-10">
-                      <div className="prose prose-slate max-w-none">
+                      <div className="max-w-none">
                         {detailCourse.richDescription.length ? (
-                          <PortableText value={detailCourse.richDescription} components={portableTextComponents} />
+                          <PortableText value={detailCourse.richDescription} components={courseDescriptionComponents} />
                         ) : (
-                          <p className="text-sm leading-7 text-slate-600">{detailCourse.description || 'Course details will be added soon.'}</p>
+                          <p className="text-sm leading-7 text-slate-700">{detailCourse.description || 'Course details will be added soon.'}</p>
                         )}
                       </div>
                       {detailCourse.courseFeatures.length > 0 && (
@@ -1097,19 +1113,19 @@ function VideoCoursesPage({
 
                   {activeDetailTab === 'syllabusPlanner' && (
                     detailCourse.syllabusPlanner.length ? (
-                      <ol className="space-y-3">
+                      <ol className="space-y-4">
                         {detailCourse.syllabusPlanner.map((item, index) => (
-                          <li key={item._key || `${item.title}-${index}`} className="flex gap-4 rounded-2xl border border-slate-200 p-4">
+                          <li key={item._key || `${item.title}-${index}`} className="flex gap-4 rounded-2xl border border-slate-200 p-5">
                             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-800">
                               <ListChecks className="h-5 w-5" />
                             </span>
-                            <div>
-                              <p className="text-[11px] font-extrabold uppercase tracking-wide text-blue-700">{item.week || `Part ${index + 1}`}</p>
-                              <h3 className="mt-1 font-extrabold text-slate-900">{item.title}</h3>
+                            <div className="min-w-0 space-y-2">
+                              <p className="text-[11px] font-extrabold uppercase leading-5 tracking-wide text-blue-700">{item.week || `Part ${index + 1}`}</p>
+                              <h3 className="text-base font-extrabold leading-6 text-slate-900">{item.title}</h3>
                               {(item.module?.name || item.topic?.name) && (
-                                <p className="mt-1 text-xs font-semibold text-slate-500">{[item.module?.name, item.topic?.name].filter(Boolean).join(' · ')}</p>
+                                <p className="text-xs font-semibold leading-5 text-slate-500">{[item.module?.name, item.topic?.name].filter(Boolean).join(' · ')}</p>
                               )}
-                              {item.details && <p className="mt-2 text-sm leading-6 text-slate-600">{item.details}</p>}
+                              {item.details && <p className="text-sm leading-7 text-slate-600">{item.details}</p>}
                             </div>
                           </li>
                         ))}
