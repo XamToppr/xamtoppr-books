@@ -92,6 +92,7 @@ const VIDEO_COURSE_PACK_PROJECTION = `{
   "slug": slug.current,
   packPurpose,
   packType,
+  hideFromStore,
   deliveryMode,
   price,
   mrp,
@@ -178,7 +179,7 @@ const VIDEO_COURSE_PACK_PROJECTION = `{
   }
 }`;
 
-export const VIDEO_COURSE_PACKS_QUERY = `*[_type == "videoCoursePack"]
+export const VIDEO_COURSE_PACKS_QUERY = `*[_type == "videoCoursePack" && coalesce(hideFromStore, false) == false]
   | order(_createdAt desc) ${VIDEO_COURSE_PACK_PROJECTION}`;
 
 export const VIDEO_COURSE_PACK_BY_SLUG_QUERY = `*[

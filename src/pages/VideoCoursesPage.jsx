@@ -22,7 +22,8 @@ import { logVideoWatchActivity } from '../services/activityTracker';
 import sanityClient from '../sanityClient';
 import { getCourseValidity } from '../utils/courseValidity';
 import {
-  VIDEO_COURSE_PACKS_QUERY
+  VIDEO_COURSE_PACKS_QUERY,
+  VIDEO_COURSE_PACK_BY_SLUG_QUERY
 } from '../sanityQueries';
 
 const COURSE_ACCENTS = [
@@ -570,6 +571,11 @@ function VideoCoursesPage({
     ...updates
   }));
   const detailCourse = courses.find((course) => course.slug === courseSlug || course.id === courseSlug);
+  const entitlementSignature = JSON.stringify([...new Set([
+    ...enrolledCourseIds,
+    ...purchasedCourseIds,
+    ...localEnrolledCourseIds
+  ].flatMap(getCourseIdentifiers))].sort());
   const detailPricingPlans = detailCourse
     ? (detailCourse.pricingPlans.length
       ? detailCourse.pricingPlans
@@ -641,16 +647,33 @@ function VideoCoursesPage({
 
   useEffect(() => {
     let isCurrentRequest = true;
-    sanityClient.withConfig({ perspective: 'published', useCdn: false })
-      .fetch(VIDEO_COURSE_PACKS_QUERY)
-      .then((packDocuments) => {
-        if (!Array.isArray(packDocuments)) {
-          throw new Error('Sanity video course query did not return a list.');
+    const client = sanityClient.withConfig({ perspective: 'published', useCdn: false });
+    const activeCourseEntitlementIds = new Set(JSON.parse(entitlementSignature));
+    const loadCourses = async () => {
+      const packDocuments = await client.fetch(VIDEO_COURSE_PACKS_QUERY);
+      if (!Array.isArray(packDocuments)) {
+        throw new Error('Sanity video course query did not return a list.');
+      }
+
+      const mappedCourses = packDocuments.filter((pack) => pack?.title).map(mapPack);
+      if (courseSlug) {
+        const detailPack = await client.fetch(VIDEO_COURSE_PACK_BY_SLUG_QUERY, { slug: courseSlug });
+        if (detailPack?.hideFromStore === true) {
+          const mappedDetail = mapPack(detailPack, mappedCourses.length);
+          const hasActiveEntitlement = getCourseIdentifiers(mappedDetail)
+            .some((identifier) => activeCourseEntitlementIds.has(identifier));
+          if (hasActiveEntitlement) mappedCourses.push(mappedDetail);
         }
-        if (isCurrentRequest) {
-          setCourses(packDocuments.filter((pack) => pack?.title).map(mapPack));
-          setLoadError('');
-        }
+      }
+
+      return mappedCourses;
+    };
+
+    loadCourses()
+      .then((mappedCourses) => {
+        if (!isCurrentRequest) return;
+        setCourses(mappedCourses);
+        setLoadError('');
       })
       .catch((error) => {
         if (error?.name === 'AbortError') return;
@@ -664,7 +687,7 @@ function VideoCoursesPage({
     return () => {
       isCurrentRequest = false;
     };
-  }, []);
+  }, [courseSlug, entitlementSignature]);
 
   const filteredCourses = useMemo(() => courses.filter((course) => (
     (!track || course.tracks.some((item) => item.name === track))

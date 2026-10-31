@@ -267,6 +267,7 @@ const videoCoursePack = defineType({
     packType: 'Free',
     deliveryMode: 'Recorded Video',
     price: 0,
+    hideFromStore: false,
     publishingStatus: 'Draft',
     videos: []
   },
@@ -657,6 +658,14 @@ const videoCoursePack = defineType({
       type: 'array',
       group: 'demos',
       of: [defineArrayMember({ type: 'videoCourseDemoVideo' })]
+    }),
+    defineField({
+      name: 'hideFromStore',
+      title: 'Hide from Store',
+      type: 'boolean',
+      group: 'publishing',
+      description: 'Hide this course from the public catalog without removing access for existing students.',
+      initialValue: false
     }),
     defineField({
       name: 'publishingStatus',

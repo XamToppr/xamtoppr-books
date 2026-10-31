@@ -222,6 +222,7 @@ export async function createRazorpayOrder({ body, authorization, env }) {
       _type == "book"
       || (
         _type == "videoCoursePack"
+        && coalesce(hideFromStore, false) == false
         && packType == "Paid"
         && (
           !defined(publishingStatus)
