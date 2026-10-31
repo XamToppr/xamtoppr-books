@@ -1,3 +1,5 @@
+/* Keep Tailwind utilities above Sanity's global reset layer. */
+@layer sui.global, theme, base, components, utilities;
 @import "tailwindcss";
 
 .book-description p {

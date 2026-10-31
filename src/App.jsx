@@ -10,13 +10,11 @@ import { useCart } from './context/CartContext';
 import { logUserActivity } from './services/activityTracker';
 import { initiatePayment } from './services/paymentService';
 import { calculateCourseExpiryDate, getCourseValidity } from './utils/courseValidity';
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { lazy, Suspense, useState, useMemo, useEffect, useRef } from 'react';
 import HTMLFlipBook from 'react-pageflip';
 import { PortableText } from '@portabletext/react';
 import sharedPortableTextComponents from './components/PortableTextComponents';
-import { Studio } from 'sanity';
 import { Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import sanityConfig from '../sanity.config.js';
 import sanityClient from './sanityClient';
 import BookDetailPage from './pages/BookDetailPage';
 import {
@@ -59,6 +57,8 @@ import {
   FileCheck2,
   PlayCircle
 } from 'lucide-react';
+
+const SanityStudio = lazy(() => import('./components/admin/SanityStudio'));
 
 const EXAM_CATEGORIES = [
   'All Exams',
@@ -1282,13 +1282,13 @@ function BookStoreApp() {
       {/* Header */}
       <header className="sticky top-0 z-40 bg-[#0c2356] text-white shadow-lg border-b border-blue-900/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex min-h-16 items-center justify-between gap-3 py-2 sm:min-h-20 sm:gap-4">
+          <div className="flex min-h-16 items-center justify-between gap-2 py-2 sm:min-h-20 sm:gap-4">
             <div className="flex min-w-0 items-center">
               <a href="https://www.xamtoppr.com/" className="flex shrink-0 items-center rounded-lg bg-white px-1.5 py-1 transition hover:opacity-90">
                 <img
                   src="/xamtoppr-logo.png"
                   alt="XamToppr - learning for earning"
-                  className="h-10 w-auto sm:h-12"
+                  className="h-8 w-auto sm:h-12"
                   width="139"
                   height="75"
                   fetchPriority="high"
@@ -3884,7 +3884,9 @@ function LegacyAppRoutes() {
   if (pathname === '/admin' || pathname.startsWith('/admin/')) {
     return (
       <div style={{ height: '100vh', width: '100vw', position: 'fixed', inset: 0, zIndex: 99999 }}>
-        <Studio config={sanityConfig} />
+        <Suspense fallback={<div style={{ height: '100%', display: 'grid', placeItems: 'center' }}>Loading admin studio…</div>}>
+          <SanityStudio />
+        </Suspense>
       </div>
     );
   }
