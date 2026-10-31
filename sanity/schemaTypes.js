@@ -1123,6 +1123,8 @@ const studentUser = defineType({
                       to: [{ type: 'videoCoursePack' }]
                     }),
                     defineField({ name: 'courseTitle', title: 'Course Title', type: 'string' }),
+                    defineField({ name: 'pricingPlanId', title: 'Pricing Plan ID', type: 'string' }),
+                    defineField({ name: 'pricingPlanTitle', title: 'Pricing Plan', type: 'string' }),
                     defineField({ name: 'amount', title: 'Amount', type: 'number' }),
                     defineField({ name: 'finalAmount', title: 'Amount Paid', type: 'number' }),
                     defineField({ name: 'duration', title: 'Access Duration', type: 'string' }),

@@ -137,12 +137,17 @@ export default async function handler(request, response) {
     const result = await createSanityUserActivity(client, firebaseUser, payload);
     return response.status(200).json({
       success: true,
-      activityId: result.activityId,
+      ...(result.activityId ? { activityId: result.activityId } : {}),
+      ...(result.alreadyEnrolled ? { alreadyEnrolled: true } : {}),
       ...(result.courseEnrollment ? { courseEnrollment: result.courseEnrollment } : {})
     });
   } catch (error) {
     if (error.code === 'COURSE_NOT_ENROLLABLE') {
-      return response.status(409).json({ success: false, error: error.message });
+      return response.status(422).json({
+        success: false,
+        code: error.code,
+        error: error.message
+      });
     }
     console.error('Failed to write student activity to Sanity.');
     return response.status(500).json({ success: false, error: 'Unable to sync student activity to Sanity.' });

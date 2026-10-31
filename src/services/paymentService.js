@@ -3,10 +3,24 @@ import loadRazorpay from '../utils/loadRazorpay';
 
 const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID;
 
-const getPaymentItem = (item) => ({
-  productType: item.productType || 'book',
-  productId: item.sanityId || item.id
-});
+const getPaymentItem = (item) => {
+  const paymentItem = {
+    productType: item.productType || 'book',
+    productId: item.sanityId || item.id
+  };
+  if (paymentItem.productType !== 'videoCoursePack') return paymentItem;
+
+  const selectedPricingPlan = item.selectedPricingPlan
+    || (item.selectedPlanId ? {
+      _key: item.selectedPlanId,
+      planTitle: item.selectedPlanTitle || '',
+      price: item.price ?? item.offerPrice
+    } : null);
+  return {
+    ...paymentItem,
+    ...(selectedPricingPlan ? { selectedPricingPlan } : {})
+  };
+};
 
 async function postPaymentRequest(path, body, user) {
   const idToken = await user.getIdToken();

@@ -95,7 +95,7 @@ const VIDEO_COURSE_PACK_PROJECTION = `{
   deliveryMode,
   price,
   mrp,
-  pricingPlans[] { _key, planTitle, price, mrp, isRecommended },
+  pricingPlans[] { _key, planTitle, price, mrp, isRecommended, isAvailable },
   courseFeatures,
   mentors[] { _key, name, designation, details, youtubeLink },
   courseTypeTag,
@@ -178,21 +178,11 @@ const VIDEO_COURSE_PACK_PROJECTION = `{
   }
 }`;
 
-export const VIDEO_COURSE_PACKS_QUERY = `*[
-  _type == "videoCoursePack"
-  && (
-    publishingStatus == "Instant"
-    || (publishingStatus == "Scheduled" && publishingDate <= now())
-  )
-] | order(_createdAt desc) ${VIDEO_COURSE_PACK_PROJECTION}`;
+export const VIDEO_COURSE_PACKS_QUERY = `*[_type == "videoCoursePack"]
+  | order(_createdAt desc) ${VIDEO_COURSE_PACK_PROJECTION}`;
 
 export const VIDEO_COURSE_PACK_BY_SLUG_QUERY = `*[
-  _type == "videoCoursePack"
-  && slug.current == $slug
-  && (
-    publishingStatus == "Instant"
-    || (publishingStatus == "Scheduled" && publishingDate <= now())
-  )
+  _type == "videoCoursePack" && slug.current == $slug
 ][0] ${VIDEO_COURSE_PACK_PROJECTION}`;
 
 export const siteSettingsQuery = `*[_type == "siteSettings" && _id == "siteSettings"][0] {

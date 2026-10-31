@@ -26,7 +26,10 @@ export default async function handler(request, response) {
     if (error instanceof PaymentRequestError) {
       return response.status(error.status).json({ success: false, error: error.message });
     }
-    console.error('Failed to create Razorpay order.');
+    console.error(
+      'Failed to create Razorpay order:',
+      error instanceof Error ? error.message : 'Unknown server error.'
+    );
     return response.status(500).json({ success: false, error: 'Unable to create the payment order.' });
   }
 }

@@ -170,7 +170,9 @@ const mapPack = (pack, index) => {
     packPurpose: pack.packPurpose || 'Individual',
     price: Number(pack.price) || 0,
     mrp: Number(pack.mrp) || 0,
-    pricingPlans: Array.isArray(pack.pricingPlans) ? pack.pricingPlans : [],
+    pricingPlans: Array.isArray(pack.pricingPlans)
+      ? pack.pricingPlans.map((plan) => ({ ...plan, isAvailable: plan.isAvailable !== false }))
+      : [],
     courseFeatures: Array.isArray(pack.courseFeatures) ? pack.courseFeatures.filter(Boolean) : [],
     mentors: Array.isArray(pack.mentors) ? pack.mentors : [],
     courseTypeTag: pack.courseTypeTag || '',
@@ -532,6 +534,7 @@ function VideoCoursesPage({
   const [attachmentError, setAttachmentError] = useState('');
   const [enrollingCourseId, setEnrollingCourseId] = useState('');
   const [enrollmentError, setEnrollmentError] = useState('');
+  const [enrollmentNotice, setEnrollmentNotice] = useState('');
   const [localEnrolledCourseIds, setLocalEnrolledCourseIds] = useState([]);
   const [selectedPlanKey, setSelectedPlanKey] = useState('');
   const playerRequestId = React.useRef(0);
@@ -577,17 +580,27 @@ function VideoCoursesPage({
         isRecommended: false
       }])
     : [];
-  const defaultPricingPlanIndex = Math.max(0, detailPricingPlans.findIndex((plan) => plan.isRecommended));
+  const recommendedPlanIndex = detailPricingPlans.findIndex((plan) => (
+    plan.isAvailable !== false && plan.isRecommended
+  ));
+  const firstAvailablePlanIndex = detailPricingPlans.findIndex((plan) => plan.isAvailable !== false);
+  const defaultPricingPlanIndex = recommendedPlanIndex >= 0
+    ? recommendedPlanIndex
+    : firstAvailablePlanIndex;
   const currentPricingPlanKey = detailCourse
     ? `${detailCourse.id}-${detailPricingPlans[defaultPricingPlanIndex]?._key || defaultPricingPlanIndex}`
     : '';
   const activePricingPlanKey = selectedPlanKey.startsWith(`${detailCourse?.id}-`)
     ? selectedPlanKey
     : currentPricingPlanKey;
-  const selectedPricingPlanIndex = detailPricingPlans.findIndex((plan, index) => (
+  const matchingPricingPlanIndex = detailPricingPlans.findIndex((plan, index) => (
     `${detailCourse?.id}-${plan._key || index}` === activePricingPlanKey
+    && plan.isAvailable !== false
   ));
-  const selectedPricingPlan = detailPricingPlans[selectedPricingPlanIndex] || detailPricingPlans[0];
+  const selectedPricingPlanIndex = matchingPricingPlanIndex >= 0
+    ? matchingPricingPlanIndex
+    : defaultPricingPlanIndex;
+  const selectedPricingPlan = detailPricingPlans[selectedPricingPlanIndex];
   const accessibleCourseIds = useMemo(() => {
     const ownedIds = new Set([
       ...enrolledCourseIds.flatMap(getCourseIdentifiers),
@@ -628,7 +641,8 @@ function VideoCoursesPage({
 
   useEffect(() => {
     let isCurrentRequest = true;
-    sanityClient.fetch(VIDEO_COURSE_PACKS_QUERY)
+    sanityClient.withConfig({ perspective: 'published', useCdn: false })
+      .fetch(VIDEO_COURSE_PACKS_QUERY)
       .then((packDocuments) => {
         if (!Array.isArray(packDocuments)) {
           throw new Error('Sanity video course query did not return a list.');
@@ -727,12 +741,7 @@ function VideoCoursesPage({
     { id: 'demoVideos', label: 'Demo Videos' },
     { id: 'syllabusPlanner', label: 'Syllabus / Planner' },
     { id: 'timeTable', label: 'Time Table' },
-    { id: 'delivery', label: 'Subjects' },
-    ...detailSubjects.map((item) => ({
-      id: `subject-${item.id}`,
-      label: item.name,
-      subjectId: item.id
-    }))
+    { id: 'delivery', label: 'Subjects' }
   ];
 
   function closePlayer() {
@@ -912,13 +921,29 @@ function VideoCoursesPage({
       return;
     }
     setEnrollmentError('');
+    setEnrollmentNotice('');
     setEnrollingCourseId(course.id);
     try {
       const enrolled = await onEnrollCourse?.(course);
-      if (enrolled === false) throw new Error('Enrollment could not be saved. Please try again.');
+      if (enrolled === false || enrolled?.success === false) {
+        throw new Error(enrolled?.error || 'Enrollment could not be saved. Please try again.');
+      }
       setLocalEnrolledCourseIds((current) => (
         current.includes(course.id) ? current : [...current, course.id]
       ));
+      if (enrolled?.alreadyEnrolled) {
+        setEnrollmentNotice('You’re already enrolled. Continue learning from this course.');
+        if (courseSlug === course.slug) {
+          updateDetailNavigation({
+            tab: 'delivery',
+            subjectId: detailSubjects[0]?.id || '',
+            moduleId: '',
+            topicId: ''
+          });
+        }
+      } else {
+        setEnrollmentNotice('You’re enrolled. Continue learning from this course.');
+      }
     } catch (error) {
       console.error('Failed to enroll in video course.');
       setEnrollmentError(error.message || 'Enrollment could not be saved. Please try again.');
@@ -963,7 +988,21 @@ function VideoCoursesPage({
         </section>
       )}
 
-      <main id="course-catalog" className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6 sm:pb-20 sm:pt-10 lg:px-8">
+      <main
+        id="course-catalog"
+        className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6 sm:pb-20 sm:pt-10 lg:px-8"
+        style={courseSlug ? { paddingInline: 'clamp(16px, 4vw, 32px)' } : undefined}
+      >
+        {enrollmentNotice && (
+          <p role="status" className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-800">
+            {enrollmentNotice}
+          </p>
+        )}
+        {enrollmentError && (
+          <p role="alert" className="mb-5 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-medium text-rose-800">
+            {enrollmentError}
+          </p>
+        )}
         {courseSlug ? (
           isLoading ? (
             <p role="status" className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600">
@@ -995,7 +1034,10 @@ function VideoCoursesPage({
 
               <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-8">
                 <section className="min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                  <header className="border-b border-slate-100 px-5 py-7 sm:px-8 sm:py-9">
+                  <header
+                    className="border-b border-slate-100 px-5 py-7 sm:px-8 sm:py-9"
+                    style={{ padding: '28px clamp(16px, 5vw, 32px)' }}
+                  >
                     <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-blue-700">
                       {detailCourse.courseTypeTag || detailCourse.deliveryMode}
                     </p>
@@ -1005,11 +1047,14 @@ function VideoCoursesPage({
                     )}
                   </header>
 
-                  <div role="tablist" aria-label="Course details" className="flex gap-1 overflow-x-auto border-b border-slate-200 px-3 pt-3 sm:px-5">
+                  <div
+                    role="tablist"
+                    aria-label="Course details"
+                    aria-orientation="horizontal"
+                    className="course-detail-tabs"
+                  >
                     {detailTabs.map((tab) => {
-                      const isSelected = tab.subjectId
-                        ? activeDetailTab === 'delivery' && selectedSubjectId === tab.subjectId
-                        : activeDetailTab === tab.id && (tab.id !== 'delivery' || !selectedSubjectId);
+                      const isSelected = activeDetailTab === tab.id;
                       return (
                         <button
                           type="button"
@@ -1018,14 +1063,12 @@ function VideoCoursesPage({
                           id={`course-tab-${tab.id}`}
                           aria-selected={isSelected}
                           aria-controls="course-detail-panel"
-                          onClick={() => updateDetailNavigation(tab.subjectId
-                            ? { tab: 'delivery', subjectId: tab.subjectId, moduleId: '', topicId: '' }
-                            : { tab: tab.id, ...(tab.id === 'delivery' ? { subjectId: '', moduleId: '', topicId: '' } : {}) })}
-                          className={`min-h-11 shrink-0 border-b-2 px-3 text-xs font-extrabold transition sm:px-4 sm:text-sm ${
-                            isSelected
-                              ? 'border-amber-500 text-blue-950'
-                              : 'border-transparent text-slate-500 hover:text-blue-800'
-                          }`}
+                          tabIndex={isSelected ? 0 : -1}
+                          onClick={() => updateDetailNavigation({
+                            tab: tab.id,
+                            ...(tab.id === 'delivery' ? { subjectId: '', moduleId: '', topicId: '' } : {})
+                          })}
+                          className="course-detail-tab"
                         >
                           {tab.label}
                         </button>
@@ -1036,10 +1079,8 @@ function VideoCoursesPage({
                   <div
                     id="course-detail-panel"
                     role="tabpanel"
-                    aria-labelledby={activeDetailTab === 'delivery' && selectedSubjectId
-                      ? `course-tab-subject-${selectedSubjectId}`
-                      : `course-tab-${activeDetailTab}`}
-                    className="min-h-64 p-5 sm:p-8"
+                    aria-labelledby={`course-tab-${activeDetailTab}`}
+                    className="course-detail-panel"
                   >
                   {activeDetailTab === 'description' && (
                     <div className="space-y-10">
@@ -1322,9 +1363,11 @@ function VideoCoursesPage({
                       ) : (
                         <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
                           <span className="text-3xl font-black text-slate-950">
-                            {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(selectedPlanPrice)}
+                            {selectedPricingPlan
+                              ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(selectedPlanPrice)
+                              : 'Unavailable'}
                           </span>
-                          {selectedPlanMrp > selectedPlanPrice && (
+                          {selectedPricingPlan && selectedPlanMrp > selectedPlanPrice && (
                             <span className="text-sm font-semibold text-slate-400 line-through">
                               {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(selectedPlanMrp)}
                             </span>
@@ -1337,7 +1380,7 @@ function VideoCoursesPage({
                         </p>
                       )}
 
-                      {detailCourse.packType !== 'Free' && detailCourse.pricingPlans.length > 0 && (
+                      {detailCourse.packType !== 'Free' && detailPricingPlans.length > 0 && (
                         <fieldset className="mt-5 space-y-2.5">
                           <legend className="mb-2 text-sm font-extrabold text-slate-900">Choose your plan</legend>
                           {detailPricingPlans.map((plan, index) => {
@@ -1346,8 +1389,12 @@ function VideoCoursesPage({
                             return (
                               <label
                                 key={planKey}
-                                className={`relative flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${
-                                  isSelected ? 'border-blue-700 bg-blue-50/70 ring-1 ring-blue-700' : 'border-slate-200 hover:border-blue-300'
+                                className={`relative flex items-start gap-3 rounded-xl border p-3.5 transition ${
+                                  plan.isAvailable === false
+                                    ? 'cursor-not-allowed border-slate-200 bg-slate-50 opacity-60'
+                                    : isSelected
+                                      ? 'cursor-pointer border-blue-700 bg-blue-50/70 ring-1 ring-blue-700'
+                                      : 'cursor-pointer border-slate-200 hover:border-blue-300'
                                 }`}
                               >
                                 <input
@@ -1356,11 +1403,15 @@ function VideoCoursesPage({
                                   value={planKey}
                                   checked={isSelected}
                                   onChange={() => setSelectedPlanKey(planKey)}
+                                  disabled={plan.isAvailable === false}
                                   className="mt-1 h-4 w-4 accent-blue-800"
                                 />
                                 <span className="min-w-0 flex-1">
                                   <span className="flex flex-wrap items-center gap-2 font-bold text-slate-900">
                                     {plan.planTitle || `Plan ${index + 1}`}
+                                    {plan.isAvailable === false && (
+                                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-600">Unavailable</span>
+                                    )}
                                     {plan.isRecommended && (
                                       <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-amber-900">Recommended</span>
                                     )}
@@ -1405,11 +1456,20 @@ function VideoCoursesPage({
                               ...detailCourse,
                               price: selectedPricingPlan?.price ?? detailCourse.price,
                               mrp: selectedPricingPlan?.mrp ?? detailCourse.mrp,
-                              selectedPlanTitle: selectedPricingPlan?.planTitle || ''
+                              selectedPricingPlan: detailCourse.pricingPlans.length
+                                ? selectedPricingPlan
+                                : null,
+                              selectedPlanId: detailCourse.pricingPlans.length
+                                ? selectedPricingPlan?._key || ''
+                                : '',
+                              selectedPlanTitle: detailCourse.pricingPlans.length
+                                ? selectedPricingPlan?.planTitle || ''
+                                : ''
                             });
                           }
                         }}
-                        disabled={enrollingCourseId === detailCourse.id}
+                        disabled={enrollingCourseId === detailCourse.id
+                          || (detailCourse.packType !== 'Free' && !selectedPricingPlan)}
                         className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-5 py-3 text-sm font-extrabold text-slate-950 shadow-sm transition hover:bg-amber-300 disabled:cursor-wait disabled:opacity-60"
                       >
                         {isDetailCourseAccessible && !isDetailCourseExpired
@@ -1506,7 +1566,8 @@ function VideoCoursesPage({
                 const courseIsExpired = isCourseExpired(course);
                 const courseValidity = getCourseValidity(courseExpiryById[course.id]);
                 const courseIsAccessible = isCourseAccessible(course);
-                const cardPlan = course.pricingPlans.find((plan) => plan.isRecommended) || course.pricingPlans[0];
+                const availableCardPlans = course.pricingPlans.filter((plan) => plan.isAvailable !== false);
+                const cardPlan = availableCardPlans.find((plan) => plan.isRecommended) || availableCardPlans[0];
                 const cardPrice = Number(cardPlan?.price ?? course.price) || 0;
                 const cardMrp = Number(cardPlan?.mrp ?? course.mrp) || 0;
                 const discountPercentage = cardMrp > cardPrice
@@ -1529,7 +1590,19 @@ function VideoCoursesPage({
                     : null
                 ].filter(Boolean);
                 return (
-                <article key={course.id} className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-200 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl">
+                <article
+                  key={course.id}
+                  role="link"
+                  tabIndex={0}
+                  onClick={() => navigate(`/video-courses/${encodeURIComponent(course.slug)}`)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      navigate(`/video-courses/${encodeURIComponent(course.slug)}`);
+                    }
+                  }}
+                  className="group flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-200 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-blue-700 focus:ring-offset-2"
+                >
                   <div className={`relative aspect-video overflow-hidden bg-gradient-to-br ${course.accent}`}>
                     {course.thumbnailUrl && (
                       <img src={course.thumbnailUrl} alt={`${course.title} thumbnail`} className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]" loading="lazy" />
@@ -1567,9 +1640,11 @@ function VideoCoursesPage({
                         <p className="text-xl font-black text-slate-950">
                           {course.packType === 'Free'
                             ? 'Free'
-                            : new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(cardPrice)}
+                            : cardPlan
+                              ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(cardPrice)
+                              : 'Unavailable'}
                         </p>
-                        {cardMrp > cardPrice && (
+                        {cardPlan && cardMrp > cardPrice && (
                           <span className="text-sm font-semibold text-slate-400 line-through">
                             {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(cardMrp)}
                           </span>
@@ -1580,40 +1655,10 @@ function VideoCoursesPage({
                           </span>
                         )}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (course.packType === 'Free') {
-                            if (courseIsAccessible && !courseIsExpired) {
-                              navigate(`/video-courses/${encodeURIComponent(course.slug)}`);
-                            } else {
-                              void enrollFreeCourse(course);
-                            }
-                          } else if (courseIsAccessible && !courseIsExpired) {
-                            navigate(`/video-courses/${encodeURIComponent(course.slug)}`);
-                          } else {
-                            onBuyCourse?.({
-                              ...course,
-                              price: cardPlan?.price ?? course.price,
-                              mrp: cardPlan?.mrp ?? course.mrp,
-                              selectedPlanTitle: cardPlan?.planTitle || ''
-                            });
-                          }
-                        }}
-                        disabled={course.packType === 'Free' && enrollingCourseId === course.id}
-                        className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-950 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-blue-900 disabled:cursor-wait disabled:opacity-60"
-                      >
-                        <span className="text-white">{course.packType === 'Free'
-                          ? enrollingCourseId === course.id
-                            ? 'Enrolling…'
-                            : courseIsAccessible && !courseIsExpired
-                              ? 'View Full Course'
-                              : courseIsExpired ? 'Renew Free' : 'Enroll Free'
-                          : courseIsAccessible && !courseIsExpired
-                            ? 'View Full Course'
-                            : courseIsExpired ? 'Renew Course' : 'Buy Now'}</span>
+                      <div className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-950 px-4 py-2.5 text-sm font-extrabold text-white transition group-hover:bg-blue-900">
+                        <span>View Course Details</span>
                         <ArrowRight className="h-4 w-4 text-white" />
-                      </button>
+                      </div>
                     </div>
                   </div>
                 </article>
@@ -1624,7 +1669,6 @@ function VideoCoursesPage({
               No published video packs match these filters. Publish a pack in Sanity Studio or try another topic.
             </p>
           )}
-          {enrollmentError && <p role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-medium text-rose-800">{enrollmentError}</p>}
         </section>
 
         <section aria-labelledby="reels-heading" className="mt-12 rounded-3xl bg-slate-950 px-4 py-7 text-white sm:mt-16 sm:px-7 sm:py-9">

@@ -4,6 +4,13 @@ import { logUserActivity } from '../services/activityTracker';
 const CartContext = createContext(null);
 const CART_STORAGE_KEY = 'xamtoppr-books-cart';
 
+const getSelectedPricingPlan = (plan) => {
+  if (!plan || typeof plan._key !== 'string' || typeof plan.planTitle !== 'string') return null;
+  const price = Number(plan.price);
+  if (!plan._key || !Number.isFinite(price) || price <= 0) return null;
+  return { _key: plan._key, planTitle: plan.planTitle, price };
+};
+
 const readStoredCart = () => {
   try {
     const storedCart = localStorage.getItem(CART_STORAGE_KEY);
@@ -38,13 +45,19 @@ export function CartProvider({ children }) {
     if (existingIndex !== -1) {
       if (product.productType !== 'videoCoursePack') return;
       const currentItem = cartItemsRef.current[existingIndex];
+      const selectedPricingPlan = getSelectedPricingPlan(product.selectedPricingPlan);
       const updatedItem = {
         ...currentItem,
         price: Number(product.offerPrice ?? product.price) || 0,
         displayPrice: product.displayPrice || '',
-        selectedPlanTitle: product.selectedPlanTitle || ''
+        selectedPricingPlan,
+        selectedPlanId: selectedPricingPlan?._key || product.selectedPlanId || '',
+        selectedPlanTitle: selectedPricingPlan?.planTitle || product.selectedPlanTitle || ''
       };
-      if (currentItem.price === updatedItem.price && currentItem.selectedPlanTitle === updatedItem.selectedPlanTitle) return;
+      if (currentItem.price === updatedItem.price
+        && currentItem.selectedPricingPlan?._key === updatedItem.selectedPricingPlan?._key
+        && currentItem.selectedPlanId === updatedItem.selectedPlanId
+        && currentItem.selectedPlanTitle === updatedItem.selectedPlanTitle) return;
       const nextItems = [...cartItemsRef.current];
       nextItems[existingIndex] = updatedItem;
       cartItemsRef.current = nextItems;
@@ -52,6 +65,7 @@ export function CartProvider({ children }) {
       return;
     }
 
+    const selectedPricingPlan = getSelectedPricingPlan(product.selectedPricingPlan);
     const nextItems = [...cartItemsRef.current, {
       id: productId,
       sanityId: product.sanityId || productId,
@@ -61,7 +75,9 @@ export function CartProvider({ children }) {
       title: product.title,
       price: Number(product.offerPrice ?? product.price) || 0,
       displayPrice: product.displayPrice || '',
-      selectedPlanTitle: product.selectedPlanTitle || '',
+      selectedPricingPlan,
+      selectedPlanId: selectedPricingPlan?._key || product.selectedPlanId || '',
+      selectedPlanTitle: selectedPricingPlan?.planTitle || product.selectedPlanTitle || '',
       coverImage: product.coverImage || '',
       pdfUrl: product.pdfUrl || '',
       samplePdfUrl: product.samplePdfUrl || ''

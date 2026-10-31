@@ -37,7 +37,8 @@ function getSanityClient(env) {
     dataset: env.SANITY_DATASET || env.VITE_SANITY_DATASET || 'production',
     apiVersion: '2024-01-01',
     token,
-    useCdn: false
+    useCdn: false,
+    perspective: 'published'
   });
 }
 
@@ -64,17 +65,37 @@ async function authenticate(authorization, uid, firebaseApiKey) {
 }
 
 async function razorpayRequest(path, method, config, body) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers: {
-      Authorization: `Basic ${Buffer.from(`${config.keyId}:${config.keySecret}`).toString('base64')}`,
-      ...(body ? { 'Content-Type': 'application/json' } : {})
-    },
-    ...(body ? { body: JSON.stringify(body) } : {})
-  });
-  const result = await response.json();
+  let response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${config.keyId}:${config.keySecret}`).toString('base64')}`,
+        ...(body ? { 'Content-Type': 'application/json' } : {})
+      },
+      ...(body ? { body: JSON.stringify(body) } : {})
+    });
+  } catch (error) {
+    console.error('Unable to connect to the Razorpay API:', error instanceof Error ? error.message : 'Unknown network error.');
+    throw new PaymentRequestError(502, 'Unable to connect to Razorpay. Please try again.');
+  }
+
+  let result;
+  try {
+    result = await response.json();
+  } catch (error) {
+    console.error('Razorpay returned an invalid response:', {
+      status: response.status,
+      message: error instanceof Error ? error.message : 'Invalid JSON response.'
+    });
+    throw new PaymentRequestError(502, 'Razorpay returned an invalid response. Please try again.');
+  }
   if (!response.ok) {
-    console.error('Razorpay API request failed with status:', response.status);
+    console.error('Razorpay API request was rejected:', {
+      status: response.status,
+      code: result?.error?.code || 'UNKNOWN',
+      description: result?.error?.description || 'No provider description returned.'
+    });
     throw new PaymentRequestError(502, 'Razorpay could not process the payment request.');
   }
   return result;
@@ -166,12 +187,30 @@ export async function createRazorpayOrder({ body, authorization, env }) {
   const expectedAmount = Number(body.expectedAmount);
   const products = requestedItems.map((item) => ({
     productType: getString(item?.productType) || 'book',
-    productId: getString(item?.productId || item?.bookId)
+    productId: getString(item?.productId || item?.bookId),
+    selectedPricingPlan: item?.selectedPricingPlan && typeof item.selectedPricingPlan === 'object'
+      && !Array.isArray(item.selectedPricingPlan)
+      ? {
+        key: getString(item.selectedPricingPlan._key),
+        title: getString(item.selectedPricingPlan.planTitle),
+        price: Number(item.selectedPricingPlan.price)
+      }
+      : null,
+    selectedPlanId: getString(item?.selectedPlanId),
+    selectedPlanTitle: getString(item?.selectedPlanTitle)
   }));
   const productIds = products.map((item) => item.productId);
   if (products.length === 0 || products.length > 20
     || products.some((item) => !['book', 'videoCoursePack'].includes(item.productType)
-      || !item.productId || item.productId.length > 200)
+      || !item.productId || item.productId.length > 200
+      || item.selectedPlanId.length > 200 || item.selectedPlanTitle.length > 200
+      || (item.selectedPricingPlan
+        && (!item.selectedPricingPlan.key || item.selectedPricingPlan.key.length > 200
+          || item.selectedPricingPlan.title.length > 200
+          || !Number.isFinite(item.selectedPricingPlan.price)
+          || item.selectedPricingPlan.price <= 0))
+      || (item.productType === 'book'
+        && (item.selectedPlanId || item.selectedPlanTitle || item.selectedPricingPlan)))
     || new Set(productIds).size !== productIds.length
     || !Number.isSafeInteger(expectedAmount) || expectedAmount <= 0) {
     throw new PaymentRequestError(400, 'The selected products are invalid.');
@@ -184,9 +223,10 @@ export async function createRazorpayOrder({ body, authorization, env }) {
       || (
         _type == "videoCoursePack"
         && packType == "Paid"
-        && publishingStatus in ["Instant", "Scheduled"]
         && (
-          publishingStatus == "Instant"
+          !defined(publishingStatus)
+          ||
+          publishingStatus != "Scheduled"
           || (defined(publishingDate) && publishingDate <= now())
         )
       )
@@ -197,7 +237,8 @@ export async function createRazorpayOrder({ body, authorization, env }) {
       offerPrice,
       price,
       duration,
-      packPurpose
+      packPurpose,
+      pricingPlans[] { _key, planTitle, price, isAvailable, isRecommended }
     }`,
     { productIds }
   );
@@ -217,21 +258,57 @@ export async function createRazorpayOrder({ body, authorization, env }) {
       throw new PaymentRequestError(409, 'You already own one of the selected video courses.');
     }
   }
-  const items = products.map(({ productType, productId }) => {
+  const items = products.map(({
+    productType,
+    productId,
+    selectedPricingPlan,
+    selectedPlanId,
+    selectedPlanTitle
+  }) => {
     const product = catalogById.get(productId);
-    const amount = Number(productType === 'book' ? product?.offerPrice : product?.price);
     if (product?._type !== productType) {
       throw new PaymentRequestError(400, 'A selected product is unavailable for purchase.');
     }
+    let selectedPlan = null;
+    const requestedPlanId = selectedPricingPlan?.key || selectedPlanId;
+    const requestedPlanTitle = selectedPricingPlan?.title || selectedPlanTitle;
+    if (productType === 'videoCoursePack' && product) {
+      const plans = Array.isArray(product.pricingPlans) ? product.pricingPlans : [];
+      if (plans.length) {
+        selectedPlan = requestedPlanId
+          ? plans.find((plan) => plan._key === requestedPlanId)
+          : requestedPlanTitle
+            ? plans.find((plan) => plan.planTitle === requestedPlanTitle)
+            : plans.find((plan) => plan.isAvailable !== false && plan.isRecommended)
+              || plans.find((plan) => plan.isAvailable !== false);
+        if (!selectedPlan || selectedPlan.isAvailable === false) {
+          throw new PaymentRequestError(400, 'The selected course pricing plan is unavailable.');
+        }
+        if (selectedPricingPlan
+          && Math.round(selectedPricingPlan.price * 100) !== Math.round(Number(selectedPlan.price) * 100)) {
+          throw new PaymentRequestError(409, 'The course pricing plan price changed. Refresh the course page and try again.');
+        }
+      } else if (requestedPlanId) {
+        throw new PaymentRequestError(409, 'The course pricing plan changed. Refresh the course page and try again.');
+      }
+    }
+    const amount = Number(productType === 'book'
+      ? product?.offerPrice
+      : selectedPlan?.price ?? product?.price);
     if (!product || !Number.isFinite(amount) || amount <= 0) {
       throw new PaymentRequestError(400, 'A selected product is unavailable or has no valid price.');
     }
+    const resolvedSelectedPlan = selectedPlan || null;
     return {
       productType,
       productId,
       title: product.title || 'Product',
       packPurpose: product.packPurpose || '',
-      ...(productType === 'videoCoursePack' ? { duration: product.duration || '' } : {}),
+      ...(productType === 'videoCoursePack' ? {
+        duration: product.duration || '',
+        selectedPlanId: resolvedSelectedPlan?._key || '',
+        selectedPlanTitle: resolvedSelectedPlan?.planTitle || ''
+      } : {}),
       amount
     };
   });
@@ -252,20 +329,34 @@ export async function createRazorpayOrder({ body, authorization, env }) {
     return { ...item, finalAmount: (itemPaise - allocatedDiscount) / 100 };
   });
   const amountPaise = subtotalPaise - discountPaise;
-  if (!Number.isSafeInteger(amountPaise) || amountPaise <= 0) {
+  if (!Number.isSafeInteger(amountPaise)) {
     throw new PaymentRequestError(400, 'The order amount is invalid.');
+  }
+  if (amountPaise < 100) {
+    throw new PaymentRequestError(400, 'Razorpay requires a payable amount of at least ₹1.00.');
   }
   if (amountPaise !== expectedAmount) {
     throw new PaymentRequestError(409, 'The catalog price changed. Refresh the catalog and try again.');
   }
 
   const config = getPaymentConfig(env);
+  const razorpayNotes = { firebaseUid: uid };
+  if (discountedItems.length === 1) {
+    const [item] = discountedItems;
+    razorpayNotes.productType = item.productType;
+    razorpayNotes.productId = item.productId;
+    if (item.productType === 'videoCoursePack') {
+      razorpayNotes.pricingPlanKey = item.selectedPlanId || '';
+      razorpayNotes.pricingPlanPrice = String(Math.round(item.amount * 100));
+    }
+  } else {
+    razorpayNotes.productType = 'mixed';
+  }
   const order = await razorpayRequest('/orders', 'POST', config, {
     amount: amountPaise,
     currency: 'INR',
-    payment_capture: 1,
     receipt: `xam_${randomUUID().replaceAll('-', '').slice(0, 28)}`,
-    notes: { firebaseUid: uid }
+    notes: razorpayNotes
   });
   const orderToken = createOrderToken({
     uid,
@@ -313,6 +404,8 @@ async function recordSanityPurchase(client, firebaseUser, phone, paymentId, orde
       _type: 'object',
       course: { _type: 'reference', _ref: item.productId },
       courseTitle: item.title,
+      pricingPlanId: item.selectedPlanId || '',
+      pricingPlanTitle: item.selectedPlanTitle || '',
       amount: item.amount,
       finalAmount: item.finalAmount,
       duration: item.duration || '',
@@ -490,6 +583,8 @@ export async function verifyRazorpayPayment({ body, authorization, env }) {
     ...(item.productType === 'videoCoursePack'
       ? {
         duration: item.duration || '',
+        pricingPlanId: item.selectedPlanId || '',
+        pricingPlanTitle: item.selectedPlanTitle || '',
         expiresAt: calculateCourseExpiryDate(purchasedAt, item.duration)
       }
       : {}),

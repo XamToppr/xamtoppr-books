@@ -261,7 +261,7 @@ const localUserActivityApi = (env) => {
           const courseTitle = getString(body.courseTitle)
           const phone = getString(body.phone)
           const reason = getString(body.reason)
-          const amount = body.amount
+          const amount = Number(body.amount)
           const firebaseApiKey = getString(body.firebaseApiKey)
             || env.VITE_FIREBASE_API_KEY
             || env.FIREBASE_WEB_API_KEY
@@ -391,7 +391,10 @@ const localRazorpayApi = (env) => ({
             response.end(JSON.stringify({ success: false, error: error.message }))
             return
           }
-          console.error('Failed to handle a local Razorpay request.')
+          console.error(
+            'Failed to handle a local Razorpay request:',
+            error instanceof Error ? error.message : 'Unknown server error.'
+          )
           response.statusCode = 500
           response.end(JSON.stringify({ success: false, error: 'Unable to process the Razorpay request.' }))
         }

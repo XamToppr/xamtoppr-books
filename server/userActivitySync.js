@@ -59,7 +59,6 @@ export async function createSanityUserActivity(client, firebaseUser, {
   if (action === 'enroll_free_course') {
     course = await client.getDocument(courseId);
     if (!course || course._type !== 'videoCoursePack' || course.packType !== 'Free'
-      || !['Instant', 'Scheduled'].includes(course.publishingStatus)
       || (course.publishingStatus === 'Scheduled'
         && (!course.publishingDate || new Date(course.publishingDate).getTime() > Date.now()))) {
       const error = new Error('This free course is not available for enrollment.');
@@ -110,6 +109,15 @@ export async function createSanityUserActivity(client, firebaseUser, {
       expiresAt: enrollmentExpiry
     }
     : null;
+  if (existingEnrollment) {
+    return {
+      activityId: null,
+      totalCoins: Number(currentStudent?.totalCoins) || 0,
+      courseEnrollment,
+      alreadyEnrolled: true
+    };
+  }
+
   const activityId = `activity_${randomUUID()}`;
   const activityDocument = {
     _id: activityId,
@@ -143,7 +151,11 @@ export async function createSanityUserActivity(client, firebaseUser, {
   const transaction = client.transaction()
     .create(activityDocument)
     .patch(studentId, (patch) => {
-      let updatedPatch = patch
+      let updatedPatch = patch;
+      if (action === 'enroll_free_course') {
+        updatedPatch = updatedPatch.ifRevisionId(currentStudent._rev);
+      }
+      updatedPatch = updatedPatch
         .set({
           fullName: firebaseUser.displayName || 'Student',
           email: firebaseUser.email || '',
@@ -179,8 +191,31 @@ export async function createSanityUserActivity(client, firebaseUser, {
     await transaction.commit();
   } catch (error) {
     console.error('Sanity transaction failed in createSanityUserActivity.');
+    const isRevisionConflict = error.statusCode === 409 || error.response?.statusCode === 409;
+    if (action === 'enroll_free_course' && isRevisionConflict) {
+      const latestStudent = await client.getDocument(studentId);
+      const latestEnrollment = [...(latestStudent?.enrolledCourses || [])]
+        .reverse()
+        .find((entry) => entry?.course?._ref === course._id
+          && isCourseEntitlementActive(entry, course.duration));
+      if (latestEnrollment) {
+        return {
+          activityId: null,
+          totalCoins: Number(latestStudent?.totalCoins) || 0,
+          courseEnrollment: {
+            courseId: course._id,
+            courseTitle: course.title || courseTitle,
+            duration: course.duration || '',
+            enrolledAt: latestEnrollment.enrolledAt,
+            expiresAt: latestEnrollment.expiresAt
+              || calculateCourseExpiryDate(latestEnrollment.enrolledAt, course.duration)
+          },
+          alreadyEnrolled: true
+        };
+      }
+    }
     throw error;
   }
 
-  return { activityId, totalCoins, courseEnrollment };
+  return { activityId, totalCoins, courseEnrollment, alreadyEnrolled: false };
 }

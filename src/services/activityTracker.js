@@ -74,8 +74,11 @@ export async function logCheckoutActivity({
       throw new Error(responseBody.error || `Checkout activity logging failed with status ${response.status}.`);
     }
     return true;
-  } catch {
-    console.error('Unable to log the checkout activity to Student Activity & Leads.');
+  } catch (error) {
+    console.error(
+      'Unable to log the checkout activity to Student Activity & Leads:',
+      error instanceof Error ? error.message : 'Unknown activity logging error.'
+    );
     return false;
   }
 }
@@ -138,6 +141,7 @@ export async function logUserActivity(actionType, details = {}) {
 
   const activityDetails = getActivityDetails(details);
   let courseEnrollment = null;
+  let alreadyEnrolled = false;
   if (actionType === 'enroll_free_course') {
     try {
       const idToken = await user.getIdToken();
@@ -157,13 +161,16 @@ export async function logUserActivity(actionType, details = {}) {
         })
       });
       const responseBody = await response.json();
-      if (!response.ok) {
+      if (response.status === 409) {
+        alreadyEnrolled = true;
+      } else if (!response.ok) {
         throw new Error(responseBody.error || `Course enrollment failed with status ${response.status}.`);
       }
       courseEnrollment = responseBody.courseEnrollment || null;
-    } catch {
+      alreadyEnrolled = alreadyEnrolled || responseBody.alreadyEnrolled === true;
+    } catch (error) {
       console.error('Unable to validate and save the free course enrollment.');
-      return false;
+      return { success: false, error: error.message || 'Course enrollment could not be saved.' };
     }
   }
 
@@ -174,6 +181,26 @@ export async function logUserActivity(actionType, details = {}) {
     const result = await runTransaction(db, async (transaction) => {
       const userSnapshot = await transaction.get(userRef);
       const profile = userSnapshot.data() || {};
+      if (actionType === 'enroll_free_course' && activityDetails.courseId) {
+        const existingCourseIds = [
+          ...(Array.isArray(profile.enrolledCourseIds) ? profile.enrolledCourseIds : []),
+          ...(Array.isArray(profile.enrolledCourses)
+            ? profile.enrolledCourses.map((entry) => (
+              typeof entry === 'string'
+                ? entry
+                : entry?.courseId || entry?.course?._ref || entry?._ref
+            ))
+            : [])
+        ];
+        if (alreadyEnrolled && existingCourseIds.includes(activityDetails.courseId)) {
+          return {
+            logged: true,
+            alreadyEnrolled: true,
+            totalCoins: Number(profile.totalCoins) || 0,
+            phone: ''
+          };
+        }
+      }
       if (actionType === 'purchase_complete'
         && (profile.processedPaymentIds || []).includes(verifiedPayment.paymentId)) {
         return { logged: true, totalCoins: Number(profile.totalCoins) || 0, phone: '' };
@@ -230,6 +257,8 @@ export async function logUserActivity(actionType, details = {}) {
           userUpdates.purchasedCourses = arrayUnion(...coursePurchases.map((purchase) => ({
             courseId: purchase.productId || purchase.courseId,
             courseTitle: purchase.title,
+            pricingPlanId: purchase.pricingPlanId || '',
+            pricingPlanTitle: purchase.pricingPlanTitle || '',
             price: purchase.finalAmount ?? purchase.amount,
             amount: purchase.amount,
             finalAmount: purchase.finalAmount ?? purchase.amount,
@@ -255,13 +284,16 @@ export async function logUserActivity(actionType, details = {}) {
         }
       }
 
-      transaction.set(activityRef, activity);
+      if (!alreadyEnrolled) transaction.set(activityRef, activity);
       transaction.set(userRef, userUpdates, { merge: true });
-      return { logged: true, totalCoins, phone };
+      return { logged: true, alreadyEnrolled, totalCoins, phone };
     });
 
     if (!result.logged) return false;
-    if (actionType === 'purchase_complete' || actionType === 'enroll_free_course') return true;
+    if (actionType === 'enroll_free_course') {
+      return { success: true, alreadyEnrolled: result.alreadyEnrolled || alreadyEnrolled };
+    }
+    if (actionType === 'purchase_complete') return true;
 
     try {
       const idToken = await user.getIdToken();

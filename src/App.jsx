@@ -851,6 +851,8 @@ function BookStoreApp() {
       offerPrice: course.price,
       displayPrice: `₹${Number(course.price).toLocaleString('en-IN')}`,
       coverImage: course.thumbnailUrl || '',
+      selectedPricingPlan: course.selectedPricingPlan || null,
+      selectedPlanId: course.selectedPlanId || '',
       selectedPlanTitle: course.selectedPlanTitle || '',
       packPurpose: course.packPurpose || 'Individual'
     });
@@ -868,7 +870,7 @@ function BookStoreApp() {
       productType: 'videoCoursePack',
       phone: userProfile?.phone || ''
     });
-    if (enrolled) await refreshUserProfile();
+    if (enrolled && enrolled.success !== false) await refreshUserProfile();
     return enrolled;
   };
 

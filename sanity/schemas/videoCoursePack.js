@@ -366,6 +366,13 @@ const videoCoursePack = defineType({
               title: 'Recommended Plan',
               type: 'boolean',
               initialValue: false
+            }),
+            defineField({
+              name: 'isAvailable',
+              title: 'Available for Purchase',
+              type: 'boolean',
+              description: 'Turn off to hide this plan from checkout while keeping it visible in course details.',
+              initialValue: true
             })
           ],
           preview: {
