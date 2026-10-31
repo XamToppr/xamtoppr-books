@@ -10,7 +10,7 @@ import { useCart } from './context/CartContext';
 import { logUserActivity } from './services/activityTracker';
 import { initiatePayment } from './services/paymentService';
 import { calculateCourseExpiryDate, getCourseValidity } from './utils/courseValidity';
-import React, { lazy, Suspense, useState, useMemo, useEffect, useRef } from 'react';
+import React, { lazy, Suspense, useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import HTMLFlipBook from 'react-pageflip';
 import { PortableText } from '@portabletext/react';
 import sharedPortableTextComponents from './components/PortableTextComponents';
@@ -59,6 +59,16 @@ import {
 } from 'lucide-react';
 
 const SanityStudio = lazy(() => import('./components/admin/SanityStudio'));
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return null;
+}
 
 const EXAM_CATEGORIES = [
   'All Exams',
@@ -3901,11 +3911,14 @@ function LegacyAppRoutes() {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/book/:slug" element={<BookDetailPage />} />
-      <Route path="/my-library" element={<MyLibrary />} />
-      <Route path="/video-courses/*" element={<BookStoreApp />} />
-      <Route path="*" element={<LegacyAppRoutes />} />
-    </Routes>
+    <>
+      <ScrollToTop />
+      <Routes>
+        <Route path="/book/:slug" element={<BookDetailPage />} />
+        <Route path="/my-library" element={<MyLibrary />} />
+        <Route path="/video-courses/*" element={<BookStoreApp />} />
+        <Route path="*" element={<LegacyAppRoutes />} />
+      </Routes>
+    </>
   );
 }
