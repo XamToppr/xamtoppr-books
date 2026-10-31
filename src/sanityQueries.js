@@ -93,6 +93,7 @@ const VIDEO_COURSE_PACK_PROJECTION = `{
   packPurpose,
   packType,
   hideFromStore,
+  isFeatured,
   deliveryMode,
   price,
   mrp,

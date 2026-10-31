@@ -267,6 +267,7 @@ const videoCoursePack = defineType({
     packType: 'Free',
     deliveryMode: 'Recorded Video',
     price: 0,
+    isFeatured: false,
     hideFromStore: false,
     publishingStatus: 'Draft',
     videos: []
@@ -286,6 +287,14 @@ const videoCoursePack = defineType({
       group: 'details',
       options: { source: 'title', maxLength: 96 },
       validation: (Rule) => Rule.required()
+    }),
+    defineField({
+      name: 'isFeatured',
+      title: 'Featured Course',
+      type: 'boolean',
+      group: 'details',
+      description: 'Show this course in the featured banner on the Video Courses page.',
+      initialValue: false
     }),
     defineField({
       name: 'packPurpose',

@@ -7,6 +7,7 @@ import {
   CalendarDays,
   ChevronDown,
   ChevronLeft,
+  ChevronRight,
   Check,
   Clock3,
   ClipboardCheck,
@@ -150,6 +151,7 @@ const mapPack = (pack, index) => {
     title: pack.title,
     slug: pack.slug,
     description: pack.shortDescription || '',
+    isFeatured: pack.isFeatured === true,
     richDescription: pack.description || [],
     deliveryMode: pack.deliveryMode || 'Recorded Video',
     timeTable: pack.timeTable || [],
@@ -538,6 +540,8 @@ function VideoCoursesPage({
   const [enrollmentNotice, setEnrollmentNotice] = useState('');
   const [localEnrolledCourseIds, setLocalEnrolledCourseIds] = useState([]);
   const [selectedPlanKey, setSelectedPlanKey] = useState('');
+  const [featuredCourseIndex, setFeaturedCourseIndex] = useState(0);
+  const [isFeaturedCarouselPaused, setIsFeaturedCarouselPaused] = useState(false);
   const playerRequestId = React.useRef(0);
   const handleVideoWatch = useCallback((engagement) => {
     if (!currentUser || !activeVideo) return;
@@ -644,6 +648,21 @@ function VideoCoursesPage({
   const selectedPlanPrice = Number(selectedPricingPlan?.price ?? detailCourse?.price) || 0;
   const selectedPlanMrp = Number(selectedPricingPlan?.mrp ?? detailCourse?.mrp) || 0;
   const selectedPlanSavings = Math.max(0, selectedPlanMrp - selectedPlanPrice);
+  const featuredCourses = useMemo(
+    () => courses.filter((course) => course.isFeatured),
+    [courses]
+  );
+  const activeFeaturedCourseIndex = featuredCourses.length
+    ? featuredCourseIndex % featuredCourses.length
+    : 0;
+
+  useEffect(() => {
+    if (isFeaturedCarouselPaused || featuredCourses.length < 2) return undefined;
+    const intervalId = window.setInterval(() => {
+      setFeaturedCourseIndex((index) => (index + 1) % featuredCourses.length);
+    }, 4000);
+    return () => window.clearInterval(intervalId);
+  }, [featuredCourses.length, isFeaturedCarouselPaused]);
 
   useEffect(() => {
     let isCurrentRequest = true;
@@ -987,10 +1006,99 @@ function VideoCoursesPage({
   return (
     <div className="min-h-screen bg-slate-50">
       {!courseSlug && (
-        <section className="relative overflow-hidden bg-gradient-to-br from-[#0c2356] via-blue-900 to-indigo-900 text-white">
+        <section
+          aria-label="Featured video courses"
+          onMouseEnter={() => setIsFeaturedCarouselPaused(true)}
+          onMouseLeave={() => setIsFeaturedCarouselPaused(false)}
+          className="relative overflow-hidden bg-gradient-to-br from-[#0c2356] via-[#102d6b] to-[#153a8a] text-white shadow-inner"
+        >
         <div className="pointer-events-none absolute -right-24 -top-32 h-96 w-96 rounded-full border-[48px] border-white/5" />
         <div className="pointer-events-none absolute bottom-0 right-1/3 h-48 w-48 rounded-full bg-amber-400/10 blur-3xl" />
-        <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
+        <div className={`relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 ${featuredCourses.length ? 'h-[560px] py-6 sm:h-[470px] sm:py-12 lg:h-[500px]' : 'py-12 sm:py-16 lg:py-20'}`}>
+          {featuredCourses.length ? (
+            <>
+              {featuredCourses.map((course, index) => (
+                <article
+                  key={course.id}
+                  aria-hidden={index !== activeFeaturedCourseIndex}
+                  className={`absolute inset-0 grid min-w-0 grid-cols-1 grid-rows-[210px_1fr] items-center gap-3 overflow-hidden px-11 pb-12 pt-5 transition-opacity duration-500 sm:grid-rows-1 sm:gap-7 sm:px-12 sm:py-10 lg:grid-cols-[minmax(0,1fr)_minmax(250px,300px)] lg:gap-10 lg:px-16 ${
+                    index === activeFeaturedCourseIndex ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+                  }`}
+                >
+                  <div className="relative z-10 order-2 min-w-0 max-w-3xl sm:order-1">
+                    <div className="inline-flex max-w-full items-center gap-2 truncate rounded-full border border-amber-300/40 bg-amber-400/15 px-3 py-1.5 text-xs font-black uppercase tracking-wider text-amber-200">
+                      <Sparkles className="h-3.5 w-3.5" /> Featured Course
+                    </div>
+                    <h1 className="mt-2 line-clamp-2 max-w-3xl text-2xl font-black leading-tight tracking-tight text-white sm:mt-4 sm:text-4xl lg:text-5xl">
+                      {course.title}
+                    </h1>
+                    <p className="mt-2 line-clamp-2 max-w-2xl text-xs leading-relaxed text-blue-100 sm:mt-4 sm:text-base">
+                      {course.description || `Explore ${course.deliveryMode.toLowerCase()} lessons and prepare with ${course.title}.`}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/video-courses/${encodeURIComponent(course.slug)}`)}
+                      className="mt-4 inline-flex items-center gap-2 rounded-full bg-amber-400 px-4 py-2.5 text-xs font-extrabold text-slate-950 shadow-lg transition hover:bg-amber-300 sm:mt-6 sm:px-5 sm:py-3 sm:text-sm"
+                    >
+                      View Details <ArrowRight className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="relative z-10 order-1 mx-auto flex h-[190px] w-[142px] items-center justify-center sm:order-2 sm:h-[300px] sm:w-[225px] lg:h-[380px] lg:w-[285px]">
+                    <div className="absolute inset-3 rounded-full bg-amber-300/20 blur-3xl" />
+                    <div className="relative h-full w-full overflow-hidden rounded-2xl border border-white/20 bg-slate-950 shadow-[18px_22px_35px_rgba(0,0,0,0.45)] transition duration-300 hover:-translate-y-2 hover:rotate-1">
+                      {course.thumbnailUrl ? (
+                        <img
+                          src={course.thumbnailUrl}
+                          alt={`${course.title} course cover`}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className={`flex h-full flex-col items-center justify-center bg-gradient-to-br ${course.accent} p-4 text-center`}>
+                          <Play className="mb-4 h-10 w-10 text-amber-300" />
+                          <span className="line-clamp-5 text-sm font-black leading-tight text-white sm:text-xl">{course.title}</span>
+                          <span className="mt-3 text-xs font-semibold text-blue-100">{course.deliveryMode}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              ))}
+
+              {featuredCourses.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    aria-label="Previous featured course"
+                    onClick={() => setFeaturedCourseIndex((activeFeaturedCourseIndex - 1 + featuredCourses.length) % featuredCourses.length)}
+                    className="absolute left-3 top-1/2 z-20 -translate-y-1/2 rounded-full border border-white/30 bg-slate-950/40 p-2.5 text-white backdrop-blur transition hover:bg-white/20 sm:left-6"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Next featured course"
+                    onClick={() => setFeaturedCourseIndex((activeFeaturedCourseIndex + 1) % featuredCourses.length)}
+                    className="absolute right-3 top-1/2 z-20 -translate-y-1/2 rounded-full border border-white/30 bg-slate-950/40 p-2.5 text-white backdrop-blur transition hover:bg-white/20 sm:right-6"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                  <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2">
+                    {featuredCourses.map((course, index) => (
+                      <button
+                        type="button"
+                        key={course.id}
+                        aria-label={`Show featured course ${index + 1}`}
+                        aria-current={index === activeFeaturedCourseIndex ? 'true' : undefined}
+                        onClick={() => setFeaturedCourseIndex(index)}
+                        className={`h-2.5 rounded-full transition-all ${index === activeFeaturedCourseIndex ? 'w-7 bg-amber-300' : 'w-2.5 bg-white/50 hover:bg-white/80'}`}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
           <div className="max-w-3xl">
             <span className="inline-flex items-center gap-2 rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1.5 text-xs font-extrabold uppercase tracking-wider text-amber-200">
               <Sparkles className="h-4 w-4" /> Learn your way
@@ -1007,6 +1115,7 @@ function VideoCoursesPage({
               Explore the catalog <ArrowRight className="h-4 w-4" />
             </a>
           </div>
+          )}
         </div>
         </section>
       )}
