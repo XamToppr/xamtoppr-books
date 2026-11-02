@@ -8,7 +8,7 @@ import CopyCouponAction from './sanity/actions/copyCouponAction.js';
 import { createCouponPublishAction } from './sanity/couponActions.js';
 
 const ADMIN_ROLE = 'administrator';
-const RESTRICTED_ACTIONS = new Set(['delete', 'discardChanges', 'unpublish']);
+const RESTRICTED_ACTIONS = new Set(['discardChanges', 'unpublish']);
 const MASTER_TYPES = new Set(['track', 'platform', 'subject', 'module', 'topic', 'subTopic']);
 const DEDICATED_TYPES = new Set(['siteSettings', 'onlineClass', 'order', ...MASTER_TYPES]);
 
@@ -61,13 +61,16 @@ export default defineConfig({
       const isAdministrator = context.currentUser?.roles?.some(
         (role) => role.name === ADMIN_ROLE
       );
-      const accessControlledActions = isAdministrator
-        ? prev
-        : prev.filter((Action) => !RESTRICTED_ACTIONS.has(Action.action));
-      if (context.schemaType !== 'coupon') return accessControlledActions;
+      const deleteActions = prev.filter((Action) => Action.action === 'delete');
+      const accessControlledActions = prev.filter((Action) => (
+        Action.action !== 'delete'
+        && (isAdministrator || !RESTRICTED_ACTIONS.has(Action.action))
+      ));
+      const documentActions = [...accessControlledActions, ...deleteActions];
+      if (context.schemaType !== 'coupon') return documentActions;
 
       return [
-        ...accessControlledActions.map((Action) => (
+        ...documentActions.map((Action) => (
           Action.action === 'publish' ? createCouponPublishAction(Action) : Action
         )),
         CopyCouponAction
