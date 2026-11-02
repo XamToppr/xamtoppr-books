@@ -74,5 +74,10 @@ export const masterTypes = [
     name: 'topic',
     title: 'Topics',
     parent: { field: 'module', title: 'Module', type: 'module' }
+  }),
+  createMasterType({
+    name: 'subTopic',
+    title: 'Sub Topic',
+    parent: { field: 'topic', title: 'Topic', type: 'topic' }
   })
 ];

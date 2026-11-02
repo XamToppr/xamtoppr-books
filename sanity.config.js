@@ -9,7 +9,7 @@ import { createCouponPublishAction } from './sanity/couponActions.js';
 
 const ADMIN_ROLE = 'administrator';
 const RESTRICTED_ACTIONS = new Set(['delete', 'discardChanges', 'unpublish']);
-const MASTER_TYPES = new Set(['track', 'platform', 'subject', 'module', 'topic']);
+const MASTER_TYPES = new Set(['track', 'platform', 'subject', 'module', 'topic', 'subTopic']);
 const DEDICATED_TYPES = new Set(['siteSettings', 'onlineClass', 'order', ...MASTER_TYPES]);
 
 const onlineClassesByTaxonomy = (S) => S.documentTypeList('track')
@@ -95,7 +95,16 @@ export default defineConfig({
                   S.documentTypeListItem('platform').title('Platform'),
                   S.documentTypeListItem('subject').title('Subject'),
                   S.documentTypeListItem('module').title('Module'),
-                  S.documentTypeListItem('topic').title('Topics')
+                  S.listItem()
+                    .title('Topics')
+                    .id('topic')
+                    .child(S.documentTypeList('topic')
+                      .title('Topics')
+                      .child((topicId) => S.documentTypeList('subTopic')
+                        .title('Sub Topics')
+                        .filter('_type == "subTopic" && topic._ref == $topicId')
+                        .params({ topicId }))),
+                  S.documentTypeListItem('subTopic').title('Sub Topics')
                 ])
             ),
           S.listItem()
