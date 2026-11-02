@@ -147,6 +147,21 @@ const onlineClass = defineType({
       validation: (Rule) => Rule.required()
     }),
     defineField({
+      name: 'subTopic',
+      title: 'Sub Topic',
+      type: 'reference',
+      group: 'taxonomy',
+      to: [{ type: 'subTopic' }],
+      options: {
+        filter: ({ document }) => {
+          const topicId = document?.topic?._ref;
+          return topicId
+            ? { filter: 'isActive == true && topic._ref == $topicId', params: { topicId } }
+            : { filter: 'isActive == true' };
+        }
+      }
+    }),
+    defineField({
       name: 'videoLink',
       title: 'Video Link',
       type: 'url',
