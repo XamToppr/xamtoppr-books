@@ -100,11 +100,21 @@ export default defineConfig({
                     .id('topic')
                     .child(S.documentTypeList('topic')
                       .title('Topics')
-                      .child((topicId) => S.documentTypeList('subTopic')
-                        .title('Sub Topics')
-                        .filter('_type == "subTopic" && topic._ref == $topicId')
-                        .params({ topicId }))),
-                  S.documentTypeListItem('subTopic').title('Sub Topics')
+                      .child((topicId) => S.list()
+                        .title('Topic')
+                        .items([
+                          S.listItem()
+                            .title('Topic Details')
+                            .id('topicDetails')
+                            .child(S.document().schemaType('topic').documentId(topicId)),
+                          S.listItem()
+                            .title('Sub Topics')
+                            .id('subTopics')
+                            .child(S.documentTypeList('subTopic')
+                              .title('Sub Topics')
+                              .filter('_type == "subTopic" && topic._ref == $topicId')
+                              .params({ topicId }))
+                        ])))
                 ])
             ),
           S.listItem()
