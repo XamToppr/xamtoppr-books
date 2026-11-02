@@ -95,26 +95,16 @@ export default defineConfig({
                   S.documentTypeListItem('platform').title('Platform'),
                   S.documentTypeListItem('subject').title('Subject'),
                   S.documentTypeListItem('module').title('Module'),
-                  S.listItem()
+                  S.documentTypeListItem('topic')
                     .title('Topics')
-                    .id('topic')
-                    .child(S.documentTypeList('topic')
-                      .title('Topics')
-                      .child((topicId) => S.list()
-                        .title('Topic')
-                        .items([
-                          S.listItem()
-                            .title('Topic Details')
-                            .id('topicDetails')
-                            .child(S.document().schemaType('topic').documentId(topicId)),
-                          S.listItem()
-                            .title('Sub Topics')
-                            .id('subTopics')
-                            .child(S.documentTypeList('subTopic')
-                              .title('Sub Topics')
-                              .filter('_type == "subTopic" && topic._ref == $topicId')
-                              .params({ topicId }))
-                        ])))
+                    .child((topicId) => S.document()
+                      .schemaType('topic')
+                      .documentId(topicId)
+                      .child(S.documentTypeList('subTopic')
+                        .title('Sub Topics')
+                        .filter('_type == "subTopic" && topic._ref == $topicId')
+                        .params({ topicId }))),
+                  S.documentTypeListItem('subTopic').title('Sub Topics')
                 ])
             ),
           S.listItem()
