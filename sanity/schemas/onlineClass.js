@@ -1,5 +1,32 @@
-import { defineArrayMember, defineField, defineType } from 'sanity';
+import { createElement } from 'react';
+import { Box, Button, Flex, TextInput } from '@sanity/ui';
+import { defineArrayMember, defineField, defineType, PatchEvent, set } from 'sanity';
 import { portableTextImageMember, portableTextTableMember } from '../portableTextMembers.js';
+
+const generateClassId = () => {
+  const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
+  return `XC-${new Date().getFullYear()}-${suffix}`;
+};
+
+const ClassIdInput = ({ value, onChange, elementProps }) => createElement(
+  Flex,
+  { align: 'center', gap: 2 },
+  createElement(
+    Box,
+    { flex: 1 },
+    createElement(TextInput, {
+      ...elementProps,
+      value: value || '',
+      onChange: (event) => onChange(PatchEvent.from(set(event.currentTarget.value)))
+    })
+  ),
+  createElement(Button, {
+    text: 'Generate',
+    mode: 'ghost',
+    type: 'button',
+    onClick: () => onChange(PatchEvent.from(set(generateClassId())))
+  })
+);
 
 const richTextMember = defineArrayMember({
   type: 'block',
@@ -40,11 +67,22 @@ const onlineClass = defineType({
     { name: 'resources', title: 'Class Resources' },
     { name: 'publishing', title: 'Publishing' }
   ],
-  initialValue: {
-    videoType: 'longFormat',
-    status: 'Active'
+  initialValue: () => {
+    return {
+      classId: generateClassId(),
+      videoType: 'longFormat',
+      status: 'Active'
+    };
   },
   fields: [
+    defineField({
+      name: 'classId',
+      title: 'Class ID',
+      type: 'string',
+      group: 'details',
+      components: { input: ClassIdInput },
+      validation: (Rule) => Rule.required()
+    }),
     defineField({
       name: 'title',
       title: 'Class Title',
@@ -235,6 +273,7 @@ const onlineClass = defineType({
   ],
   preview: {
     select: {
+      classId: 'classId',
       title: 'title',
       videoType: 'videoType',
       teacherName: 'teacherName',
@@ -246,9 +285,10 @@ const onlineClass = defineType({
       status: 'status',
       media: 'image'
     },
-    prepare: ({ title, videoType, teacherName, track, platform, subject, module, topic, status, media }) => ({
+    prepare: ({ classId, title, videoType, teacherName, track, platform, subject, module, topic, status, media }) => ({
       title: title || 'Untitled online class',
       subtitle: [
+        classId,
         videoType === 'shortReel' ? 'Short Reel / Bite' : 'Long-Format Chapter',
         teacherName,
         [track, platform, subject, module, topic].filter(Boolean).join(' → '),
