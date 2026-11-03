@@ -610,6 +610,11 @@ const videoCoursePack = defineType({
       type: 'array',
       group: 'classes',
       description: 'Select active standalone classes to include in this course pack.',
+      validation: (Rule) => Rule.custom((value) => {
+        const ids = (value || []).map((item) => item?._ref).filter(Boolean);
+        return new Set(ids).size === ids.length
+          || 'This video is already added to this course pack.';
+      }),
       of: [
         defineArrayMember({
           type: 'reference',
