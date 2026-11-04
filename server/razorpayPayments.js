@@ -382,8 +382,41 @@ export async function createRazorpayOrder({ body, authorization, env }) {
 async function recordSanityPurchase(client, firebaseUser, phone, paymentId, orderPayload, purchasedAt) {
   const studentId = `student_${firebaseUser.localId}`;
   const activityId = `purchase_${createHash('sha256').update(paymentId).digest('hex')}`;
+  const orderDocuments = orderPayload.items.map((item, index) => ({
+    _id: `order_${createHash('sha256').update(`${paymentId}:${index}`).digest('hex')}`,
+    _type: 'order',
+    userEmail: firebaseUser.email || '',
+    userPhone: phone,
+    studentName: firebaseUser.displayName || 'Student',
+    studentUid: firebaseUser.localId,
+    student: { _type: 'reference', _ref: studentId },
+    productType: item.productType,
+    productId: item.productId,
+    productTitle: item.title,
+    ...(item.productType === 'book'
+      ? { bookName: { _type: 'reference', _ref: item.productId } }
+      : {
+        videoCoursePack: { _type: 'reference', _ref: item.productId },
+        courseTitle: item.title,
+        pricingPlanId: item.selectedPlanId || '',
+        pricingPlanTitle: item.selectedPlanTitle || '',
+        duration: item.duration || ''
+      }),
+    amount: item.finalAmount,
+    totalAmount: orderPayload.amount / 100,
+    paymentStatus: 'Success',
+    razorpayOrderId: orderPayload.orderId,
+    paymentId,
+    appliedCoupon: orderPayload.coupon?.code || '',
+    purchasedAt
+  }));
   const existingActivity = await client.getDocument(activityId);
   if (existingActivity) {
+    const transaction = client.transaction();
+    orderDocuments.forEach((orderDocument) => {
+      transaction.createIfNotExists(orderDocument);
+    });
+    await transaction.commit();
     return { activityId, alreadyRecorded: true };
   }
 
@@ -465,31 +498,34 @@ async function recordSanityPurchase(client, firebaseUser, phone, paymentId, orde
     purchasedCourses: []
   };
   await client.createIfNotExists(newStudent);
+  const transaction = client.transaction()
+    .patch(studentId, (patch) => {
+      let updatedPatch = patch
+        .set({
+          fullName: firebaseUser.displayName || 'Student',
+          email: firebaseUser.email || '',
+          phone,
+          firebaseUid: firebaseUser.localId,
+          leadStatus: 'CONVERTED',
+          latestActivityTimestamp: purchasedAt
+        })
+        .setIfMissing({ totalCoins: 0, purchasedBooks: [], purchasedCourses: [], activities: [] });
+      if (bookPurchases.length) updatedPatch = updatedPatch.append('purchasedBooks', bookPurchases);
+      if (coursePurchases.length) updatedPatch = updatedPatch.append('purchasedCourses', coursePurchases);
+      return updatedPatch
+        .append('activities', [{
+          _key: randomUUID(),
+          _type: 'reference',
+          _ref: activityId
+        }])
+        .inc({ totalCoins: PURCHASE_COINS });
+    })
+    .create(activity);
+  orderDocuments.forEach((orderDocument) => {
+    transaction.createIfNotExists(orderDocument);
+  });
   try {
-    await client.transaction()
-      .patch(studentId, (patch) => {
-        let updatedPatch = patch
-          .set({
-            fullName: firebaseUser.displayName || 'Student',
-            email: firebaseUser.email || '',
-            phone,
-            firebaseUid: firebaseUser.localId,
-            leadStatus: 'CONVERTED',
-            latestActivityTimestamp: purchasedAt
-          })
-          .setIfMissing({ totalCoins: 0, purchasedBooks: [], purchasedCourses: [], activities: [] });
-        if (bookPurchases.length) updatedPatch = updatedPatch.append('purchasedBooks', bookPurchases);
-        if (coursePurchases.length) updatedPatch = updatedPatch.append('purchasedCourses', coursePurchases);
-        return updatedPatch
-          .append('activities', [{
-            _key: randomUUID(),
-            _type: 'reference',
-            _ref: activityId
-          }])
-          .inc({ totalCoins: PURCHASE_COINS });
-      })
-      .create(activity)
-      .commit();
+    await transaction.commit();
   } catch (error) {
     if (error.statusCode === 409 && await client.getDocument(activityId)) {
       return { activityId, alreadyRecorded: true };
