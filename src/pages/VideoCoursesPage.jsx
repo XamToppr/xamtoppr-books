@@ -338,7 +338,7 @@ function VideoPlayer({ video, onWatch }) {
     return (
       <iframe
         title={video.title}
-        src={player.src}
+        src={`${player.src}${player.src.includes('?') ? '&' : '?'}autoplay=1`}
         className={`${aspectClass} w-full bg-black`}
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         allowFullScreen
@@ -352,6 +352,7 @@ function VideoPlayer({ video, onWatch }) {
         className={`${aspectClass} w-full bg-black object-contain`}
         src={player.src}
         controls
+        autoPlay
         playsInline
         onPlay={(event) => {
           progressRef.current.lastTimeSeconds = event.currentTarget.currentTime;
@@ -401,9 +402,9 @@ function YouTubeTrackedPlayer({
       if (disposed) return;
       playerRef.current = new youtube.Player(elementId, {
         videoId,
-        playerVars: { playsinline: 1, rel: 0 },
+        playerVars: { autoplay: 1, playsinline: 1, rel: 0 },
         events: {
-          onReady: () => {},
+          onReady: (event) => event.target.playVideo(),
           onStateChange: (event) => {
             if (event.data === youtube.PlayerState.PLAYING) {
               if (intervalRef.current) window.clearInterval(intervalRef.current);
@@ -462,6 +463,7 @@ function VimeoTrackedPlayer({
         sendCommand('addEventListener', eventName);
       });
       sendCommand('getDuration');
+      sendCommand('play');
     };
     const handleMessage = (event) => {
       if (event.origin !== 'https://player.vimeo.com' || event.source !== frame.contentWindow) return;
@@ -501,7 +503,7 @@ function VimeoTrackedPlayer({
     <iframe
       ref={frameRef}
       title={video.title}
-      src={`https://player.vimeo.com/video/${videoId}?api=1&player_id=${playerId}`}
+      src={`https://player.vimeo.com/video/${videoId}?api=1&player_id=${playerId}&autoplay=1`}
       className={`${aspectClass} w-full bg-black`}
       allow="autoplay; fullscreen; picture-in-picture"
       allowFullScreen
@@ -1859,7 +1861,7 @@ function VideoCoursesPage({
 
       {activeVideo && (
         <div
-          className="video-modal-backdrop fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/75 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+          className="video-modal-backdrop fixed inset-0 z-[100] flex h-[100dvh] items-stretch justify-center bg-slate-950/75 p-0 backdrop-blur-sm sm:items-center sm:p-4"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) closePlayer();
           }}
@@ -1868,7 +1870,7 @@ function VideoCoursesPage({
             role="dialog"
             aria-modal="true"
             aria-label="Video player"
-            className="video-modal-panel relative max-h-[92vh] w-full overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl"
+            className="video-modal-panel relative h-[100dvh] max-h-[100dvh] w-full overflow-y-auto rounded-none bg-white shadow-2xl sm:h-auto sm:max-h-[92vh] sm:rounded-3xl"
             style={{ maxWidth: activeVideo.type === 'shortReel' ? '28rem' : '48rem' }}
           >
             <header className="flex justify-end px-3 pt-3">
