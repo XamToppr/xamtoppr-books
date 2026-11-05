@@ -1884,10 +1884,15 @@ function VideoCoursesPage({
               </button>
             </header>
             <div
-              className={activeVideo.type === 'shortReel' ? 'mx-auto w-full' : 'w-full'}
-              style={activeVideo.type === 'shortReel'
-                ? { maxWidth: 'min(100%, calc((92vh - 9rem) * 9 / 16))' }
-                : undefined}
+              className={activeVideo.type === 'shortReel'
+                ? `mx-auto w-full ${
+                  activeVideo.classPdfUrl
+                    ? 'max-w-[min(100%,calc((100dvh_-_16rem)_*_9_/_16))]'
+                    : activeVideo.mappedBook
+                      ? 'max-w-[min(100%,calc((100dvh_-_13rem)_*_9_/_16))]'
+                      : 'max-w-[min(100%,calc((100dvh_-_9rem)_*_9_/_16))]'
+                } sm:max-w-[min(100%,calc((92vh_-_9rem)_*_9_/_16))]`
+                : 'w-full'}
             >
               {isPlayerLoading ? (
                 <p role="status" className={`flex ${activeVideo.type === 'shortReel' ? 'aspect-[9/16]' : 'aspect-video'} items-center justify-center bg-slate-950 p-6 text-sm font-semibold text-white`}>
