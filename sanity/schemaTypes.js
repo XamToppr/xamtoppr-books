@@ -1238,7 +1238,7 @@ const userActivity = defineType({
         ]
       }
     }),
-    defineField({ name: 'videoId', title: 'Video / Class ID', type: 'string' }),
+    defineField({ name: 'videoId', title: 'Video / Class ID', type: 'string', readOnly: true }),
     defineField({ name: 'videoTitle', title: 'Video / Class Title', type: 'string' }),
     defineField({ name: 'watchDurationSeconds', title: 'Watched Duration (seconds)', type: 'number' }),
     defineField({ name: 'videoDurationSeconds', title: 'Video Duration (seconds)', type: 'number' }),

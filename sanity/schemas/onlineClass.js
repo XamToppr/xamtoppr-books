@@ -8,7 +8,7 @@ const generateClassId = () => {
   return `XC-${new Date().getFullYear()}-${suffix}`;
 };
 
-const ClassIdInput = ({ value, onChange, elementProps }) => createElement(
+const ClassIdInput = ({ value, onChange, elementProps, readOnly }) => createElement(
   Flex,
   { align: 'center', gap: 2 },
   createElement(
@@ -17,6 +17,7 @@ const ClassIdInput = ({ value, onChange, elementProps }) => createElement(
     createElement(TextInput, {
       ...elementProps,
       value: value || '',
+      readOnly,
       onChange: (event) => onChange(PatchEvent.from(set(event.currentTarget.value)))
     })
   ),
@@ -24,6 +25,7 @@ const ClassIdInput = ({ value, onChange, elementProps }) => createElement(
     text: 'Generate',
     mode: 'ghost',
     type: 'button',
+    disabled: readOnly,
     onClick: () => onChange(PatchEvent.from(set(generateClassId())))
   })
 );
@@ -81,6 +83,7 @@ const onlineClass = defineType({
       type: 'string',
       group: 'details',
       components: { input: ClassIdInput },
+      readOnly: true,
       validation: (Rule) => Rule.required()
     }),
     defineField({
