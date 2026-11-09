@@ -610,10 +610,26 @@ const videoCoursePack = defineType({
       type: 'array',
       group: 'classes',
       description: 'Select active standalone classes to include in this course pack.',
-      validation: (Rule) => Rule.custom((value) => {
-        const ids = (value || []).map((item) => item?._ref).filter(Boolean);
-        return new Set(ids).size === ids.length
-          || 'This video is already added to this course pack.';
+      validation: (Rule) => Rule.custom(async (value, context) => {
+        const ids = (Array.isArray(value) ? value : []).map((item) => item?._ref).filter(Boolean);
+        const seen = new Set();
+        const duplicates = new Set();
+        ids.forEach((id) => {
+          if (seen.has(id)) duplicates.add(id);
+          seen.add(id);
+        });
+        if (duplicates.size === 0) return true;
+
+        const duplicateClasses = await context.getClient({ apiVersion: '2024-01-01' })
+          .fetch('*[_id in $ids]{_id, classId, title}', { ids: [...duplicates] });
+        const classNames = new Map(
+          duplicateClasses.map((onlineClass) => [
+            onlineClass._id,
+            onlineClass.classId || onlineClass.title || 'Class ID/title unavailable'
+          ])
+        );
+        const labels = [...duplicates].map((id) => classNames.get(id) || 'Class ID/title unavailable');
+        return `Duplicate online class detected: ${labels.join(', ')} ${labels.length === 1 ? 'is' : 'are'} already added.`;
       }),
       of: [
         defineArrayMember({
