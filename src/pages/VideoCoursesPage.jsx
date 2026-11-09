@@ -1870,7 +1870,11 @@ function VideoCoursesPage({
             role="dialog"
             aria-modal="true"
             aria-label="Video player"
-            className="video-modal-panel relative h-[100dvh] max-h-[100dvh] w-full overflow-y-auto rounded-none bg-white shadow-2xl sm:h-auto sm:max-h-[92vh] sm:rounded-3xl"
+            className={`video-modal-panel relative w-full bg-white shadow-2xl ${
+              activeVideo.type === 'shortReel'
+                ? 'flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden rounded-none sm:h-[92dvh] sm:max-h-[92dvh] sm:rounded-3xl'
+                : 'h-[100dvh] max-h-[100dvh] overflow-y-auto rounded-none sm:h-auto sm:max-h-[92vh] sm:rounded-3xl'
+            }`}
             style={{ maxWidth: activeVideo.type === 'shortReel' ? '28rem' : '48rem' }}
           >
             <header className="flex justify-end px-3 pt-3">
@@ -1883,31 +1887,29 @@ function VideoCoursesPage({
                 <X className="h-5 w-5" />
               </button>
             </header>
-            <div
-              className={activeVideo.type === 'shortReel'
-                ? `mx-auto w-full ${
-                  activeVideo.classPdfUrl
-                    ? 'max-w-[min(100%,calc((100dvh_-_16rem)_*_9_/_16))]'
-                    : activeVideo.mappedBook
-                      ? 'max-w-[min(100%,calc((100dvh_-_13rem)_*_9_/_16))]'
-                      : 'max-w-[min(100%,calc((100dvh_-_9rem)_*_9_/_16))]'
-                } sm:max-w-[min(100%,calc((92vh_-_9rem)_*_9_/_16))]`
-                : 'w-full'}
+            <div className={activeVideo.type === 'shortReel'
+              ? 'grid min-h-0 flex-1 place-items-center overflow-hidden'
+              : 'w-full'}
             >
-              {isPlayerLoading ? (
-                <p role="status" className={`flex ${activeVideo.type === 'shortReel' ? 'aspect-[9/16]' : 'aspect-video'} items-center justify-center bg-slate-950 p-6 text-sm font-semibold text-white`}>
-                  Loading video…
-                </p>
-              ) : playerError ? (
-                <p role="alert" className={`flex ${activeVideo.type === 'shortReel' ? 'aspect-[9/16]' : 'aspect-video'} items-center justify-center bg-slate-950 p-6 text-center text-sm font-semibold text-rose-100`}>
-                  {playerError}
-                </p>
-              ) : (
-                <VideoPlayer video={activeVideo} onWatch={handleVideoWatch} />
-              )}
+              <div className={activeVideo.type === 'shortReel'
+                ? 'aspect-[9/16] h-full max-w-full'
+                : 'w-full'}
+              >
+                {isPlayerLoading ? (
+                  <p role="status" className={`flex ${activeVideo.type === 'shortReel' ? 'h-full w-full' : 'aspect-video'} items-center justify-center bg-slate-950 p-6 text-sm font-semibold text-white`}>
+                    Loading video…
+                  </p>
+                ) : playerError ? (
+                  <p role="alert" className={`flex ${activeVideo.type === 'shortReel' ? 'h-full w-full' : 'aspect-video'} items-center justify-center bg-slate-950 p-6 text-center text-sm font-semibold text-rose-100`}>
+                    {playerError}
+                  </p>
+                ) : (
+                  <VideoPlayer video={activeVideo} onWatch={handleVideoWatch} />
+                )}
+              </div>
             </div>
             {(activeVideo.classPdfUrl || activeVideo.mappedBook) && (
-              <div className="space-y-3 border-t border-slate-200 p-4">
+              <div className="shrink-0 space-y-3 border-t border-slate-200 p-4">
                 {activeVideo.mappedBook && renderMappedBookCard(activeVideo.mappedBook)}
                 {activeVideo.classPdfUrl && (
                   <a
