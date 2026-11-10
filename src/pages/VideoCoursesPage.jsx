@@ -32,12 +32,6 @@ const COURSE_ACCENTS = [
   'from-emerald-600 to-teal-700',
   'from-violet-600 to-fuchsia-700'
 ];
-const REEL_ACCENTS = [
-  'from-orange-500 via-rose-500 to-fuchsia-700',
-  'from-cyan-500 via-blue-600 to-indigo-800',
-  'from-emerald-500 via-teal-600 to-blue-800',
-  'from-violet-500 via-purple-600 to-indigo-900'
-];
 const courseDescriptionComponents = {
   ...portableTextComponents,
   block: {
@@ -166,7 +160,6 @@ const mapPack = (pack, index) => {
     videos,
     onlineClasses,
     demoVideos,
-    reels: videos.filter((video) => video.type === 'shortReel'),
     lessons: courseVideos.length,
     duration: pack.duration || '',
     packType: pack.packType || 'Free',
@@ -722,21 +715,6 @@ function VideoCoursesPage({
       ))
     )
     && (!search || `${course.title} ${course.description} ${course.subjects.join(' ')} ${(course.onlineClasses.length ? course.onlineClasses : course.videos).map((video) => `${video.title} ${video.topic}`).join(' ')}`.toLowerCase().includes(search.toLowerCase()))
-  )), [courses, track, platform, subject, module, topic, search]);
-
-  const filteredVideos = useMemo(() => courses
-    .filter((course) => course.packType === 'Free')
-    .flatMap((course) => (course.onlineClasses.length ? course.onlineClasses : course.reels)
-      .map((video, index) => ({ ...video, accent: REEL_ACCENTS[index % REEL_ACCENTS.length] })))
-    .filter((video, index, videos) => (
-    video.type === 'shortReel'
-    && videos.findIndex((candidate) => candidate.id === video.id) === index
-    && (!track || video.tracks.some((item) => item.name === track))
-    && (!platform || video.platforms.some((item) => item.name === platform))
-    && (!subject || video.subject === subject)
-    && (!module || video.module === module)
-    && (!topic || video.topic === topic)
-    && (!search || `${video.title} ${video.topic} ${video.subject}`.toLowerCase().includes(search.toLowerCase()))
   )), [courses, track, platform, subject, module, topic, search]);
 
   const platforms = uniqueValues(courses
@@ -1627,7 +1605,7 @@ function VideoCoursesPage({
         <section aria-label="Filter video lessons" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
             <label className="block flex-[1.5] text-xs font-bold text-slate-600">
-              <span className="mb-1.5 block">Search courses and bites</span>
+              <span className="mb-1.5 block">Search video courses</span>
               <span className="relative block">
                 <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
@@ -1805,56 +1783,6 @@ function VideoCoursesPage({
           )}
         </section>
 
-        <section aria-labelledby="reels-heading" className="mt-12 rounded-3xl bg-slate-950 px-4 py-7 text-white sm:mt-16 sm:px-7 sm:py-9">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-amber-300">Quick revision</p>
-              <h2 id="reels-heading" className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Reels &amp; learning bites</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Short concept previews for the moments between study sessions.</p>
-            </div>
-            <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold text-slate-200">{filteredVideos.length} bites</span>
-          </div>
-          {isLoading ? (
-            <p role="status" className="mt-5 text-sm text-slate-300">Loading mapped reels…</p>
-          ) : loadError ? (
-            <p role="alert" className="mt-5 rounded-xl border border-rose-300/30 bg-rose-950/40 p-4 text-sm text-rose-100">{loadError}</p>
-          ) : filteredVideos.length ? (
-            <div className="mt-6 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-3 md:grid md:grid-cols-2 md:overflow-visible xl:grid-cols-4">
-              {filteredVideos.map((video) => (
-                <button
-                  type="button"
-                  key={video.id}
-                  onClick={() => openVideo(video)}
-                  className="group relative h-[350px] w-[230px] shrink-0 snap-start overflow-hidden rounded-2xl text-left shadow-lg transition hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-amber-300 md:w-full"
-                  aria-label={`Play bite: ${video.title}`}
-                >
-                  <span className={`absolute inset-0 bg-gradient-to-br ${video.accent}`} />
-                  {video.thumbnailUrl && <img src={video.thumbnailUrl} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" />}
-                  <span className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/5 to-black/10" />
-                  <span className="absolute left-4 top-4 rounded-full border border-white/30 bg-black/20 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider backdrop-blur">
-                    {video.platforms.map((item) => item.name).filter(Boolean).join(' · ') || video.packTitle}
-                  </span>
-                  <span className="absolute right-4 top-4 rounded-full bg-black/25 px-2.5 py-1 text-[10px] font-bold backdrop-blur">{video.duration}</span>
-                  <span className="absolute left-1/2 top-1/2 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/50 bg-white/20 backdrop-blur transition group-hover:scale-110 group-hover:bg-white/30">
-                    <Play className="ml-0.5 h-6 w-6 fill-white text-white" />
-                  </span>
-                  <span className="absolute inset-x-0 bottom-0 p-4">
-                    <span className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-200">
-                      <Sparkles className="h-3.5 w-3.5" /> {video.subject}
-                    </span>
-                    <span className="block text-lg font-black leading-tight">{video.title}</span>
-                    <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-white/80">Play bite <ArrowRight className="h-3.5 w-3.5" /></span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-5 rounded-2xl border border-dashed border-white/20 p-8 text-center text-sm text-slate-300">
-              No published short reels match these filters.
-            </p>
-          )}
-          <p className="mt-3 text-xs text-slate-400">Swipe sideways to browse on mobile. Reels are published free class previews.</p>
-        </section>
           </>
         )}
       </main>
