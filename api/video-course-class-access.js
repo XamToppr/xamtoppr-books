@@ -5,6 +5,11 @@ import { isCourseEntitlementActive } from '../src/utils/courseValidity.js';
 
 const getString = (value) => (typeof value === 'string' ? value.trim() : '');
 const normalizeCourseId = (value) => getString(value).replace(/^(?:drafts\.)+/, '');
+const getMappedClassId = (entry) => (
+  typeof entry === 'string'
+    ? getString(entry)
+    : getString(entry?._ref) || getString(entry?._id)
+);
 const getEntitlementCourseId = (entry) => (
   typeof entry === 'string'
     ? entry
@@ -82,37 +87,35 @@ export async function getVideoCourseClassAccess({ body, authorization, env }) {
     const sanityClients = getSanityClients(env);
     let sanity = sanityClients[0].client;
     const studentId = `student_${uid}`;
+    const baseCourseId = normalizeCourseId(courseId);
+    const draftCourseId = `drafts.${baseCourseId}`;
+
     const courseProjection = `{
       _id,
       "slug": slug.current,
       packType,
       duration,
-      "classIds": classes[]->_id,
+      "classes": classes,
       "legacyLessons": videos[]{_key, videoTitle, videoType, duration, videoUrl}
     }`;
-    const courseQuery = `*[
-        _type == "videoCoursePack"
-        && (_id == $courseId || slug.current == $courseSlug)
-        && (
-          publishingStatus == "Instant"
-          || (publishingStatus == "Scheduled" && defined(publishingDate) && publishingDate <= now())
-        )
-      ][0]${courseProjection}`;
+
     let course = null;
+    
     for (let index = 0; index < sanityClients.length; index += 1) {
       const sanityConfiguration = sanityClients[index];
       try {
-        course = await sanityConfiguration.client.fetch(courseQuery, {
-          courseId: normalizeCourseId(courseId),
-          courseSlug: normalizeCourseId(courseId)
+        course = await sanityConfiguration.client.fetch(`*[
+          _type == "videoCoursePack"
+          && (_id == $baseCourseId || _id == $draftCourseId || slug.current == $courseSlug)
+        ][0]${courseProjection}`, {
+          baseCourseId,
+          draftCourseId,
+          courseSlug: baseCourseId
         });
       } catch (error) {
         const statusCode = Number(error?.statusCode);
         const canRetry = statusCode === 401 || statusCode === 403 || statusCode === 404;
         if (!canRetry || index === sanityClients.length - 1) throw error;
-        console.warn('Sanity access failed for the configured dataset; retrying with storefront settings.', {
-          statusCode
-        });
         continue;
       }
 
@@ -120,33 +123,44 @@ export async function getVideoCourseClassAccess({ body, authorization, env }) {
         sanity = sanityConfiguration.client;
         break;
       }
-      if (index < sanityClients.length - 1) {
-        console.warn('Published course was not found in the configured dataset; retrying with storefront settings.');
-      }
     }
 
     const isLocalDevelopment = env.NODE_ENV === 'development'
       || env.VERCEL_ENV === 'development';
+
     if (!course && isLocalDevelopment) {
       course = await sanity.fetch(`*[
         _type == "videoCoursePack"
-        && _id == $draftCourseId
+        && (_id == $baseCourseId || _id == $draftCourseId)
       ][0]${courseProjection}`, {
-        draftCourseId: `drafts.${normalizeCourseId(courseId)}`
+        baseCourseId,
+        draftCourseId
       });
     }
 
     const student = await sanity.getDocument(studentId);
 
-    const isMappedClass = classId && course?.classIds?.includes(classId);
+    const normalizedClassId = normalizeCourseId(classId);
+    
+    const isMappedClass = Boolean(
+      normalizedClassId
+      && Array.isArray(course?.classes)
+      && course.classes.some((entry) => {
+        const mappedId = normalizeCourseId(getMappedClassId(entry));
+        return mappedId === normalizedClassId;
+      })
+    );
+
     const legacyLesson = lessonKey
       ? course?.legacyLessons?.find((lesson) => lesson?._key === lessonKey)
       : null;
+
     if (!course || (!isMappedClass && !legacyLesson)) {
       throw new VideoCourseAccessError(404, 'The class is not part of this published course.');
     }
+
     const courseIdentifiers = new Set(
-      [course._id, course.slug].map(normalizeCourseId).filter(Boolean)
+      [course._id, course.slug, baseCourseId].map(normalizeCourseId).filter(Boolean)
     );
     const courseEntitlements = [
       ...(Array.isArray(student?.purchasedCourses) ? student.purchasedCourses : []),
@@ -154,6 +168,7 @@ export async function getVideoCourseClassAccess({ body, authorization, env }) {
       ...(Array.isArray(student?.purchasedCourseIds) ? student.purchasedCourseIds : []),
       ...(Array.isArray(student?.enrolledCourseIds) ? student.enrolledCourseIds : [])
     ].filter((entry) => courseIdentifiers.has(normalizeCourseId(getEntitlementCourseId(entry))));
+    
     if (!courseEntitlements.length) {
       throw new VideoCourseAccessError(403, 'Purchase or enroll in this course to access the class.');
     }
@@ -164,7 +179,7 @@ export async function getVideoCourseClassAccess({ body, authorization, env }) {
     const onlineClass = classId
       ? await sanity.fetch(`*[
         _type == "onlineClass"
-        && _id == $classId
+        && (_id == $classId || _id == $draftClassId)
         && status == "Active"
       ][0]{
         title,
@@ -181,12 +196,16 @@ export async function getVideoCourseClassAccess({ body, authorization, env }) {
           mrp,
           buyUrl
         }
-      }`, { classId })
+      }`, { 
+        classId: normalizedClassId,
+        draftClassId: `drafts.${normalizedClassId}`
+      })
       : legacyLesson && {
         title: legacyLesson.videoTitle,
         videoType: legacyLesson.videoType,
         videoLink: legacyLesson.videoUrl
       };
+
     if (!onlineClass?.videoLink) {
       throw new VideoCourseAccessError(404, 'This class does not have a playable video.');
     }
