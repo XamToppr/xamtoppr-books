@@ -4,7 +4,7 @@ import { getSanityWriteToken } from '../server/environment.js';
 import { isCourseEntitlementActive } from '../src/utils/courseValidity.js';
 
 const getString = (value) => (typeof value === 'string' ? value.trim() : '');
-const normalizeCourseId = (value) => getString(value).replace(/^drafts\./, '');
+const normalizeCourseId = (value) => getString(value).replace(/^(?:drafts\.)+/, '');
 const getEntitlementCourseId = (entry) => (
   typeof entry === 'string'
     ? entry
@@ -59,24 +59,39 @@ export async function getVideoCourseClassAccess({ body, authorization, env }) {
 
     const sanity = getSanityClient(env);
     const studentId = `student_${uid}`;
-    const [course, student] = await Promise.all([
-      sanity.fetch(`*[
+    const courseProjection = `{
+      _id,
+      "slug": slug.current,
+      packType,
+      duration,
+      "classIds": classes[]->_id,
+      "legacyLessons": videos[]{_key, videoTitle, videoType, duration, videoUrl}
+    }`;
+    const courseQuery = `*[
         _type == "videoCoursePack"
-        && (_id == $courseId || slug.current == $courseId)
+        && (_id == $courseId || slug.current == $courseSlug)
         && (
           publishingStatus == "Instant"
           || (publishingStatus == "Scheduled" && defined(publishingDate) && publishingDate <= now())
         )
-      ][0]{
-        _id,
-        "slug": slug.current,
-        packType,
-        duration,
-        "classIds": classes[]->_id,
-        "legacyLessons": videos[]{_key, videoTitle, videoType, duration, videoUrl}
-      }`, { courseId }),
-      sanity.getDocument(studentId)
-    ]);
+      ][0]${courseProjection}`;
+    let course = await sanity.fetch(courseQuery, {
+      courseId: normalizeCourseId(courseId),
+      courseSlug: normalizeCourseId(courseId)
+    });
+
+    const isLocalDevelopment = env.NODE_ENV === 'development'
+      || env.VERCEL_ENV === 'development';
+    if (!course && isLocalDevelopment) {
+      course = await sanity.fetch(`*[
+        _type == "videoCoursePack"
+        && _id == $draftCourseId
+      ][0]${courseProjection}`, {
+        draftCourseId: `drafts.${normalizeCourseId(courseId)}`
+      });
+    }
+
+    const student = await sanity.getDocument(studentId);
 
     const isMappedClass = classId && course?.classIds?.includes(classId);
     const legacyLesson = lessonKey
