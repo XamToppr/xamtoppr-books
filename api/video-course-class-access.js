@@ -24,18 +24,40 @@ class VideoCourseAccessError extends Error {
   }
 }
 
-function getSanityClient(env) {
+function getSanityClients(env) {
   const token = getSanityWriteToken(env);
   if (!token) {
     throw new VideoCourseAccessError(503, 'Course access is not configured.');
   }
-  return createClient({
-    projectId: env.SANITY_PROJECT_ID || env.VITE_SANITY_PROJECT_ID || 'rkev3aui',
-    dataset: env.SANITY_DATASET || env.VITE_SANITY_DATASET || 'production',
-    apiVersion: '2024-01-01',
-    token,
-    useCdn: false
-  });
+  const configurations = [
+    {
+      projectId: getString(env.SANITY_PROJECT_ID)
+        || getString(env.VITE_SANITY_PROJECT_ID)
+        || 'rkev3aui',
+      dataset: getString(env.SANITY_DATASET)
+        || getString(env.VITE_SANITY_DATASET)
+        || 'production'
+    },
+    {
+      projectId: getString(env.VITE_SANITY_PROJECT_ID) || 'rkev3aui',
+      dataset: getString(env.VITE_SANITY_DATASET) || 'production'
+    }
+  ];
+  const uniqueConfigurations = configurations.filter((configuration, index) => (
+    configurations.findIndex((candidate) => (
+      candidate.projectId === configuration.projectId
+      && candidate.dataset === configuration.dataset
+    )) === index
+  ));
+  return uniqueConfigurations.map((configuration) => ({
+    ...configuration,
+    client: createClient({
+      ...configuration,
+      apiVersion: '2024-01-01',
+      token,
+      useCdn: false
+    })
+  }));
 }
 
 export async function getVideoCourseClassAccess({ body, authorization, env }) {
@@ -57,7 +79,8 @@ export async function getVideoCourseClassAccess({ body, authorization, env }) {
       throw new VideoCourseAccessError(403, 'The requested user does not match the authenticated account.');
     }
 
-    const sanity = getSanityClient(env);
+    const sanityClients = getSanityClients(env);
+    let sanity = sanityClients[0].client;
     const studentId = `student_${uid}`;
     const courseProjection = `{
       _id,
@@ -75,10 +98,32 @@ export async function getVideoCourseClassAccess({ body, authorization, env }) {
           || (publishingStatus == "Scheduled" && defined(publishingDate) && publishingDate <= now())
         )
       ][0]${courseProjection}`;
-    let course = await sanity.fetch(courseQuery, {
-      courseId: normalizeCourseId(courseId),
-      courseSlug: normalizeCourseId(courseId)
-    });
+    let course = null;
+    for (let index = 0; index < sanityClients.length; index += 1) {
+      const sanityConfiguration = sanityClients[index];
+      try {
+        course = await sanityConfiguration.client.fetch(courseQuery, {
+          courseId: normalizeCourseId(courseId),
+          courseSlug: normalizeCourseId(courseId)
+        });
+      } catch (error) {
+        const statusCode = Number(error?.statusCode);
+        const canRetry = statusCode === 401 || statusCode === 403 || statusCode === 404;
+        if (!canRetry || index === sanityClients.length - 1) throw error;
+        console.warn('Sanity access failed for the configured dataset; retrying with storefront settings.', {
+          statusCode
+        });
+        continue;
+      }
+
+      if (course) {
+        sanity = sanityConfiguration.client;
+        break;
+      }
+      if (index < sanityClients.length - 1) {
+        console.warn('Published course was not found in the configured dataset; retrying with storefront settings.');
+      }
+    }
 
     const isLocalDevelopment = env.NODE_ENV === 'development'
       || env.VERCEL_ENV === 'development';
@@ -151,7 +196,10 @@ export async function getVideoCourseClassAccess({ body, authorization, env }) {
       throw new VideoCourseAccessError(401, 'Authentication is invalid or expired.');
     }
     if (error instanceof VideoCourseAccessError) throw error;
-    console.error('Unable to load entitled video course class.');
+    console.error('Unable to load entitled video course class.', {
+      statusCode: error?.statusCode,
+      sanityError: error?.response?.body?.error
+    });
     throw new VideoCourseAccessError(500, 'Unable to load this class right now.');
   }
 }
