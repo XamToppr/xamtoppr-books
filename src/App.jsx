@@ -4,6 +4,7 @@ import CartDrawer from './components/cart/CartDrawer';
 import CouponField from './components/coupon/CouponField';
 import Footer from './components/Footer';
 import MyLibrary from './components/profile/MyLibrary';
+import MobileBottomNavigation from './components/MobileBottomNavigation';
 import VideoCoursesPage from './pages/VideoCoursesPage';
 import { useAuth } from './context/AuthContext';
 import { useCart } from './context/CartContext';
@@ -246,6 +247,7 @@ const formatDownloadCount = (count) => (
 function BookStoreApp() {
   const location = useLocation();
   const navigate = useNavigate();
+  const isMockTestRoute = location.pathname.replace(/\/+$/, '') === '/test-series';
   const { currentUser, userProfile, refreshUserProfile, logout } = useAuth();
   const { cartItems, addToCart, clearCart } = useCart();
   const [booksList, setBooksList] = useState([]);
@@ -258,7 +260,6 @@ function BookStoreApp() {
   const [selectedSubject, setSelectedSubject] = useState('All Subjects');
   const [selectedTopic, setSelectedTopic] = useState('');
   const [showPreviousYearPapers, setShowPreviousYearPapers] = useState(false);
-  const [showMockTests, setShowMockTests] = useState(false);
   const [sortBy, setSortBy] = useState('popular');
   const [savedBooks, setSavedBooks] = useState(['xt-bk-001']);
   const [selectedBookForModal, setSelectedBookForModal] = useState(null);
@@ -1031,7 +1032,7 @@ function BookStoreApp() {
     setSelectedSubject('All Subjects');
     setSelectedTopic('');
     setShowPreviousYearPapers(false);
-    setShowMockTests(false);
+    if (isMockTestRoute) navigate('/');
     setQuickFilterBadge('ALL');
     setSortBy('popular');
     showToast('Filters cleared successfully');
@@ -1113,7 +1114,7 @@ function BookStoreApp() {
       if (selectedPlatform && !book.platforms.some((platform) => platform?.name === selectedPlatform)) return false;
       if (selectedTopic && book.topic?.name !== selectedTopic) return false;
       if (showPreviousYearPapers && !book.isPreviousYear) return false;
-      if (showMockTests && !book.isMockTest) return false;
+      if (isMockTestRoute && !book.isMockTest) return false;
 
       if (selectedMedium !== 'All Mediums') {
         if (!book.language.toLowerCase().includes(selectedMedium.toLowerCase().split(' ')[0])) {
@@ -1152,7 +1153,7 @@ function BookStoreApp() {
     selectedSubject,
     selectedTopic,
     showPreviousYearPapers,
-    showMockTests,
+    isMockTestRoute,
     quickFilterBadge,
     sortBy
   ]);
@@ -1702,7 +1703,7 @@ function BookStoreApp() {
                   selectedSubject !== 'All Subjects' ||
                   selectedTopic ||
                   showPreviousYearPapers ||
-                  showMockTests ||
+                  isMockTestRoute ||
                   quickFilterBadge !== 'ALL' ||
                   searchQuery) && (
                   <button
@@ -1888,10 +1889,10 @@ function BookStoreApp() {
               </button>
               <button
                 type="button"
-                aria-pressed={showMockTests}
-                onClick={() => setShowMockTests((selected) => !selected)}
+                aria-pressed={isMockTestRoute}
+                onClick={() => navigate(isMockTestRoute ? '/' : '/test-series')}
                 className={`rounded-lg border px-3 py-2 text-xs font-bold transition ${
-                  showMockTests
+                  isMockTestRoute
                     ? 'border-blue-950 bg-blue-950 text-white'
                     : 'border-slate-300 bg-white text-slate-700 hover:bg-blue-50'
                 }`}
@@ -1903,7 +1904,7 @@ function BookStoreApp() {
         </section>
 
         {/* Books & Notes Grid */}
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+        <section id="study-notes" className="scroll-mt-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
             <div className="flex items-center gap-2">
               <h2 className="text-lg sm:text-xl font-bold text-blue-950">
@@ -3919,6 +3920,7 @@ export default function App() {
         <Route path="/video-courses/*" element={<BookStoreApp />} />
         <Route path="*" element={<LegacyAppRoutes />} />
       </Routes>
+      <MobileBottomNavigation />
     </>
   );
 }
