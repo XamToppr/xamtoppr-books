@@ -227,7 +227,7 @@ export default function AiAssistantWidget() {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 font-sans">
+    <div className="fixed bottom-24 right-6 z-50 font-sans sm:bottom-6">
       {/* Chat Window Box */}
       {isOpen && (
         <div className="mb-4 flex h-[480px] w-[350px] sm:w-[380px] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl transition-all duration-300 animate-fadeIn">
