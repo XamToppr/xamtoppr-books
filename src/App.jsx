@@ -25,6 +25,12 @@ import {
   siteSettingsQuery
 } from './sanityQueries';
 import {
+  getBookTrendingTerms,
+  getTopTrendingTags,
+  readTrendingSearchHistory,
+  recordTrendingSearchTerms
+} from './utils/trendingSearchHistory';
+import {
   Search,
   BookOpen,
   Download,
@@ -286,6 +292,8 @@ function BookStoreApp() {
   });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [trendingHistory, setTrendingHistory] = useState(readTrendingSearchHistory);
+  const trendingTags = useMemo(() => getTopTrendingTags(trendingHistory), [trendingHistory]);
   const [selectedExam, setSelectedExam] = useState('All Exams');
   const [selectedTrack, setSelectedTrack] = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState('');
@@ -765,7 +773,18 @@ function BookStoreApp() {
     } catch (error) {
       console.error('Unable to save recently viewed books.', error);
     }
+    setTrendingHistory(recordTrendingSearchTerms(getBookTrendingTerms(book)));
   };
+
+  useEffect(() => {
+    const searchTerm = searchQuery.trim();
+    if (searchTerm.length < 2) return undefined;
+
+    const timeoutId = window.setTimeout(() => {
+      setTrendingHistory(recordTrendingSearchTerms([searchTerm]));
+    }, 500);
+    return () => window.clearTimeout(timeoutId);
+  }, [searchQuery]);
 
   const updateBookMetrics = (book, metrics) => {
     setBooksList((currentBooks) => currentBooks.map((currentBook) => (
@@ -1785,21 +1804,15 @@ function BookStoreApp() {
             </div>
 
             {/* Popular Quick Tags */}
-            <div className="mt-3.5 flex items-center gap-2 flex-wrap text-xs text-slate-600">
-              <span className="font-semibold text-slate-700 flex items-center gap-1">
+            <div className="mt-3.5 flex min-w-0 items-center gap-2 overflow-x-auto text-xs text-slate-600">
+              <span className="flex shrink-0 items-center gap-1 font-semibold text-slate-700">
                 <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Popular:
               </span>
-              {[
-                'Biology Notes',
-                'Maths Formula Sheet',
-                'General Studies 7500+',
-                'Handwritten History',
-                'Static GK Atlas'
-              ].map((tag) => (
+              {trendingTags.map((tag) => (
                 <button
                   key={tag}
                   onClick={() => setSearchQuery(tag)}
-                  className="bg-slate-100 hover:bg-amber-100 hover:text-amber-900 border border-slate-200 hover:border-amber-300 px-2.5 py-1 rounded-md transition text-slate-700 font-medium"
+                  className="shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-slate-100 px-2.5 py-1 font-medium text-slate-700 transition hover:border-amber-300 hover:bg-amber-100 hover:text-amber-900"
                 >
                   {tag}
                 </button>
@@ -2113,10 +2126,10 @@ function BookStoreApp() {
                     {/* ENLARGED COVER CONTAINER */}
                     <div
                       onClick={() => {
-                        recordRecentlyViewedBook(book);
                         if (isVisualNote) {
                           openSampleFlipbook(book);
                         } else {
+                          recordRecentlyViewedBook(book);
                           setSelectedBookForModal(book);
                         }
                       }}
@@ -2199,10 +2212,10 @@ function BookStoreApp() {
 
                         <h3
                           onClick={() => {
-                            recordRecentlyViewedBook(book);
                             if (isVisualNote) {
                               openSampleFlipbook(book);
                             } else {
+                              recordRecentlyViewedBook(book);
                               setSelectedBookForModal(book);
                             }
                           }}

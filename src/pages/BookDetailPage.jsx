@@ -30,6 +30,10 @@ import { useAuth } from '../context/AuthContext';
 import { initiatePayment } from '../services/paymentService';
 import sanityClient from '../sanityClient';
 import { BOOK_BY_SLUG_QUERY } from '../sanityQueries';
+import {
+  getBookTrendingTerms,
+  recordTrendingSearchTerms
+} from '../utils/trendingSearchHistory';
 
 function YoutubeIcon({ className }) {
   return (
@@ -339,6 +343,11 @@ export default function BookDetailPage() {
       isCurrentRequest = false;
     };
   }, [slug]);
+
+  useEffect(() => {
+    if (loadedSlug !== slug || !book) return;
+    recordTrendingSearchTerms(getBookTrendingTerms(book));
+  }, [book, loadedSlug, slug]);
 
   useEffect(() => {
     let isCurrentRequest = true;
