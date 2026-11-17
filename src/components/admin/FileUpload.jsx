@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { Trash2 } from 'lucide-react';
 import { useClient } from 'sanity';
 import UploadedFilesList from './UploadedFilesList.jsx';
 import './FileUpload.css';
@@ -38,6 +39,13 @@ export default function FileUpload() {
     )));
   };
 
+  const removeEntry = (id) => {
+    if (isUploading) return;
+    setEntries((current) => current.filter((entry) => entry.id !== id));
+    setFormError('');
+    setUploadMessage('');
+  };
+
   const handleFileChange = (id, file) => {
     setFormError('');
     setUploadMessage('');
@@ -66,6 +74,11 @@ export default function FileUpload() {
     event.preventDefault();
     setFormError('');
     setUploadMessage('');
+
+    if (entries.length === 0) {
+      setFormError('Add at least one file before uploading.');
+      return;
+    }
 
     const missingFileIndex = entries.findIndex((entry) => !entry.file);
     if (missingFileIndex !== -1) {
@@ -181,7 +194,19 @@ export default function FileUpload() {
         <div className="file-upload__items">
           {entries.map((entry, index) => (
             <section className="file-upload__item" key={entry.id}>
-              <h2>File {index + 1}</h2>
+              <div className="file-upload__item-header">
+                <h2>File {index + 1}</h2>
+                <button
+                  aria-label={`Remove file upload item ${index + 1}`}
+                  className="file-upload__danger"
+                  disabled={isUploading}
+                  type="button"
+                  onClick={() => removeEntry(entry.id)}
+                >
+                  <Trash2 aria-hidden="true" size={16} />
+                  <span>Remove</span>
+                </button>
+              </div>
 
               <div className="file-upload__fields">
                 <label className="file-upload__field">

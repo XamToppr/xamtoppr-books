@@ -46,6 +46,18 @@
   font-weight: 600;
 }
 
+.file-upload__item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.file-upload__item-header h2 {
+  margin: 0;
+}
+
 .file-upload__fields {
   display: grid;
   grid-template-columns: minmax(160px, 0.8fr) minmax(220px, 1.2fr) minmax(180px, 1fr);
@@ -314,6 +326,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   border: 1px solid #d93025;
   border-radius: 5px;
   background: #fff;
