@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import AuthModal from '../components/auth/AuthModal';
 import CouponField from '../components/coupon/CouponField';
 import Footer from '../components/Footer';
@@ -114,6 +115,18 @@ const formatPrice = (amount) => `₹${Number(amount || 0).toLocaleString('en-IN'
   maximumFractionDigits: 2
 })}`;
 
+const getBookDescriptionText = (description) => {
+  if (typeof description === 'string') return description.replace(/\s+/g, ' ').trim();
+  if (!Array.isArray(description)) return '';
+  return description
+    .flatMap((block) => Array.isArray(block?.children)
+      ? block.children.map((child) => (typeof child?.text === 'string' ? child.text : ''))
+      : [])
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
 const getHighDefinitionImageUrl = (assetUrl) => {
   if (!assetUrl) return '';
   try {
@@ -170,38 +183,6 @@ const hasPurchasedBook = (profile, book) => {
     && profile.purchasedBookIds.some(matchesBook))
     || purchaseEntries.some(matchesBook);
 };
-
-function updateMetaTag(attribute, key, content, createdElements) {
-  let element = document.head.querySelector(`meta[${attribute}="${key}"]`);
-  if (!element) {
-    element = document.createElement('meta');
-    element.setAttribute(attribute, key);
-    document.head.appendChild(element);
-    createdElements.push(element);
-  }
-  const previousContent = element.getAttribute('content');
-  element.setAttribute('content', content);
-  return () => {
-    if (previousContent === null) element.removeAttribute('content');
-    else element.setAttribute('content', previousContent);
-  };
-}
-
-function updateCanonicalUrl(url, createdElements) {
-  let element = document.head.querySelector('link[rel="canonical"]');
-  if (!element) {
-    element = document.createElement('link');
-    element.rel = 'canonical';
-    document.head.appendChild(element);
-    createdElements.push(element);
-  }
-  const previousHref = element.href;
-  element.href = url;
-  return () => {
-    if (!previousHref) element.removeAttribute('href');
-    else element.href = previousHref;
-  };
-}
 
 function FollowIconLink({ channel }) {
   const Icon = channel.icon;
@@ -410,6 +391,35 @@ export default function BookDetailPage() {
   const relatedBooks = relatedBooksResult?.slug === slug ? relatedBooksResult.books : [];
   const relatedBooksError = relatedBooksResult?.slug === slug ? relatedBooksResult.error : '';
   const chapters = book?.tableOfContents || book?.indexTable || book?.chapters || [];
+  const seoBook = !loading
+    && book
+    && (book.slug === slug || book.slug?.current === slug)
+    ? book
+    : null;
+  const canonicalUrl = `${window.location.origin}${window.location.pathname}`;
+  const seoTitle = seoBook ? `${seoBook.title} | XamToppr` : loading ? 'Loading book | XamToppr' : 'Book not found | XamToppr';
+  const seoDescription = seoBook
+    ? getBookDescriptionText(seoBook.description)
+      || `${seoBook.title} - ${category || 'Exam preparation'} study book from XamToppr.`
+    : loading
+      ? 'Explore XamToppr exam preparation books, study notes, and sample PDFs.'
+      : 'The requested book could not be found on XamToppr.';
+  const seoImage = seoBook ? getHighDefinitionImageUrl(seoBook.coverImage) : '';
+  const bookStructuredData = seoBook ? {
+    '@context': 'https://schema.org',
+    '@type': 'Book',
+    name: seoBook.title,
+    description: seoDescription,
+    ...(seoImage ? { image: seoImage } : {}),
+    ...(seoBook.author ? { author: seoBook.author } : {}),
+    ...(seoBook.publisher ? { publisher: seoBook.publisher } : {}),
+    offers: {
+      '@type': 'Offer',
+      price: String(price),
+      priceCurrency: 'INR',
+      url: canonicalUrl
+    }
+  } : null;
 
   const showToast = (message) => {
     setToastMessage(message);
@@ -420,36 +430,6 @@ export default function BookDetailPage() {
   useEffect(() => () => {
     if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
   }, []);
-
-  useEffect(() => {
-    if (!book) {
-      document.title = loading ? 'Loading book | XamToppr' : 'Book not found | XamToppr';
-      return undefined;
-    }
-
-    const previousTitle = document.title;
-    const createdElements = [];
-    const description = `${book.title} - ${category || 'Exam preparation'} study book from XamToppr.`;
-    const restoreMeta = [
-      updateMetaTag('name', 'description', description, createdElements),
-      updateMetaTag('property', 'og:type', 'product', createdElements),
-      updateMetaTag('property', 'og:title', `${book.title} | XamToppr`, createdElements),
-      updateMetaTag('property', 'og:description', description, createdElements),
-      updateMetaTag('property', 'og:url', window.location.href, createdElements),
-      updateMetaTag('property', 'og:image', coverImageUrl, createdElements),
-      updateMetaTag('name', 'twitter:card', 'summary_large_image', createdElements),
-      updateMetaTag('name', 'twitter:title', `${book.title} | XamToppr`, createdElements),
-      updateMetaTag('name', 'twitter:description', description, createdElements),
-      updateCanonicalUrl(window.location.href, createdElements)
-    ];
-
-    document.title = `${book.title} | XamToppr`;
-    return () => {
-      document.title = previousTitle;
-      restoreMeta.forEach((restore) => restore());
-      createdElements.forEach((element) => element.remove());
-    };
-  }, [book, category, coverImageUrl, loading]);
 
   const copyBookLink = async () => {
     try {
@@ -502,7 +482,27 @@ export default function BookDetailPage() {
   };
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-900">
+    <>
+      <Helmet>
+        <title>{seoTitle}</title>
+        <meta name="description" content={seoDescription} />
+        <meta property="og:type" content="book" />
+        <meta property="og:title" content={seoTitle} />
+        <meta property="og:description" content={seoDescription} />
+        <meta property="og:url" content={canonicalUrl} />
+        {seoImage && <meta property="og:image" content={seoImage} />}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={seoTitle} />
+        <meta name="twitter:description" content={seoDescription} />
+        {seoImage && <meta name="twitter:image" content={seoImage} />}
+        <link rel="canonical" href={canonicalUrl} />
+        {bookStructuredData && (
+          <script type="application/ld+json">
+            {JSON.stringify(bookStructuredData).replace(/</g, '\\u003c')}
+          </script>
+        )}
+      </Helmet>
+      <div className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-900">
       {toastMessage && (
         <div role="status" className="fixed bottom-5 left-4 right-4 z-[100] mx-auto max-w-md rounded-xl bg-slate-950 px-5 py-3 text-center text-sm font-semibold text-white shadow-2xl sm:left-auto sm:right-5">
           {toastMessage}
@@ -809,6 +809,7 @@ export default function BookDetailPage() {
 
       <Footer className="mt-16" />
       <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
-    </div>
+      </div>
+    </>
   );
 }
