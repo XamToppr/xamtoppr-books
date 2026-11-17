@@ -227,12 +227,12 @@ export default function AiAssistantWidget() {
   };
 
   return (
-    <div className="fixed bottom-24 right-6 z-50 font-sans sm:bottom-6">
+    <div className="fixed bottom-20 right-4 z-50 font-sans sm:bottom-6 sm:right-6">
       {/* Chat Window Box */}
       {isOpen && (
-        <div className="mb-4 flex h-[480px] w-[350px] sm:w-[380px] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl transition-all duration-300 animate-fadeIn">
+        <div className="mb-4 flex h-[460px] max-h-[70vh] w-[92vw] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl transition-all duration-300 animate-fadeIn sm:w-[380px]">
           {/* Header */}
-          <div className="flex items-center justify-between bg-[#0c2356] px-4 py-3.5 text-white">
+          <div className="flex items-center justify-between bg-[#0c2356] px-3 py-3.5 text-white sm:px-4">
             <div className="flex items-center gap-2.5">
               <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-amber-400 text-slate-950 font-black shadow">
                 <Sparkles className="h-4 w-4 fill-slate-950" />
@@ -247,7 +247,7 @@ export default function AiAssistantWidget() {
             </div>
             <button
               onClick={() => setIsOpen(false)}
-              className="rounded-lg p-1.5 text-slate-300 hover:bg-white/10 hover:text-white transition"
+              className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-300 hover:bg-white/10 hover:text-white transition"
               aria-label="Close assistant"
             >
               <X className="h-5 w-5" />
@@ -255,7 +255,7 @@ export default function AiAssistantWidget() {
           </div>
 
           {/* Messages Scroll Area */}
-          <div className="flex-1 overflow-y-auto bg-slate-50 p-4 space-y-3.5 text-xs sm:text-sm">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-50 p-3 space-y-3.5 text-sm sm:p-4">
             {messages.map((msg, index) => (
               <div
                 key={`${msg.sender}-${index}`}
@@ -328,25 +328,25 @@ export default function AiAssistantWidget() {
           </div>
 
           {/* Quick Action Chips */}
-          <div className="border-t border-slate-100 bg-white px-3 py-2 flex gap-1.5 overflow-x-auto scrollbar-none">
+          <div className="border-t border-slate-100 bg-white px-3 py-2 flex gap-2 overflow-x-auto overscroll-x-contain scrollbar-none">
             <button
               onClick={() => handleQuickAction('free_books')}
               disabled={isTyping}
-              className="shrink-0 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-900 transition hover:bg-blue-100"
+              className="min-h-11 shrink-0 rounded-full border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-900 transition hover:bg-blue-100"
             >
               📚 Free Books
             </button>
             <button
               onClick={() => handleQuickAction('exam_alerts')}
               disabled={isTyping}
-              className="shrink-0 rounded-full border border-purple-200 bg-purple-50 px-3 py-1 text-[11px] font-bold text-purple-900 transition hover:bg-purple-100"
+              className="min-h-11 shrink-0 rounded-full border border-purple-200 bg-purple-50 px-3 py-2 text-xs font-bold text-purple-900 transition hover:bg-purple-100"
             >
               🔥 Exam Alerts
             </button>
             <button
               onClick={() => handleQuickAction('request_book')}
               disabled={isTyping}
-              className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-bold text-amber-900 transition hover:bg-amber-100"
+              className="min-h-11 shrink-0 rounded-full border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900 transition hover:bg-amber-100"
             >
               🎯 Request Book
             </button>
@@ -360,13 +360,13 @@ export default function AiAssistantWidget() {
               onChange={(e) => setInputText(e.target.value)}
               disabled={isTyping}
               placeholder="Ask anything or search books..."
-              className="flex-1 rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2 text-xs sm:text-sm outline-none transition focus:border-blue-700 focus:bg-white focus:ring-1 focus:ring-blue-700"
+              className="flex-1 rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-base outline-none transition focus:border-blue-700 focus:bg-white focus:ring-1 focus:ring-blue-700 sm:text-sm"
             />
             <button
               type="submit"
               aria-label="Send message"
               disabled={isTyping || !inputText.trim()}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-950 text-white transition hover:bg-blue-900 active:scale-95"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-950 text-white transition hover:bg-blue-900 active:scale-95"
             >
               <Send className="h-4 w-4" />
             </button>
