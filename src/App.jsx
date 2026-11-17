@@ -1,3 +1,4 @@
+import AiAssistantWidget from './components/AiAssistantWidget';
 import UserButton from './components/auth/UserButton';
 import AuthModal from './components/auth/AuthModal';
 import CartDrawer from './components/cart/CartDrawer';
@@ -4092,6 +4093,7 @@ export default function App() {
         <Route path="/video-courses/*" element={<BookStoreApp />} />
         <Route path="*" element={<LegacyAppRoutes />} />
       </Routes>
+      <AiAssistantWidget />
       <MobileBottomNavigation />
     </>
   );
