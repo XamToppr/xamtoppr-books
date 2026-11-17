@@ -235,6 +235,9 @@ function ChannelButton({ channel, children, className }) {
 
 function AffiliateMarketplaceBox({ amazonUrl, flipkartUrl, coverImage, title, badge }) {
   if (!amazonUrl && !flipkartUrl) return null;
+  const badgeLabel = typeof badge === 'string' && /^(free|free sample)$/i.test(badge.trim())
+    ? 'Free'
+    : badge;
 
   const marketplaces = [
     { name: 'Amazon', url: amazonUrl, buttonLabel: '📦 Buy on Amazon', className: 'bg-amber-500 text-slate-950 hover:bg-amber-400' },
@@ -257,8 +260,8 @@ function AffiliateMarketplaceBox({ amazonUrl, flipkartUrl, coverImage, title, ba
                 )}
               </div>
               <div className="min-w-0 flex-1 py-0.5">
-                <span className="inline-flex max-w-full truncate rounded-full bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600 ring-1 ring-slate-200">
-                  {badge || name}
+                <span className={`inline-flex max-w-full truncate rounded-full bg-white px-2 py-1 text-[10px] font-bold ${badgeLabel === 'Free' ? '' : 'uppercase'} tracking-wide text-slate-600 ring-1 ring-slate-200`}>
+                  {badgeLabel || name}
                 </span>
                 <h3 className="mt-1.5 line-clamp-2 text-sm font-bold leading-snug text-slate-900">{title}</h3>
               </div>

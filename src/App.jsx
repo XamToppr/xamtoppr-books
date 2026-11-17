@@ -244,13 +244,46 @@ const formatDownloadCount = (count) => (
   count >= 1000 ? `${(count / 1000).toFixed(1)}K` : count
 );
 
+const normalizeBookBadge = (value) => {
+  const badge = typeof value === 'string' ? value.trim() : '';
+  return /^(free|free sample)$/i.test(badge) ? 'Free' : badge;
+};
+
+const BOOK_BADGE_SECTIONS = [
+  { id: 'free', title: 'FREE BOOKS', path: '/books/free', badges: ['free'] },
+  { id: 'new-launch', title: 'NEW LAUNCH', path: '/books/new-launch', badges: ['new launch'] },
+  {
+    id: 'trending-bestsellers',
+    title: 'TRENDING & BESTSELLERS',
+    path: '/books/trending-bestsellers',
+    badges: ['trending', 'bestseller']
+  },
+  { id: 'special-offers', title: 'SPECIAL OFFERS', path: '/books/special-offers', badges: ['special offer'] }
+];
+const RECENTLY_VIEWED_BOOKS_STORAGE_KEY = 'xamtoppr-recently-viewed-books';
+
 function BookStoreApp() {
   const location = useLocation();
   const navigate = useNavigate();
-  const isMockTestRoute = location.pathname.replace(/\/+$/, '') === '/test-series';
+  const normalizedPathname = location.pathname.replace(/\/+$/, '') || '/';
+  const isHomeRoute = normalizedPathname === '/';
+  const isMockTestRoute = normalizedPathname === '/test-series';
+  const isFullBookListRoute = normalizedPathname === '/books';
+  const badgeCategoryPage = BOOK_BADGE_SECTIONS.find((section) => section.path === normalizedPathname);
   const { currentUser, userProfile, refreshUserProfile, logout } = useAuth();
   const { cartItems, addToCart, clearCart } = useCart();
   const [booksList, setBooksList] = useState([]);
+  const [recentlyViewedBookIds, setRecentlyViewedBookIds] = useState(() => {
+    try {
+      const storedBookIds = JSON.parse(localStorage.getItem(RECENTLY_VIEWED_BOOKS_STORAGE_KEY) || '[]');
+      return Array.isArray(storedBookIds)
+        ? storedBookIds.filter((bookId) => typeof bookId === 'string').slice(0, 8)
+        : [];
+    } catch (error) {
+      console.error('Unable to load recently viewed books.', error);
+      return [];
+    }
+  });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedExam, setSelectedExam] = useState('All Exams');
@@ -303,6 +336,7 @@ function BookStoreApp() {
   const flipBookRef = useRef(null);
   const paymentInProgressRef = useRef(false);
   const flipAudioRef = useRef(null);
+  const recentlyViewedBookIdsRef = useRef(recentlyViewedBookIds);
   const downloadedBooksRef = useRef(new Set());
   const lastViewedBookIdRef = useRef(null);
   const selectedBookAmount = Number(selectedBookForModal?.offerPrice) || 0;
@@ -420,7 +454,7 @@ function BookStoreApp() {
           .map((book) => {
             const offerPrice = Number(book.offerPrice) || 0;
             const isFree = offerPrice === 0;
-            const badge = book.badge || (isFree ? 'Free Sample' : 'Bestseller');
+            const badge = normalizeBookBadge(book.badge) || (isFree ? 'Free' : 'Bestseller');
             const language = book.language === 'Bilingual'
               ? 'Bilingual (Hindi + English)'
               : book.language === 'English' ? 'English Medium' : 'Hindi Medium';
@@ -430,6 +464,7 @@ function BookStoreApp() {
               id: book.bookId || book._id,
               slug: book.slug || book.bookId || book._id,
               title: book.title,
+              catalogBadge: normalizeBookBadge(book.badge),
               author: book.author || 'XamToppr Editorial Team',
               publisher: book.publisher || 'XamToppr Publications',
               exam: Array.isArray(book.exam) && book.exam.length
@@ -716,6 +751,22 @@ function BookStoreApp() {
     }
   };
 
+  const recordRecentlyViewedBook = (book) => {
+    const bookId = book?.sanityId;
+    if (!bookId) return;
+    const nextBookIds = [
+      bookId,
+      ...recentlyViewedBookIdsRef.current.filter((currentId) => currentId !== bookId)
+    ].slice(0, 8);
+    recentlyViewedBookIdsRef.current = nextBookIds;
+    setRecentlyViewedBookIds(nextBookIds);
+    try {
+      localStorage.setItem(RECENTLY_VIEWED_BOOKS_STORAGE_KEY, JSON.stringify(nextBookIds));
+    } catch (error) {
+      console.error('Unable to save recently viewed books.', error);
+    }
+  };
+
   const updateBookMetrics = (book, metrics) => {
     setBooksList((currentBooks) => currentBooks.map((currentBook) => (
       currentBook.sanityId === book.sanityId ? { ...currentBook, ...metrics } : currentBook
@@ -757,6 +808,7 @@ function BookStoreApp() {
   };
 
   const openSampleFlipbook = (book) => {
+    recordRecentlyViewedBook(book);
     void logUserActivity('read_sample_pdf', {
       bookId: book.sanityId,
       bookTitle: book.title
@@ -1162,6 +1214,64 @@ function BookStoreApp() {
     return booksList.filter((book) => book.isFeatured === true);
   }, [booksList]);
 
+  const bookGridColumns = viewportSize.width >= 1024
+    ? 4
+    : viewportSize.width >= 768
+      ? 3
+      : viewportSize.width >= 640
+        ? 2
+        : 1;
+  const visibleBooks = useMemo(() => (
+    isFullBookListRoute ? filteredBooks : filteredBooks.slice(0, bookGridColumns * 2)
+  ), [bookGridColumns, filteredBooks, isFullBookListRoute]);
+  const catalogSections = useMemo(() => {
+    const booksForBadgeSection = (section, books) => books.filter((book) => (
+      section.badges.includes((book.catalogBadge || '').trim().toLowerCase())
+    ));
+
+    if (badgeCategoryPage) {
+      return [{
+        id: badgeCategoryPage.id,
+        title: badgeCategoryPage.title,
+        books: booksForBadgeSection(badgeCategoryPage, booksList)
+      }];
+    }
+
+    if (isHomeRoute) {
+      const bestSellerBooks = [...booksList]
+        .sort((a, b) => b.downloadsCount - a.downloadsCount || b.totalReviews - a.totalReviews)
+        .slice(0, 4);
+      const recentlyViewedBooks = recentlyViewedBookIds
+        .map((bookId) => booksList.find((book) => book.sanityId === bookId))
+        .filter(Boolean)
+        .slice(0, 4);
+
+      return [
+        ...BOOK_BADGE_SECTIONS.map((section) => ({
+          ...section,
+          books: booksForBadgeSection(section, filteredBooks).slice(0, 4)
+        })),
+        { id: 'best-sellers', title: 'Best Sellers & Most Downloaded', books: bestSellerBooks },
+        { id: 'recently-viewed', title: 'Recently Viewed Items', books: recentlyViewedBooks }
+      ];
+    }
+
+    return [{
+      id: 'all-books',
+      title: isFullBookListRoute ? 'All Books & Study Material' : 'Available Books & Study Material',
+      books: visibleBooks
+    }];
+  }, [
+    badgeCategoryPage,
+    booksList,
+    filteredBooks,
+    isFullBookListRoute,
+    isHomeRoute,
+    recentlyViewedBookIds,
+    visibleBooks
+  ]);
+  const catalogBookCount = catalogSections.reduce((total, section) => total + section.books.length, 0);
+
   useEffect(() => {
     setFeaturedBookIndex((index) => featuredBooks.length ? index % featuredBooks.length : 0);
   }, [featuredBooks.length]);
@@ -1548,7 +1658,9 @@ function BookStoreApp() {
                     <div className="relative z-10 order-2 min-w-0 max-w-3xl sm:order-1">
                       <div className="inline-flex max-w-full items-center gap-2 truncate rounded-full border border-amber-300/40 bg-amber-400/15 px-3 py-1.5 text-xs font-black uppercase tracking-wider text-amber-200">
                         <Sparkles className="h-3.5 w-3.5" />
-                        {book.badge === 'New Launch' ? '🔥 HOT LAUNCH' : book.badge.toUpperCase()}
+                        {book.badge === 'New Launch'
+                          ? '🔥 HOT LAUNCH'
+                          : book.badge === 'Free' ? 'Free' : book.badge.toUpperCase()}
                       </div>
                       <h1 className="mt-2 line-clamp-2 max-w-3xl text-2xl font-black leading-tight tracking-tight text-white sm:mt-4 sm:text-4xl lg:text-5xl">
                         {book.title}
@@ -1558,7 +1670,10 @@ function BookStoreApp() {
                       </p>
                       <button
                         type="button"
-                        onClick={() => setSelectedBookForModal(book)}
+                        onClick={() => {
+                          recordRecentlyViewedBook(book);
+                          setSelectedBookForModal(book);
+                        }}
                         className="mt-4 inline-flex items-center gap-2 rounded-full bg-amber-400 px-4 py-2.5 text-xs font-extrabold text-slate-950 shadow-lg transition hover:bg-amber-300 sm:mt-6 sm:px-5 sm:py-3 sm:text-sm"
                       >
                         View Details <ArrowRight className="h-4 w-4" />
@@ -1641,6 +1756,7 @@ function BookStoreApp() {
         </section>
 
         {/* Filter Controls */}
+        {!badgeCategoryPage && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 sm:-mt-8 relative z-20">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200/80 p-4 sm:p-6">
             <div className="relative">
@@ -1902,19 +2018,33 @@ function BookStoreApp() {
             </div>
           </div>
         </section>
+        )}
 
         {/* Books & Notes Grid */}
         <section id="study-notes" className="scroll-mt-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+          {!isHomeRoute && (
           <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
             <div className="flex items-center gap-2">
               <h2 className="text-lg sm:text-xl font-bold text-blue-950">
-                Available Books & Study Material
+                {badgeCategoryPage?.title
+                  || (isFullBookListRoute ? 'All Books & Study Material' : 'Available Books & Study Material')}
               </h2>
               <span className="bg-blue-100 text-blue-900 text-xs font-bold px-2.5 py-0.5 rounded-full">
-                {filteredBooks.length} {filteredBooks.length === 1 ? 'Item' : 'Items'}
+                {catalogBookCount} {catalogBookCount === 1 ? 'Item' : 'Items'}
               </span>
             </div>
+            <button
+              type="button"
+              onClick={() => navigate(badgeCategoryPage || isFullBookListRoute ? '/' : '/books')}
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-bold text-blue-900 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-800"
+            >
+              {badgeCategoryPage || isFullBookListRoute ? 'Back to Home' : 'View All'}
+              {badgeCategoryPage || isFullBookListRoute
+                ? <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                : <ArrowRight className="h-4 w-4" aria-hidden="true" />}
+            </button>
           </div>
+          )}
 
           {bookLoadError ? (
             <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-800">
@@ -1933,7 +2063,7 @@ function BookStoreApp() {
                 </div>
               ))}
             </div>
-          ) : filteredBooks.length === 0 ? (
+          ) : catalogBookCount === 0 ? (
             <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-10 sm:p-14 text-center max-w-2xl mx-auto my-8 shadow-sm">
               <BookMarked className="w-12 h-12 text-amber-500 mx-auto mb-3" />
               <h3 className="text-xl font-bold text-slate-800">No study material found</h3>
@@ -1946,8 +2076,30 @@ function BookStoreApp() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {filteredBooks.map((book) => {
+            <div className="space-y-8">
+              {catalogSections.map((section) => (
+              <section key={section.id} className="space-y-4">
+                {isHomeRoute && (
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h2 className="text-lg sm:text-xl font-bold text-blue-950">{section.title}</h2>
+                    {section.path && (
+                      <Link
+                        to={section.path}
+                        className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-bold text-blue-900 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-800"
+                      >
+                        View All
+                        <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                      </Link>
+                    )}
+                  </div>
+                )}
+                {section.books.length > 0 && (
+                <div className={`grid gap-6 ${
+                  isHomeRoute || badgeCategoryPage
+                    ? 'grid-cols-2 lg:grid-cols-4'
+                    : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4'
+                }`}>
+              {section.books.map((book) => {
                 const isSaved = savedBooks.includes(book.id);
                 const isPaid = !book.isFree;
                 const alreadyPurchased = hasBookAlreadyBeenPurchased(userProfile, book);
@@ -1961,6 +2113,7 @@ function BookStoreApp() {
                     {/* ENLARGED COVER CONTAINER */}
                     <div
                       onClick={() => {
+                        recordRecentlyViewedBook(book);
                         if (isVisualNote) {
                           openSampleFlipbook(book);
                         } else {
@@ -1991,7 +2144,7 @@ function BookStoreApp() {
                       )}
 
                       <div className="absolute top-3 inset-x-3 flex items-start justify-between z-10">
-                        <span className={`${book.badgeColor} text-white font-extrabold text-[10px] uppercase px-2 py-0.5 rounded-md shadow-md`}>
+                        <span className={`${book.badgeColor} text-white font-extrabold text-[10px] ${book.badge === 'Free' ? '' : 'uppercase'} px-2 py-0.5 rounded-md shadow-md`}>
                           {book.badge}
                         </span>
 
@@ -2046,6 +2199,7 @@ function BookStoreApp() {
 
                         <h3
                           onClick={() => {
+                            recordRecentlyViewedBook(book);
                             if (isVisualNote) {
                               openSampleFlipbook(book);
                             } else {
@@ -2093,6 +2247,7 @@ function BookStoreApp() {
                         ) : (
                           <Link
                             to={`/book/${encodeURIComponent(book.slug)}`}
+                            onClick={() => recordRecentlyViewedBook(book)}
                             className="flex-1 bg-blue-950 hover:bg-blue-900 text-white text-xs font-bold py-2.5 px-3 rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm active:scale-98"
                           >
                             <Eye className="w-3.5 h-3.5 text-amber-400" />
@@ -2144,6 +2299,10 @@ function BookStoreApp() {
                   </div>
                 );
               })}
+            </div>
+                )}
+              </section>
+              ))}
             </div>
           )}
         </section>
@@ -3221,7 +3380,7 @@ function BookStoreApp() {
     {/* Top Header Badge & Title (Fixed Header ~90px) */}
     <div className="relative z-10 h-[85px]">
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[10px] font-extrabold tracking-widest uppercase bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full shadow">
+        <span className={`text-[10px] font-extrabold tracking-widest ${book.badge === 'Free' ? '' : 'uppercase'} bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full shadow`}>
           {book.badge || 'Study Notes'}
         </span>
         <span className="text-[10px] font-bold text-slate-300 bg-slate-900/80 px-2.5 py-0.5 rounded-full border border-slate-700">
@@ -3414,7 +3573,7 @@ function BookStoreApp() {
               <div className="p-5 sm:p-6 bg-[#0c2356] text-white flex items-start justify-between relative">
                 <div className="pr-8">
                   <div className="flex items-center gap-2 mb-1.5">
-                    <span className={`${selectedBookForModal.badgeColor || 'bg-amber-400'} text-white text-[10px] font-extrabold uppercase px-2 py-0.5 rounded shadow-sm`}>
+                    <span className={`${selectedBookForModal.badgeColor || 'bg-amber-400'} text-white text-[10px] font-extrabold ${selectedBookForModal.badge === 'Free' ? '' : 'uppercase'} px-2 py-0.5 rounded shadow-sm`}>
                       {selectedBookForModal.badge}
                     </span>
                     <span className="text-xs text-blue-200 font-medium">

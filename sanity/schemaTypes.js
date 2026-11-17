@@ -674,7 +674,7 @@ const book = defineType({
       title: 'Badge',
       type: 'string',
       group: 'details',
-      options: { list: ['Bestseller', 'New Launch', 'Trending', 'Free Sample', 'Special Offer'] }
+      options: { list: ['Bestseller', 'New Launch', 'Trending', 'Free', 'Special Offer'] }
     }),
     defineField({
       name: 'author',
